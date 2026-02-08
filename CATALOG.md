@@ -1,4 +1,4 @@
-<!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
+<!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
 # TARS: A Knowledge Work Assistant
 

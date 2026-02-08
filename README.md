@@ -1,8 +1,8 @@
-<!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
+<!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
 # TARS
 
-Strategic intelligence framework for Claude Code and Claude Cowork. TARS turns Claude into a persistent, context-aware executive assistant that remembers your organization, manages your work, processes meetings, captures knowledge, and helps you think strategically.
+Knowledge work assistant plugin for Claude Code and Claude Cowork. TARS turns Claude into a persistent, context-aware executive assistant that remembers your organization, manages your work, processes meetings, captures knowledge, and helps you think strategically.
 
 Built for leaders, operators, and teams who want AI that adapts to their business, not the other way around. TARS learns your people, your initiatives, your decisions—and stays grounded in your workspace.
 
@@ -171,4 +171,8 @@ The inspiration comes directly from one of my favorite movies, *Interstellar* by
 
 ## License
 
-Apache 2.0. See `LICENSE`.
+PolyForm Noncommercial 1.0.0. See `LICENSE`.
+
+> **Note**: Commercial use requires prior permission. Please contact the author for commercial licensing.
+
+Users must preserve the attribution notices in the `NOTICE` file when distributing this work.
