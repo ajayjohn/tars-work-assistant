@@ -35,3 +35,4 @@ tars-cowork-plugin/
 
 # Trash folder (for cleanup before git commit)
 trash/
+ROADMAP.md
