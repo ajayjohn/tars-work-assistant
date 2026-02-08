@@ -4,7 +4,7 @@
 
 ## Section 1: Executive Summary
 
-**TARS is a knowledge operating system that embeds intelligence into your daily workflows — capturing decisions, surfacing context instantly, and automating strategic rigor.**
+**TARS is a knowledge work assistant that embeds intelligence into your daily workflows — capturing decisions, surfacing context instantly, and automating strategic rigor.**
 
 Most knowledge workers lose hours every week to the same recurring problems: context switching kills productivity (colleagues ask you questions you answered last week), meeting follow-through disappears (action items are captured in 12 different places), and strategic decisions rely on whoever talks loudest in the room instead of rigorous analysis.
 

@@ -1,7 +1,7 @@
 {
   "name": "tars",
   "version": "2.0.0",
-  "description": "Strategic intelligence framework with memory, task management, meeting processing, strategic analysis, and stakeholder communications. Turns Claude into a persistent, context-aware executive assistant.",
+  "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications. Turns Claude into a persistent, context-aware executive assistant.",
   "author": {
     "name": "Ajay John",
     "url": "https://github.com/ajayjohn"
