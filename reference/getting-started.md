@@ -1,6 +1,6 @@
 # Getting started with TARS
 
-Welcome! TARS is your strategic intelligence assistant. It maintains a persistent knowledge base of your people, initiatives, decisions, and organizational context -- so you can focus on leading rather than remembering.
+Welcome! TARS is your knowledge work assistant. It maintains a persistent knowledge base of your people, initiatives, decisions, and organizational context -- so you can focus on leading rather than remembering.
 
 ## First 5 minutes
 

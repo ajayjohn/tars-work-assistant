@@ -12,7 +12,7 @@
 
 ## What TARS is
 
-TARS is a **skill-based strategic intelligence framework** for Claude Code and Claude Cowork. It turns Claude into a persistent, context-aware executive assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications.
+TARS is a **knowledge work assistant plugin** for Claude Code and Claude Cowork. It turns Claude into a persistent, context-aware executive assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications.
 
 Target users: executives, senior ICs, and knowledge workers who need structured thinking support across recurring workflows.
 
