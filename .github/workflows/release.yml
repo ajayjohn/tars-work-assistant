@@ -2,10 +2,12 @@ name: TARS Plugin Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version_override:
-        description: "Version to release (optional, overrides plugin.json)"
-        required: false
+  push:
+    branches:
+      - main
+    paths:
+      - ".claude-plugin/plugin.json"
+      - ".github/workflows/release.yml"
 
 permissions:
   contents: write
