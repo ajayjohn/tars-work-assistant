@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Claude local settings (user-specific, not plugin config)
+.claude/settings.local.json
+
+# Node modules (if any MCP deps are installed locally)
+node_modules/
+
+# Workspace runtime data (created by /welcome, not shipped with plugin)
+memory/people/*.md
+memory/initiatives/*.md
+memory/decisions/*.md
+memory/products/*.md
+memory/vendors/*.md
+memory/competitors/*.md
+memory/organizational-context/*.md
+journal/
+contexts/
+CLAUDE.md
+
+# Keep index templates and empty directory markers
+!memory/_index.md
+!memory/*/_index.md
+
+# Inbox runtime data
+inbox/pending/*
+inbox/processing/*
+inbox/completed/*
+inbox/failed/*
+!inbox/pending/.gitkeep
+!inbox/processing/.gitkeep
+!inbox/completed/.gitkeep
+!inbox/failed/.gitkeep
+
+# Archive runtime data
+archive/*.md
+archive/*/*.md
+!archive/_archive_index.yaml
+
+# Distribution build artifacts (regenerated from source)
+tars-cowork-plugin/

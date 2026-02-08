@@ -1,0 +1,138 @@
+name: TARS Plugin Validation
+
+on:
+  pull_request:
+    paths:
+      - 'skills/**'
+      - 'commands/**'
+      - 'scripts/**'
+      - 'reference/**'
+      - '.claude-plugin/**'
+      - 'tests/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate Plugin Structure
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          # Get files changed in this PR
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+
+          echo "Changed files:"
+          echo "$CHANGED"
+          echo ""
+
+          # Determine which test categories to run
+          RUN_STRUCTURE=false
+          RUN_FRONTMATTER=false
+          RUN_REFERENCES=false
+          RUN_ROUTING=false
+          RUN_TEMPLATES=false
+          RUN_SCRIPTS=false
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              skills/*)
+                RUN_FRONTMATTER=true
+                RUN_REFERENCES=true
+                RUN_ROUTING=true
+                ;;
+              commands/*)
+                RUN_STRUCTURE=true
+                RUN_REFERENCES=true
+                ;;
+              scripts/*)
+                RUN_SCRIPTS=true
+                ;;
+              reference/*)
+                RUN_TEMPLATES=true
+                ;;
+              .claude-plugin/plugin.json)
+                RUN_STRUCTURE=true
+                RUN_REFERENCES=true
+                ;;
+              tests/*)
+                # If tests themselves changed, run all
+                RUN_STRUCTURE=true
+                RUN_FRONTMATTER=true
+                RUN_REFERENCES=true
+                RUN_ROUTING=true
+                RUN_TEMPLATES=true
+                RUN_SCRIPTS=true
+                ;;
+            esac
+          done <<< "$CHANGED"
+
+          echo "run_structure=$RUN_STRUCTURE" >> "$GITHUB_OUTPUT"
+          echo "run_frontmatter=$RUN_FRONTMATTER" >> "$GITHUB_OUTPUT"
+          echo "run_references=$RUN_REFERENCES" >> "$GITHUB_OUTPUT"
+          echo "run_routing=$RUN_ROUTING" >> "$GITHUB_OUTPUT"
+          echo "run_templates=$RUN_TEMPLATES" >> "$GITHUB_OUTPUT"
+          echo "run_scripts=$RUN_SCRIPTS" >> "$GITHUB_OUTPUT"
+
+      - name: Validate structure
+        if: steps.changes.outputs.run_structure == 'true'
+        run: python3 tests/validate-structure.py
+
+      - name: Validate frontmatter
+        if: steps.changes.outputs.run_frontmatter == 'true'
+        run: python3 tests/validate-frontmatter.py
+
+      - name: Validate references
+        if: steps.changes.outputs.run_references == 'true'
+        run: python3 tests/validate-references.py
+
+      - name: Validate routing
+        if: steps.changes.outputs.run_routing == 'true'
+        run: python3 tests/validate-routing.py
+
+      - name: Validate templates
+        if: steps.changes.outputs.run_templates == 'true'
+        run: python3 tests/validate-templates.py
+
+      - name: Validate scripts
+        if: steps.changes.outputs.run_scripts == 'true'
+        run: python3 tests/validate-scripts.py
+
+      - name: Check version bump
+        if: |
+          steps.changes.outputs.run_structure == 'true' ||
+          steps.changes.outputs.run_frontmatter == 'true' ||
+          steps.changes.outputs.run_routing == 'true'
+        run: |
+          # Check that plugin.json version was bumped if skills or commands changed
+          BASE_VERSION=$(git show ${{ github.event.pull_request.base.sha }}:.claude-plugin/plugin.json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('version',''))" 2>/dev/null || echo "")
+          HEAD_VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json')).get('version',''))")
+
+          if [ -n "$BASE_VERSION" ] && [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+            echo "::warning::plugin.json version ($HEAD_VERSION) was not bumped. Consider running: python scripts/bump-version.py patch"
+          else
+            echo "Version: $BASE_VERSION -> $HEAD_VERSION"
+          fi
+
+      - name: Check CHANGELOG updated
+        if: |
+          steps.changes.outputs.run_structure == 'true' ||
+          steps.changes.outputs.run_frontmatter == 'true'
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || echo "")
+          if echo "$CHANGED" | grep -q "CHANGELOG.md"; then
+            echo "CHANGELOG.md was updated"
+          else
+            echo "::warning::CHANGELOG.md was not updated. Consider adding release notes."
+          fi

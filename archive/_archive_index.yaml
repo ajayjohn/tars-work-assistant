@@ -1,0 +1,11 @@
+# Archive index
+# Auto-maintained by scripts/archive.py
+# Each entry records: original path, archive path, date archived, reason
+#
+# Format:
+# - file: archive/YYYY-MM/category/filename.md
+#   original: memory/category/filename.md
+#   date: YYYY-MM-DD
+#   reason: staleness tier exceeded | manual archive | ephemeral expiry
+
+entries: []

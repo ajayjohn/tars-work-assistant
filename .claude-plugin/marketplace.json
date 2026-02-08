@@ -1,0 +1,8 @@
+{
+  "category": "productivity",
+  "tags": ["enterprise", "strategy", "meetings", "knowledge-management"],
+  "source": {
+    "source": "url",
+    "url": "https://github.com/ajayjohn/tars-work-assistant.git"
+  }
+}

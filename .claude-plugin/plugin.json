@@ -1,0 +1,54 @@
+{
+  "name": "tars",
+  "version": "2.0.0",
+  "description": "Strategic intelligence framework with memory, task management, meeting processing, strategic analysis, and stakeholder communications. Turns Claude into a persistent, context-aware executive assistant.",
+  "author": {
+    "name": "Ajay John",
+    "url": "https://github.com/ajayjohn"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/ajayjohn/tars-work-assistant",
+  "homepage": "https://github.com/ajayjohn/tars-work-assistant#readme",
+  "bugs": {
+    "url": "https://github.com/ajayjohn/tars-work-assistant/issues"
+  },
+  "keywords": [
+    "strategy",
+    "meetings",
+    "tasks",
+    "memory",
+    "analysis",
+    "briefings",
+    "knowledge-graph",
+    "executive-assistant",
+    "claude-plugin"
+  ],
+  "contributors": [],
+  "skills": [
+    "skills/core/SKILL.md",
+    "skills/meeting/SKILL.md",
+    "skills/tasks/SKILL.md",
+    "skills/learn/SKILL.md",
+    "skills/think/SKILL.md",
+    "skills/briefing/SKILL.md",
+    "skills/initiative/SKILL.md",
+    "skills/maintain/SKILL.md",
+    "skills/welcome/SKILL.md",
+    "skills/communicate/SKILL.md",
+    "skills/create/SKILL.md",
+    "skills/answer/SKILL.md"
+  ],
+  "commands": [
+    "commands/welcome.md",
+    "commands/meeting.md",
+    "commands/briefing.md",
+    "commands/tasks.md",
+    "commands/learn.md",
+    "commands/think.md",
+    "commands/initiative.md",
+    "commands/maintain.md",
+    "commands/communicate.md",
+    "commands/create.md",
+    "commands/answer.md"
+  ]
+}

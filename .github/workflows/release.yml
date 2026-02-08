@@ -1,0 +1,197 @@
+name: TARS Plugin Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.claude-plugin/plugin.json'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Release Plugin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run full test suite
+        run: |
+          chmod +x tests/run-all.sh
+          ./tests/run-all.sh --full
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Plugin version: $VERSION"
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG already exists — skipping release"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG does not exist — proceeding with release"
+          fi
+
+      - name: Auto-update documentation
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Generate skill inventory from plugin.json + frontmatter
+          python3 -c "
+          import json, os, re
+
+          root = '.'
+          with open('.claude-plugin/plugin.json') as f:
+              manifest = json.load(f)
+
+          # Build skill table
+          skills = []
+          for skill_path in manifest.get('skills', []):
+              full = os.path.join(root, skill_path)
+              if not os.path.isfile(full):
+                  continue
+              with open(full) as sf:
+                  content = sf.read()
+              fm = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+              if not fm:
+                  continue
+              name = desc = invocable = ''
+              for line in fm.group(1).split('\n'):
+                  line = line.strip()
+                  if line.startswith('name:'):
+                      name = line.split(':', 1)[1].strip()
+                  elif line.startswith('description:'):
+                      desc = line.split(':', 1)[1].strip()
+                  elif line.startswith('user-invocable:'):
+                      invocable = line.split(':', 1)[1].strip()
+              skills.append({'name': name, 'desc': desc, 'invocable': invocable})
+
+          # Build command table
+          commands = []
+          for cmd_path in manifest.get('commands', []):
+              full = os.path.join(root, cmd_path)
+              if not os.path.isfile(full):
+                  continue
+              with open(full) as cf:
+                  content = cf.read()
+              fm = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+              if not fm:
+                  continue
+              desc = ''
+              for line in fm.group(1).split('\n'):
+                  line = line.strip()
+                  if line.startswith('description:'):
+                      desc = line.split(':', 1)[1].strip()
+              cmd_name = os.path.basename(cmd_path).replace('.md', '')
+              commands.append({'name': cmd_name, 'desc': desc})
+
+          # Output inventory
+          print(f'Skills: {len(skills)}')
+          for s in skills:
+              marker = '(bg)' if s['invocable'] == 'false' else ''
+              print(f\"  - {s['name']} {marker}: {s['desc']}\")
+          print(f'Commands: {len(commands)}')
+          for c in commands:
+              print(f\"  - /{c['name']}: {c['desc']}\")
+          "
+
+          echo "Documentation auto-update complete for v${VERSION}"
+
+      - name: Build plugin archive
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE="tars-v${VERSION}.zip"
+
+          # Create archive excluding dev files
+          zip -r "$ARCHIVE" \
+            .claude-plugin/ \
+            .mcp.json \
+            skills/ \
+            commands/ \
+            scripts/ \
+            reference/ \
+            ARCHITECTURE.md \
+            CHANGELOG.md \
+            README.md \
+            LICENSE \
+            NOTICE \
+            -x "tests/*" \
+            -x ".github/*" \
+            -x "tars-cowork-plugin/*" \
+            -x "memory/*" \
+            -x "journal/*" \
+            -x "inbox/*" \
+            -x "archive/*" \
+            -x "*.pyc" \
+            -x "__pycache__/*" \
+            -x "ROADMAP.md"
+
+          echo "archive=$ARCHIVE" >> "$GITHUB_ENV"
+          echo "Built archive: $ARCHIVE"
+
+      - name: Extract changelog for release
+        if: steps.tag_check.outputs.exists == 'false'
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract the changelog section for this version
+          python3 -c "
+          import re, sys
+
+          with open('CHANGELOG.md') as f:
+              content = f.read()
+
+          # Find section for this version
+          pattern = rf'## v?{re.escape(\"$VERSION\")}.*?\n(.*?)(?=\n## |\Z)'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              notes = match.group(1).strip()
+              # Limit to 5000 chars for GitHub release
+              if len(notes) > 5000:
+                  notes = notes[:4997] + '...'
+              print(notes)
+          else:
+              print(f'Release v{\"$VERSION\"}')
+          " > /tmp/release_notes.md
+
+          echo "Release notes extracted"
+
+      - name: Create git tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub release
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: TARS ${{ steps.version.outputs.tag }}
+          body_path: /tmp/release_notes.md
+          files: ${{ env.archive }}
+          draft: false
+          prerelease: false

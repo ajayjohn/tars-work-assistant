@@ -1,0 +1,11 @@
+# Housekeeping state tracker
+# Checked by core skill at session start.
+# If last_run != today, triggers automatic housekeeping.
+# Updated by scripts/health-check.py and maintain skill.
+
+last_run: null
+last_success: false
+run_count: 0
+last_archival: null
+last_index_rebuild: null
+pending_inbox_count: 0
