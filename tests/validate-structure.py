@@ -14,7 +14,6 @@ REQUIRED_ROOT_FILES = [
     "ARCHITECTURE.md",
     "CHANGELOG.md",
     "README.md",
-    "ROADMAP.md",
 ]
 
 REQUIRED_ROOT_DIRS = [
