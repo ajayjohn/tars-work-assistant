@@ -125,32 +125,47 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           ARCHIVE="tars-v${VERSION}.zip"
 
-          # Create archive excluding dev files
-          zip -r "$ARCHIVE" \
-            .claude-plugin/ \
-            .mcp.json \
-            skills/ \
-            commands/ \
-            scripts/ \
-            reference/ \
-            ARCHITECTURE.md \
-            CHANGELOG.md \
-            README.md \
-            LICENSE \
-            NOTICE \
-            -x "tests/*" \
-            -x ".github/*" \
-            -x "tars-cowork-plugin/*" \
-            -x "memory/*" \
-            -x "journal/*" \
-            -x "inbox/*" \
-            -x "archive/*" \
-            -x "*.pyc" \
-            -x "__pycache__/*" \
-            -x "ROADMAP.md"
+          # Create temporary build directory
+          mkdir -p build-temp/.claude-plugin
+
+          # Copy plugin files
+          cp -r skills commands scripts reference build-temp/
+          cp .mcp.json LICENSE NOTICE build-temp/
+
+          # Create minimal plugin.json for Cowork (auto-discovers skills/commands)
+          python3 << 'PYTHON_SCRIPT'
+          import json
+
+          # Read source plugin.json
+          with open('.claude-plugin/plugin.json', 'r') as f:
+              source = json.load(f)
+
+          # Create minimal version (Cowork auto-discovers skills/commands from directory structure)
+          minimal = {
+              "name": source["name"],
+              "version": source["version"],
+              "description": source["description"],
+              "author": source["author"],
+              "license": source["license"]
+          }
+
+          # Write minimal version
+          with open('build-temp/.claude-plugin/plugin.json', 'w') as f:
+              json.dump(minimal, f, indent=2)
+
+          print(f"✓ Created minimal plugin.json for Cowork distribution (v{minimal['version']})")
+          PYTHON_SCRIPT
+
+          # Create archive from build directory
+          cd build-temp
+          zip -r "../$ARCHIVE" . -x "*.pyc" -x "__pycache__/*"
+          cd ..
+
+          # Cleanup
+          rm -rf build-temp
 
           echo "archive=$ARCHIVE" >> "$GITHUB_ENV"
-          echo "Built archive: $ARCHIVE"
+          echo "Built Cowork-compatible archive: $ARCHIVE"
 
       - name: Extract changelog for release
         if: steps.tag_check.outputs.exists == 'false'
@@ -199,5 +214,3 @@ jobs:
           files: ${{ env.archive }}
           draft: false
           prerelease: false
-
-# Trigger release workflow retry
