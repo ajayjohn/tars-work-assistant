@@ -1,6 +1,6 @@
 <!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
 
-# TARS: The Leadership Adoption Guide
+# TARS: A Knowledge Work Assistant
 
 ## Section 1: Executive Summary
 

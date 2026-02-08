@@ -163,6 +163,12 @@ TARS answers from inline help metadata. For deeper reference material, see `refe
 
 ---
 
+## Origin: Why the Name TARS?
+
+The inspiration comes directly from one of my favorite movies, *Interstellar* by Christopher Nolan. TARS is a robot from the movie that plays a crucial role in the storyline. I named this assistant TARS because ultimately, I want it to be a partner that is robust, reliable and brings a distinct perspective to your work, just like TARS did in the movie.
+
+---
+
 ## License
 
 Apache 2.0. See `LICENSE`.
