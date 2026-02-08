@@ -8,6 +8,22 @@ Built for leaders, operators, and teams who want AI that adapts to their busines
 
 ## Installation
 
+### Option 1: Install from Marketplace (Recommended)
+
+Subscribe to automatic updates:
+
+1. Open **Cowork → Settings → Marketplaces**
+2. Click **"Add Marketplace"**
+3. Enter URL: `https://github.com/ajayjohn/tars-work-assistant`
+4. The TARS plugin will appear in your plugin list
+5. Click **Install** and run `/welcome` to set up
+
+**Benefits**: Automatic updates when new versions are released.
+
+### Option 2: Manual Installation
+
+For Claude Code or one-time installation:
+
 ```bash
 claude plugin install ./tars
 ```

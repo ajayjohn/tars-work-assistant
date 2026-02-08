@@ -1,0 +1,36 @@
+{
+  "name": "TARS Marketplace",
+  "description": "Official marketplace for TARS - Task-Aware Research & Strategy assistant and related productivity plugins",
+  "author": {
+    "name": "Ajay John",
+    "url": "https://github.com/ajayjohn"
+  },
+  "plugins": [
+    {
+      "name": "tars",
+      "displayName": "TARS",
+      "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications. Turns Claude into a persistent, context-aware executive assistant.",
+      "version": "2.0.0",
+      "author": {
+        "name": "Ajay John",
+        "url": "https://github.com/ajayjohn"
+      },
+      "category": "productivity",
+      "tags": [
+        "enterprise",
+        "strategy",
+        "meetings",
+        "knowledge-management",
+        "executive-assistant"
+      ],
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ajayjohn/tars-work-assistant.git",
+        "path": "/"
+      },
+      "homepage": "https://github.com/ajayjohn/tars-work-assistant#readme",
+      "repository": "https://github.com/ajayjohn/tars-work-assistant",
+      "license": "Apache-2.0"
+    }
+  ]
+}
