@@ -21,9 +21,8 @@ rsync -av --delete "$REPO_ROOT/skills/" "$PLUGIN_DIR/skills/"
 rsync -av --delete "$REPO_ROOT/commands/" "$PLUGIN_DIR/commands/"
 rsync -av --delete "$REPO_ROOT/reference/" "$PLUGIN_DIR/reference/"
 cp "$REPO_ROOT/.mcp.json" "$PLUGIN_DIR/.mcp.json"
-cp "$REPO_ROOT/marketplace.json" "$PLUGIN_DIR/marketplace.json"
 
-echo "✓ Files synced"
+echo "✓ Files synced (marketplace.json stays at root only)"
 
 # Step 3: Re-validate
 echo "Step 3: Re-validating..."
