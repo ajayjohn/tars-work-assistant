@@ -4,7 +4,7 @@
   "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications",
   "owner": {
     "name": "Ajay John",
-    
+    "email": example@aja
   },
   "plugins": [
     {
