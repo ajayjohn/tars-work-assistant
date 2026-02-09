@@ -1,6 +1,7 @@
 ---
 name: create
 description: Generate presentation-grade decks, narratives, and speeches with audience adaptation
+user-invocable: true
 ---
 
 # Artifact generation protocol

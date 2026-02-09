@@ -1,6 +1,7 @@
 ---
 name: think
 description: Strategic analysis, adversarial validation, executive council debate, and discovery mode for complex decisions
+user-invocable: true
 ---
 
 # Think: Multi-mode strategic analysis protocol

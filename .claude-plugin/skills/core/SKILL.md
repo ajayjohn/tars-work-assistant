@@ -1,6 +1,7 @@
 ---
 name: core
 description: Identity, routing, communication style, memory protocol, task protocol, decision frameworks, and clarification for TARS
+user-invocable: false
 ---
 
 # Core framework

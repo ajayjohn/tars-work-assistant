@@ -1,6 +1,7 @@
 ---
 name: welcome
 description: Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering
+user-invocable: true
 ---
 
 # Welcome to TARS

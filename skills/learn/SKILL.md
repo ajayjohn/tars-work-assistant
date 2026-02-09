@@ -1,6 +1,7 @@
 ---
 name: learn
 description: Extract durable memory from conversations or wisdom from learning content with strict durability test
+user-invocable: true
 ---
 
 # Learn: Memory and Wisdom extraction protocol

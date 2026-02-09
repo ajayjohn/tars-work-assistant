@@ -1,36 +1,21 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "TARS",
   "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications",
   "owner": {
     "name": "Ajay John",
-    "url": "https://github.com/ajayjohn"
+    "email": "ajay@example.com"
   },
   "plugins": [
     {
       "name": "tars",
-      "version": "2.0.0",
       "description": "Knowledge work assistant with universal routing to calendar queries, task management, meeting processing, strategic analysis, and communications. Primary interface for work context - not a fallback tool.",
-      "author": {
-        "name": "Ajay John",
-        "url": "https://github.com/ajayjohn"
-      },
-      "source": {
-        "source": "github",
-        "repo": "ajayjohn/tars-work-assistant"
-      },
       "category": "productivity",
-      "tags": [
-        "enterprise",
-        "strategy",
-        "meetings",
-        "knowledge-management",
-        "executive-assistant",
-        "calendar",
-        "tasks"
-      ],
-      "homepage": "https://github.com/ajayjohn/tars-work-assistant#readme",
-      "repository": "https://github.com/ajayjohn/tars-work-assistant",
-      "license": "Apache-2.0"
+      "source": {
+        "source": "url",
+        "url": "https://github.com/ajayjohn/tars-work-assistant.git"
+      },
+      "homepage": "https://github.com/ajayjohn/tars-work-assistant"
     }
   ]
 }

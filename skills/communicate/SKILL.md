@@ -1,6 +1,7 @@
 ---
 name: communicate
 description: Draft and refine stakeholder communications with empathy audit, RASCI enforcement, and tone adaptation
+user-invocable: true
 ---
 
 # Stakeholder communications protocol

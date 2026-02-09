@@ -1,6 +1,7 @@
 ---
 name: initiative
 description: Initiative planning, status reporting, and KPI-based performance reports with trend analysis
+user-invocable: true
 ---
 
 # Initiative skill: planning, status, and performance

@@ -1,6 +1,7 @@
 ---
 name: maintain
 description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, and archival
+user-invocable: true
 ---
 
 # Maintain skill: health, sync, rebuild, and inbox
