@@ -1,0 +1,28 @@
+# TARS maturity tracker
+# Tracks progressive onboarding milestones.
+# Updated automatically by skills as workspace grows.
+# Daily briefing includes one-line status:
+#   "TARS maturity: Level [N] ([X] people, [Y] meetings). Next: [milestone]"
+
+level: 1
+
+stats:
+  people: 0
+  meetings_processed: 0
+  decisions: 0
+  initiatives: 0
+  transcripts_fed: 0
+
+milestones:
+  level_1:
+    criteria: "Setup complete"
+    achieved: null
+  level_2:
+    criteria: "10+ people, 5+ meetings processed"
+    achieved: null
+  level_3:
+    criteria: "20+ people, 15+ meetings, 3+ initiatives"
+    achieved: null
+  level_4:
+    criteria: "30+ people, 30+ meetings, active archival"
+    achieved: null

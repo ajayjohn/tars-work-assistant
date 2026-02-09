@@ -30,6 +30,17 @@ claude plugin install ./tars
 
 Then run `/welcome` in your workspace for the progressive onboarding wizard.
 
+## Getting Started
+
+New to TARS? Read the [**Getting Started Guide**](GETTING-STARTED.md) for:
+- 5-minute quickstart
+- Your first workflows
+- Building habits that compound value
+- Maturity progression (beginner → expert)
+- Common questions answered
+
+**TLDR**: Run `/welcome`, then try "Daily briefing" to see TARS in action.
+
 ## What TARS does
 
 **Memory system**: Persistent knowledge graph of people, initiatives, decisions, products, vendors, and competitors. Wikilink-connected with durability-tested entries. Provider-agnostic integrations sync with your tools.

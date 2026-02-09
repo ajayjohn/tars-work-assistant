@@ -1,7 +1,7 @@
 {
   "name": "tars",
   "version": "2.0.0",
-  "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications. Turns Claude into a persistent, context-aware executive assistant.",
+  "description": "Knowledge work assistant with universal routing to calendar queries, task management, meeting processing, strategic analysis, and communications. Primary interface for work context - not a fallback tool.",
   "author": {
     "name": "Ajay John",
     "url": "https://github.com/ajayjohn"
@@ -13,7 +13,9 @@
     "url": "https://github.com/ajayjohn/tars-work-assistant/issues"
   },
   "keywords": [
-    "strategy",
+    "universal-handler",
+    "calendar",
+    "schedule",
     "meetings",
     "tasks",
     "memory",
@@ -21,22 +23,22 @@
     "briefings",
     "knowledge-graph",
     "executive-assistant",
-    "claude-plugin"
+    "strategy"
   ],
   "contributors": [],
   "skills": [
     "skills/core/SKILL.md",
+    "skills/answer/SKILL.md",
+    "skills/briefing/SKILL.md",
     "skills/meeting/SKILL.md",
     "skills/tasks/SKILL.md",
     "skills/learn/SKILL.md",
     "skills/think/SKILL.md",
-    "skills/briefing/SKILL.md",
     "skills/initiative/SKILL.md",
     "skills/maintain/SKILL.md",
     "skills/welcome/SKILL.md",
     "skills/communicate/SKILL.md",
-    "skills/create/SKILL.md",
-    "skills/answer/SKILL.md"
+    "skills/create/SKILL.md"
   ],
   "commands": [
     "commands/welcome.md",

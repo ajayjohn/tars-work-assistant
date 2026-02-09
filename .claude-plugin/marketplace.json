@@ -1,8 +1,33 @@
 {
-  "category": "productivity",
-  "tags": ["enterprise", "strategy", "meetings", "knowledge-management"],
-  "source": {
-    "source": "url",
-    "url": "https://github.com/ajayjohn/tars-work-assistant.git"
-  }
+  "name": "TARS",
+  "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications",
+  "owner": {
+    "name": "Ajay John",
+    "url": "https://github.com/ajayjohn"
+  },
+  "plugins": [
+    {
+      "name": "tars",
+      "version": "2.0.0",
+      "description": "Knowledge work assistant with universal routing to calendar queries, task management, meeting processing, strategic analysis, and communications. Primary interface for work context - not a fallback tool.",
+      "author": {
+        "name": "Ajay John",
+        "url": "https://github.com/ajayjohn"
+      },
+      "source": "https://github.com/ajayjohn/tars-work-assistant.git",
+      "category": "productivity",
+      "tags": [
+        "enterprise",
+        "strategy",
+        "meetings",
+        "knowledge-management",
+        "executive-assistant",
+        "calendar",
+        "tasks"
+      ],
+      "homepage": "https://github.com/ajayjohn/tars-work-assistant#readme",
+      "repository": "https://github.com/ajayjohn/tars-work-assistant",
+      "license": "Apache-2.0"
+    }
+  ]
 }

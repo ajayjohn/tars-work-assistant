@@ -1,0 +1,68 @@
+# Sensitive data guardrails
+# Patterns used by scripts/scan-secrets.py to detect secrets, credentials, and PII
+# before persisting content to memory or sharing externally.
+#
+# Actions:
+#   block  - Content MUST NOT be persisted. Redact or skip.
+#   warn   - Flag for user review before persisting.
+#
+# Allowed data (never flagged):
+#   - Individual names, client company names
+#   - Deal values, contract dates
+#   - Locations, meeting content
+#   - Business context and strategy notes
+
+sensitive_data_patterns:
+  - type: ssn
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    label: Social Security Number
+    action: block
+
+  - type: api_key
+    pattern: '(?i)(api[_-]?key|apikey)\s*[:=]\s*\S+'
+    label: API Key
+    action: block
+
+  - type: password
+    pattern: '(?i)(password|passwd|pwd)\s*[:=]\s*\S+'
+    label: Password
+    action: block
+
+  - type: bearer_token
+    pattern: '(?i)bearer\s+[A-Za-z0-9\-._~+/]+=*'
+    label: Bearer Token
+    action: block
+
+  - type: client_secret
+    pattern: '(?i)(client[_-]?secret|secret[_-]?key)\s*[:=]\s*\S+'
+    label: Client Secret
+    action: block
+
+  - type: jwt
+    pattern: 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'
+    label: JWT Token
+    action: block
+
+  - type: dob
+    pattern: '(?i)(date\s*of\s*birth|dob|born\s*on)\s*[:=]?\s*\d'
+    label: Date of Birth
+    action: warn
+
+  - type: private_key
+    pattern: '-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'
+    label: Private Key
+    action: block
+
+  - type: connection_string
+    pattern: '(?i)(mongodb|postgres|mysql|redis)://\S+:\S+@'
+    label: Database Connection String
+    action: block
+
+allowed_data:
+  - individual_names
+  - client_company_names
+  - deal_values_and_terms
+  - contract_dates
+  - locations
+  - meeting_content
+  - business_context

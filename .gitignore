@@ -20,6 +20,7 @@ Thumbs.db
 node_modules/
 
 # Workspace runtime data (created by scaffold on first run)
+data/
 memory/
 journal/
 inbox/
@@ -33,6 +34,11 @@ CLAUDE.md
 # Distribution build artifacts (regenerated from source)
 tars-cowork-plugin/
 
+# Antigravity compatibility layer
+antigravity-wrapper/
+
 # Trash folder (for cleanup before git commit)
 trash/
 ROADMAP.md
+IMPLEMENTATION_PLAN.md
+COWORK_PLUGIN_ANALYSIS.md

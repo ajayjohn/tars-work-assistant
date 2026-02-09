@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    }
+  },
+  "_instructions": {
+    "calendar": "Add your calendar MCP server configuration here. See reference/integrations.md for examples.",
+    "reminders": "Add your reminders/tasks MCP server configuration here. See reference/integrations.md for examples.",
+    "optional": "Project tracker (Jira/Linear/GitHub), documentation (Confluence/Notion), and other MCP servers can be added as needed.",
+    "setup": "Run /welcome to configure integrations with guided setup."
+  }
+}
