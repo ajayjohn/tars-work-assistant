@@ -3,7 +3,8 @@
   "name": "TARS",
   "description": "Knowledge work assistant with memory, task management, meeting processing, strategic analysis, and stakeholder communications",
   "owner": {
-    "name": "Ajay John"
+    "name": "Ajay John",
+    
   },
   "plugins": [
     {

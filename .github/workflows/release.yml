@@ -65,27 +65,27 @@ jobs:
           with open('.claude-plugin/plugin.json', 'r') as f:
               source = json.load(f)
 
-          with open('marketplace.json', 'r') as f:
+          with open('.claude-plugin/marketplace.json', 'r') as f:
               marketplace = json.load(f)
 
           # Update TARS plugin entry in marketplace
           for plugin in marketplace.get('plugins', []):
               if plugin['name'] == 'tars':
                   plugin['version'] = source['version']
-                  plugin['description'] = source['description']
+                  plugin['description'] = source.get('description', plugin.get('description', ''))
                   break
 
-          with open('marketplace.json', 'w') as f:
+          with open('.claude-plugin/marketplace.json', 'w') as f:
               json.dump(marketplace, f, indent=2)
 
-          print(f"✓ Synced marketplace.json to v{source['version']}")
+          print(f"✓ Synced .claude-plugin/marketplace.json to v{source['version']}")
           PYTHON_SCRIPT
 
           # Commit marketplace.json if changed
-          if ! git diff --quiet marketplace.json; then
+          if ! git diff --quiet .claude-plugin/marketplace.json; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add marketplace.json
+            git add .claude-plugin/marketplace.json
             git commit -m "chore: sync marketplace.json to v${VERSION}"
             git push origin main
           fi
@@ -181,9 +181,9 @@ jobs:
           minimal = {
               "name": source["name"],
               "version": source["version"],
-              "description": source["description"],
-              "author": source["author"],
-              "license": source["license"]
+              "description": source.get("description", ""),
+              "author": source.get("author", {"name": "Ajay John"}),
+              "license": source.get("license", "Apache-2.0")
           }
 
           # Write minimal version
