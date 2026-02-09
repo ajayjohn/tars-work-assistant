@@ -28,9 +28,9 @@ with open('.claude-plugin/plugin.json', 'r') as f:
 minimal = {
     "name": source["name"],
     "version": source["version"],
-    "description": source.get("description", ""),
-    "author": source.get("author", {"name": "Ajay John"}),
-    "license": source.get("license", "Apache-2.0")
+    "description": source["description"],
+    "author": source["author"],
+    "license": source["license"]
 }
 
 # Write minimal version for distribution
@@ -38,17 +38,17 @@ with open('tars-cowork-plugin/.claude-plugin/plugin.json', 'w') as f:
     json.dump(minimal, f, indent=2)
 
 # Sync version to marketplace.json
-with open('.claude-plugin/marketplace.json', 'r') as f:
+with open('marketplace.json', 'r') as f:
     marketplace = json.load(f)
 
 # Update the TARS plugin version in marketplace
 for plugin in marketplace.get('plugins', []):
     if plugin['name'] == 'tars':
         plugin['version'] = source['version']
-        plugin['description'] = source.get('description', plugin.get('description', ''))
+        plugin['description'] = source['description']
         break
 
-with open('.claude-plugin/marketplace.json', 'w') as f:
+with open('marketplace.json', 'w') as f:
     json.dump(marketplace, f, indent=2)
 
 print(f"✓ Created minimal plugin.json (v{minimal['version']})")
