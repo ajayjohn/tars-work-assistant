@@ -26,6 +26,7 @@ REQUIRED_ROOT_DIRS = [
 
 REQUIRED_PLUGIN_JSON_FIELDS = [
     "name",
+    "version",
     "description",
     "author",
 ]

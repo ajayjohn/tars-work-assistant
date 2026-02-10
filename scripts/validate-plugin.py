@@ -21,7 +21,7 @@ def validate_plugin(plugin_dir: Path):
         plugin = json.load(f)
 
     # Validate required fields
-    required = ["name", "description", "author"]
+    required = ["name", "version", "description", "author"]
     for field in required:
         if field not in plugin:
             errors.append(f"Missing required field: {field}")
