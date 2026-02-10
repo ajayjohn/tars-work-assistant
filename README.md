@@ -33,11 +33,11 @@ Then run `/welcome` in your workspace for the progressive onboarding wizard.
 ## Getting Started
 
 New to TARS? Read the [**Getting Started Guide**](GETTING-STARTED.md) for:
-- 5-minute quickstart
-- Your first workflows
-- Building habits that compound value
-- Maturity progression (beginner → expert)
-- Common questions answered
+- Quick Start (5 minutes) — workspace setup and installation
+- Your First Workflows — the TARS Inbox and batch processing
+- Building Habits — daily briefing, meeting processing, and memory updates
+- Essential Skills — strategic analysis, communication drafting, decision support
+- Common Questions — commands, calendar setup, backups, and team usage
 
 **TLDR**: Run `/welcome`, then try "Daily briefing" to see TARS in action.
 
@@ -70,9 +70,9 @@ You don't need to memorize commands. Tell TARS what you need in plain language:
 - "Here's a meeting transcript, process it" → Meeting skill (full pipeline)
 - "What's on my plate today?" → Daily briefing
 - "Poke holes in this plan" → Stress-test mode (Think skill)
-- "Remember that Sarah reports to Mike" → Learn skill (memory mode)
+- "Remember that Murph reports to Brand" → Learn skill (memory mode)
 - "Draft an email to the VP about the Q3 delay" → Communicate skill
-- "What do I know about Project Atlas?" → Answer skill (fast lookup)
+- "What do I know about Project Lazarus?" → Answer skill (fast lookup)
 
 TARS routes your request to the right skill and runs it end-to-end.
 
