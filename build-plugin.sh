@@ -34,10 +34,6 @@ minimal = {
     "license": source["license"]
 }
 
-# Include displayName if present in source
-if "displayName" in source:
-    minimal["displayName"] = source["displayName"]
-
 # Write minimal version for distribution
 with open('tars-cowork-plugin/.claude-plugin/plugin.json', 'w') as f:
     json.dump(minimal, f, indent=2)

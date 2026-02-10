@@ -186,10 +186,6 @@ jobs:
               "license": source["license"]
           }
 
-          # Include displayName if present in source
-          if "displayName" in source:
-              minimal["displayName"] = source["displayName"]
-
           # Write minimal version
           with open('build-temp/.claude-plugin/plugin.json', 'w') as f:
               json.dump(minimal, f, indent=2)
