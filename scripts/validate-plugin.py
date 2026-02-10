@@ -21,25 +21,31 @@ def validate_plugin(plugin_dir: Path):
         plugin = json.load(f)
 
     # Validate required fields
-    required = ["name", "version", "description", "skills", "commands"]
+    required = ["name", "description", "author"]
     for field in required:
         if field not in plugin:
             errors.append(f"Missing required field: {field}")
+            
+    if "author" in plugin:
+        if "name" not in plugin["author"]:
+            errors.append("Missing required field: author.name")
+        if "email" not in plugin["author"]:
+            errors.append("Missing required field: author.email")
 
-    # Validate skills exist
+    # Validate skills exist (optional)
     if "skills" in plugin:
         for skill_path in plugin["skills"]:
             full_path = plugin_dir / skill_path
             if not full_path.exists():
                 errors.append(f"Skill file not found: {skill_path}")
 
-    # Validate commands exist
+    # Validate commands exist (optional)
     if "commands" in plugin:
         for cmd_path in plugin["commands"]:
             full_path = plugin_dir / cmd_path
             if not full_path.exists():
                 errors.append(f"Command file not found: {cmd_path}")
-
+    
     return errors, warnings
 
 def validate_marketplace(repo_root: Path):

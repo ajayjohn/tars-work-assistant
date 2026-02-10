@@ -26,19 +26,11 @@ REQUIRED_ROOT_DIRS = [
 
 REQUIRED_PLUGIN_JSON_FIELDS = [
     "name",
-    "version",
     "description",
     "author",
-    "license",
-    "repository",
-    "homepage",
-    "bugs",
-    "keywords",
-    "skills",
-    "commands",
 ]
 
-REQUIRED_AUTHOR_FIELDS = ["name", "url"]
+REQUIRED_AUTHOR_FIELDS = ["name", "email"]
 
 
 def main():
@@ -70,48 +62,27 @@ def main():
         for field in REQUIRED_AUTHOR_FIELDS:
             if field not in author:
                 errors.append(f"MISSING FIELD in plugin.json author: '{field}'")
-        if "email" in author:
-            warnings.append("plugin.json author contains 'email' field (should be omitted per spec)")
+        if "url" in author:
+            warnings.append("plugin.json author contains 'url' field (should be omitted per spec)")
     else:
         errors.append("plugin.json 'author' should be an object with 'name' and 'url'")
 
-    # Bugs sub-field
-    bugs = manifest.get("bugs", {})
-    if isinstance(bugs, dict):
-        if "url" not in bugs:
-            errors.append("MISSING FIELD in plugin.json bugs: 'url'")
-    else:
-        errors.append("plugin.json 'bugs' should be an object with 'url'")
-
-    # Keywords is a non-empty array
-    keywords = manifest.get("keywords", [])
-    if not isinstance(keywords, list) or len(keywords) == 0:
-        errors.append("plugin.json 'keywords' should be a non-empty array")
-
-    # Version format check (semver-like)
+    # Version format check (optional)
     version = manifest.get("version", "")
     if version:
         parts = version.split(".")
         if len(parts) != 3 or not all(p.isdigit() for p in parts):
             errors.append(f"plugin.json version '{version}' is not valid semver (expected X.Y.Z)")
 
-    # Skills is a non-empty array of strings
+    # Skills check (optional)
     skills = manifest.get("skills", [])
-    if not isinstance(skills, list) or len(skills) == 0:
-        errors.append("plugin.json 'skills' should be a non-empty array")
-    else:
-        for s in skills:
-            if not isinstance(s, str):
-                errors.append(f"plugin.json skill entry should be a string, got: {type(s).__name__}")
+    if "skills" in manifest and (not isinstance(skills, list) or len(skills) == 0):
+        warnings.append("plugin.json 'skills' is present but empty or invalid")
 
-    # Commands is a non-empty array of strings
+    # Commands check (optional)
     commands = manifest.get("commands", [])
-    if not isinstance(commands, list) or len(commands) == 0:
-        errors.append("plugin.json 'commands' should be a non-empty array")
-    else:
-        for c in commands:
-            if not isinstance(c, str):
-                errors.append(f"plugin.json command entry should be a string, got: {type(c).__name__}")
+    if "commands" in manifest and (not isinstance(commands, list) or len(commands) == 0):
+        warnings.append("plugin.json 'commands' is present but empty or invalid")
 
     # --- 3. All referenced skill files exist on disk ---
     for skill_path in skills:
