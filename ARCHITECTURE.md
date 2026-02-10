@@ -1,10 +1,10 @@
 <!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
 
-# TARS v2.0.0 Architecture
+# TARS 2.0.1 Architecture
 
-> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS v2.0.0 framework without re-analyzing every file.
+> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS 2.0.1 framework without re-analyzing every file.
 
-**Version**: 2.0.0
+**Version**: 2.0.1
 **Release**: 2026-02-08
 **Architecture**: Native Claude plugin with consolidated skills, provider-agnostic integrations, and scripted operations
 
@@ -16,7 +16,7 @@ TARS is a **knowledge work assistant plugin** for Claude Code and Claude Cowork.
 
 Target users: executives, senior ICs, and knowledge workers who need structured thinking support across recurring workflows.
 
-**v2.0.0 key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~60 (from ~115 in v1.5.0). Deterministic operations extracted to 9 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
+**2.0.1 key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~60 (from ~115 in v1.5.0). Deterministic operations extracted to 9 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
 
 ---
 
@@ -27,7 +27,7 @@ Target users: executives, senior ICs, and knowledge workers who need structured 
 ```
 tars/
 ├── .claude-plugin/
-│   ├── plugin.json                      # v2.0.0 manifest (12 skills, 11 commands)
+│   ├── plugin.json                      # 2.0.1 manifest (12 skills, 11 commands)
 │   └── marketplace.json                 # Marketplace catalog entry
 ├── .mcp.json                            # Filesystem MCP server configured
 ├── skills/
@@ -180,7 +180,7 @@ This architecture provides dramatic token savings while maintaining full feature
 
 **Session baseline comparison**:
 - v1.5.0: ~115 tokens (metadata from 28 skills)
-- v2.0.0: ~60 tokens (metadata from 12 skills, plus housekeeping state check)
+- 2.0.1: ~60 tokens (metadata from 12 skills, plus housekeeping state check)
 - **Net savings**: ~55 tokens per session, ~50% skill reduction
 
 ---
@@ -249,7 +249,7 @@ The `/welcome` skill auto-detects providers via `verify-integrations.py` and upd
 
 ---
 
-## Key v2.0.0 innovations
+## Key 2.0.1 innovations
 
 ### 1. Skill consolidation
 28 skills → 12 skills (~50% reduction). Related workflow skills merged (e.g., strategic-analysis + executive-council + validation-council + discovery-mode → think). All 7 background skills → core.
@@ -490,7 +490,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ## Performance characteristics
 
-| Metric | v1.5.0 | v2.0.0 | Change |
+| Metric | v1.5.0 | 2.0.1 | Change |
 |--------|--------|--------|--------|
 | Session baseline tokens | ~115 | ~60 | -47% |
 | Skill count | 28 | 12 | -57% |
@@ -505,7 +505,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ## Version history
 
-- **v2.0.0** (2026-02-08): Architecture overhaul (skill consolidation, script extraction, provider-agnostic integrations, progressive welcome, 4-tier archival, housekeeping automation)
+- **2.0.1** (2026-02-08): Architecture overhaul (skill consolidation, script extraction, provider-agnostic integrations, progressive welcome, 4-tier archival, housekeeping automation)
 - **v1.5.0** (2026-02-07): Structural compliance, composite skills, heartbeat, source attribution
 - **v1.4.0** (2026-02-06): Protocol-to-skill migration, 3-level loading, provider abstraction
 - **v1.3.0** (2026-02-04): Plugin decomposition, data/ consolidation
@@ -519,7 +519,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ### What changed
 
-| v1.5.0 | v2.0.0 | Reason |
+| v1.5.0 | 2.0.1 | Reason |
 |--------|--------|--------|
 | 7 background skills | 1 core skill | Token efficiency, behavioral consolidation |
 | 19 workflow skills | 11 workflow skills | Merge related workflows (e.g., strategic-analysis + councils → think) |

@@ -1,5 +1,11 @@
 # Changelog
 
+
+## v2.0.1 (2026-02-10)
+
+> Bumped from v2.0.0
+
+
 All notable changes to the TARS framework are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers follow [Semantic Versioning](https://semver.org/).
