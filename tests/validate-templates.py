@@ -18,7 +18,6 @@ REQUIRED_REFERENCE_FILES = [
     "guardrails.yaml",
     "maturity.yaml",
     ".housekeeping-state.yaml",
-    "getting-started.md",
     "workflows.md",
 ]
 
@@ -212,23 +211,23 @@ def validate_integrations(filepath, errors, warnings):
 
 
 def validate_getting_started(filepath, errors, warnings):
-    """Validate getting-started.md exists and has reasonable content."""
+    """Validate GETTING-STARTED.md exists and has reasonable content."""
     try:
         with open(filepath) as f:
             content = f.read()
     except Exception as e:
-        errors.append(f"Cannot read getting-started.md: {e}")
+        errors.append(f"Cannot read GETTING-STARTED.md: {e}")
         return
 
     lines = [l for l in content.split("\n") if l.strip()]
     if len(lines) < 10:
-        warnings.append(f"getting-started.md seems too short ({len(lines)} non-empty lines, expected ~60)")
+        warnings.append(f"GETTING-STARTED.md seems too short ({len(lines)} non-empty lines, expected ~60)")
 
     content_lower = content.lower()
     if "tars" not in content_lower:
-        warnings.append("getting-started.md: Doesn't mention 'TARS'")
+        warnings.append("GETTING-STARTED.md: Doesn't mention 'TARS'")
     if "welcome" not in content_lower and "start" not in content_lower:
-        warnings.append("getting-started.md: Missing getting started / welcome content")
+        warnings.append("GETTING-STARTED.md: Missing getting started / welcome content")
 
 
 def validate_workflows(filepath, errors, warnings):
@@ -283,9 +282,11 @@ def main():
     if os.path.isfile(integrations):
         validate_integrations(integrations, errors, warnings)
 
-    getting_started = os.path.join(REFERENCE_DIR, "getting-started.md")
+    getting_started = os.path.join(PLUGIN_ROOT, "GETTING-STARTED.md")
     if os.path.isfile(getting_started):
         validate_getting_started(getting_started, errors, warnings)
+    else:
+        errors.append("MISSING: GETTING-STARTED.md (should be in root)")
 
     workflows = os.path.join(REFERENCE_DIR, "workflows.md")
     if os.path.isfile(workflows):

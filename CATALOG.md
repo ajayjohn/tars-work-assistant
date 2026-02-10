@@ -354,7 +354,7 @@ First value: You're oriented in your day in 90 seconds instead of 20 minutes. Th
 
 ### Next Steps
 
-- See `reference/getting-started.md` and `reference/workflows.md` for detailed guides.
+- See `GETTING-STARTED.md` and `reference/workflows.md` for detailed guides.
 - Ask TARS "what can you do?" at any time for built-in help.
 - Run a team pilot: 5 people, 2 weeks. Measure time saved. Measure decision quality. Scale from there.
 

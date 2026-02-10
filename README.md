@@ -186,7 +186,7 @@ Ask TARS directly:
 - "How do I process a meeting?"
 - "What's the difference between `/think` and `/think stress-test`?"
 
-TARS answers from inline help metadata. For deeper reference material, see `reference/getting-started.md` and `reference/workflows.md`.
+TARS answers from inline help metadata. For deeper reference material, see `GETTING-STARTED.md` and `reference/workflows.md`.
 
 ---
 

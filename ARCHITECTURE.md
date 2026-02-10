@@ -66,9 +66,10 @@ tars/
 │   ├── guardrails.yaml                  # Sensitive data patterns for scan-secrets.py
 │   ├── maturity.yaml                    # Onboarding progress (updated by welcome phases)
 │   ├── .housekeeping-state.yaml         # Auto-maintenance state (updated by maintain skill)
-│   ├── getting-started.md               # New user guide
 │   ├── workflows.md                     # Multi-skill patterns and orchestration
 │   └── shortcuts.md                     # Quick reference of all commands
+<truncated 5 lines>
+├── GETTING-STARTED.md                   # New user guide
 ├── inbox/
 │   ├── pending/                         # Awaiting processing
 │   ├── processing/                      # Currently being handled
@@ -127,9 +128,11 @@ tars/
 │   ├── guardrails.yaml          # Sensitive data patterns
 │   ├── maturity.yaml            # Onboarding progress tracking
 │   ├── .housekeeping-state.yaml # Auto-maintenance state
-│   ├── getting-started.md       # New user guide
 │   ├── workflows.md             # Multi-skill patterns
 │   └── shortcuts.md             # Command reference
+│   ├── workflows.md             # Multi-skill patterns
+│   └── shortcuts.md             # Command reference
+├── GETTING-STARTED.md           # New user guide
 ├── memory/
 │   ├── _index.md                # Master index
 │   ├── people/
