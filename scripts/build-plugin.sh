@@ -22,7 +22,7 @@ rsync -av --delete "$REPO_ROOT/commands/" "$PLUGIN_DIR/commands/"
 rsync -av --delete "$REPO_ROOT/reference/" "$PLUGIN_DIR/reference/"
 cp "$REPO_ROOT/.mcp.json" "$PLUGIN_DIR/.mcp.json"
 
-echo "✓ Files synced (marketplace.json stays at root only)"
+echo "✓ Files synced (marketplace.json stays in .claude-plugin/)"
 
 # Step 3: Re-validate
 echo "Step 3: Re-validating..."

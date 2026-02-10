@@ -43,13 +43,13 @@ def validate_plugin(plugin_dir: Path):
     return errors, warnings
 
 def validate_marketplace(repo_root: Path):
-    """Validate marketplace.json schema."""
+    """Validate marketplace.json schema (always in .claude-plugin/)."""
     errors = []
     warnings = []
 
-    marketplace_json = repo_root / "marketplace.json"
+    marketplace_json = repo_root / ".claude-plugin" / "marketplace.json"
     if not marketplace_json.exists():
-        errors.append("Missing marketplace.json")
+        errors.append("Missing .claude-plugin/marketplace.json")
         return errors, warnings
 
     with open(marketplace_json) as f:

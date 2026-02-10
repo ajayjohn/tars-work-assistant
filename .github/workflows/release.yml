@@ -58,14 +58,14 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Sync version from plugin.json to marketplace.json
+          # Sync version from plugin.json to marketplace.json (always in .claude-plugin/)
           python3 << 'PYTHON_SCRIPT'
           import json
 
           with open('.claude-plugin/plugin.json', 'r') as f:
               source = json.load(f)
 
-          with open('marketplace.json', 'r') as f:
+          with open('.claude-plugin/marketplace.json', 'r') as f:
               marketplace = json.load(f)
 
           # Update TARS plugin entry in marketplace
@@ -75,17 +75,17 @@ jobs:
                   plugin['description'] = source['description']
                   break
 
-          with open('marketplace.json', 'w') as f:
+          with open('.claude-plugin/marketplace.json', 'w') as f:
               json.dump(marketplace, f, indent=2)
 
-          print(f"✓ Synced marketplace.json to v{source['version']}")
+          print(f"✓ Synced .claude-plugin/marketplace.json to v{source['version']}")
           PYTHON_SCRIPT
 
           # Commit marketplace.json if changed
-          if ! git diff --quiet marketplace.json; then
+          if ! git diff --quiet .claude-plugin/marketplace.json; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add marketplace.json
+            git add .claude-plugin/marketplace.json
             git commit -m "chore: sync marketplace.json to v${VERSION}"
             git push origin main
           fi
@@ -185,6 +185,10 @@ jobs:
               "author": source["author"],
               "license": source["license"]
           }
+
+          # Include displayName if present in source
+          if "displayName" in source:
+              minimal["displayName"] = source["displayName"]
 
           # Write minimal version
           with open('build-temp/.claude-plugin/plugin.json', 'w') as f:

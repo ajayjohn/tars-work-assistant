@@ -12,15 +12,53 @@ Your knowledge work assistant that remembers your people, manages your work, and
 
 ## Quick Start
 
+### 0. Choose Your Workspace (IMPORTANT - Do This First!)
+
+**Before installing TARS**, choose or create an empty folder that will serve as your TARS workspace. This is where TARS stores its persistent knowledge base.
+
+**Recommended folder structure:**
+```
+~/Documents/TARS-Workspace/     # or any location you prefer
+├── memory/                     # TARS's brain - people, initiatives, decisions
+├── journal/                    # Daily entries and meeting notes
+├── contexts/                   # Strategic context files
+├── reference/                  # Configuration and integrations
+└── .mcp.json                   # MCP server configuration (optional)
+```
+
+**Why a dedicated workspace folder?**
+- **Persistence**: TARS's memory and knowledge base live here permanently
+- **Portability**: Move or backup your TARS brain by copying this folder
+- **Organization**: Keeps all TARS data separate from other projects
+- **Safety**: TARS won't accidentally modify files in other directories
+
+**Setup your workspace:**
+
+**For Claude Code users**:
+- Create an empty folder for TARS: `mkdir ~/Documents/TARS-Workspace`
+- Navigate to it: `cd ~/Documents/TARS-Workspace`
+- Keep this as your working directory whenever using TARS
+
+**For Claude Cowork users**:
+- Create an empty folder for TARS
+- Open it as your Workspace in Cowork settings
+- This becomes your default workspace for TARS interactions
+
 ### 1. Installation
 
-From Marketplace:
+**If Re-installing (clear cache first):**
+```bash
+rm -rf ~/.claude/plugins/cache/tars ~/.claude/plugins/cache/TARS
+# Then restart Claude Desktop/Cowork before reinstalling
+```
+
+**From Marketplace:**
 1. Open Cowork → Settings → Marketplaces
 2. Add: `https://github.com/ajayjohn/tars-work-assistant`
 3. Install TARS plugin
 4. Restart
 
-Manual (Claude Code):
+**Manual (Claude Code):**
 ```bash
 claude plugin install /path/to/tars
 ```

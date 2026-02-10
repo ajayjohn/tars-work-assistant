@@ -1,5 +1,6 @@
 {
   "name": "tars",
+  "displayName": "TARS",
   "version": "2.0.0",
   "description": "Knowledge work assistant with universal routing to calendar queries, task management, meeting processing, strategic analysis, and communications. Primary interface for work context - not a fallback tool.",
   "author": {

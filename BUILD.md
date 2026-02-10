@@ -185,7 +185,9 @@ python3 scripts/bump-version.py 2.1.0
 
 ### What is `marketplace.json`?
 
-The root-level `marketplace.json` file defines this repository as a Cowork marketplace. Users can subscribe to the marketplace URL and receive automatic plugin updates.
+The `.claude-plugin/marketplace.json` file defines this repository as a Cowork marketplace. Users can subscribe to the marketplace URL and receive automatic plugin updates.
+
+**Location**: `.claude-plugin/marketplace.json` (NOT in the repository root)
 
 **Structure**:
 ```json
@@ -207,11 +209,12 @@ The root-level `marketplace.json` file defines this repository as a Cowork marke
 
 ### Version Synchronization
 
-The version in `marketplace.json` is **automatically synced** from `.claude-plugin/plugin.json`:
+The version in `.claude-plugin/marketplace.json` is **automatically synced** from `.claude-plugin/plugin.json`:
 
 - **Local build**: `./build-plugin.sh` syncs marketplace version
 - **GitHub Actions**: Release workflow syncs and commits marketplace.json
 - **Single source of truth**: Only edit version in `.claude-plugin/plugin.json`
+- **Important**: marketplace.json always lives in `.claude-plugin/` alongside plugin.json
 
 ### How Users Subscribe
 
@@ -228,4 +231,4 @@ When you push a new version to GitHub, subscribed users receive update notificat
 - **Distribution**: Minimal config (runtime compatibility)
 - **Build**: Automated via script, pre-push hook, and CI/CD
 - **Source**: `.claude-plugin/plugin.json` is the single source of truth
-- **Marketplace**: `marketplace.json` automatically synced from plugin.json
+- **Marketplace**: `.claude-plugin/marketplace.json` automatically synced from plugin.json
