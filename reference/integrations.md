@@ -79,6 +79,94 @@ owner: Name
 
 ---
 
+## MCP Configuration Examples
+
+Below are copy-paste-ready `.mcp.json` configurations for common platform combinations. Place this file in your workspace root.
+
+**After creating or updating `.mcp.json`, restart Claude Cowork/Code to load the MCP servers.**
+
+### Apple Calendar + Apple Reminders (macOS)
+
+```json
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "apple-reminders": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
+    }
+  }
+}
+```
+
+### Google Calendar + Todoist (Cross-platform)
+
+```json
+{
+  "mcpServers": {
+    "google-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-calendar"]
+    },
+    "todoist": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-todoist"]
+    }
+  }
+}
+```
+
+### Microsoft 365 Calendar + Microsoft To-Do (Windows/Enterprise)
+
+```json
+{
+  "mcpServers": {
+    "microsoft-365": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-microsoft-365"]
+    }
+  }
+}
+```
+
+**Note**: Microsoft 365 MCP server typically provides both calendar and tasks in one server.
+
+### TickTick (Alternative cross-platform task manager)
+
+```json
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "ticktick": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-ticktick"]
+    }
+  }
+}
+```
+
+### Finding Other MCP Servers
+
+Search for MCP servers on:
+- [MCP GitHub Organization](https://github.com/modelcontextprotocol)
+- [Anthropic MCP Repository](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp)
+- NPM packages matching `@modelcontextprotocol/server-*` or `mcp-server-*`
+
+---
+
 ## Project Tracker
 
 category: project_tracker

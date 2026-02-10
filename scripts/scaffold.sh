@@ -31,6 +31,10 @@ DIRS=(
     "contexts/products"
     "contexts/artifacts"
     "reference"
+    "inbox/pending"
+    "inbox/processing"
+    "inbox/completed"
+    "inbox/failed"
 )
 
 created=0

@@ -67,6 +67,119 @@ And verify manually:
 1. **Task integration**: Read `reference/integrations.md` Tasks section. Execute a test `list` operation. If it fails, warn and continue.
 2. **Calendar integration**: Read `reference/integrations.md` Calendar section. Execute a test `list_events` operation. If it fails, warn and continue.
 
+Display integration status clearly using symbols:
+- ✓ (ok/configured)
+- ⚠ (not configured)
+- ✗ (error)
+- ℹ (check MCP servers)
+
+### Step 2.5: MCP Integration Setup Guidance
+
+After verifying integrations in Step 2, check the status of calendar and tasks integrations. For each integration that is not configured, provide guidance to the user.
+
+**For Calendar (if not configured):**
+
+Display:
+```
+⚠ Calendar not configured
+
+TARS needs calendar access for:
+- Daily and weekly briefings with schedule awareness
+- Meeting attendee context and calendar lookups
+- "When did I last meet X?" queries
+- Full meeting processing pipeline
+
+Recommended MCP Servers:
+- Apple Calendar: @modelcontextprotocol/server-apple-calendar
+- Google Calendar: @modelcontextprotocol/server-google-calendar
+- Microsoft 365: @modelcontextprotocol/server-microsoft-365
+
+Setup Instructions:
+1. Create .mcp.json in your workspace root (if it doesn't exist)
+2. Add calendar MCP server configuration
+3. Restart Claude Cowork/Code
+4. Re-run /welcome to verify
+
+Example .mcp.json for Apple Calendar:
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    }
+  }
+}
+```
+
+**For Tasks (if not configured):**
+
+Display:
+```
+⚠ Tasks not configured
+
+TARS needs task manager access for:
+- Automatic action item creation from meetings
+- Task tracking in daily/weekly briefings
+- Task triage and prioritization
+- Accountability tracking
+
+Recommended MCP Servers:
+- Apple Reminders: @modelcontextprotocol/server-apple-reminders
+- Todoist: @modelcontextprotocol/server-todoist
+- TickTick: @modelcontextprotocol/server-ticktick
+- Microsoft To-Do: @modelcontextprotocol/server-microsoft-todo
+- Linear: @modelcontextprotocol/server-linear (for engineering teams)
+
+Setup Instructions:
+1. Add to your .mcp.json file
+2. Restart Claude Cowork/Code
+3. Re-run /welcome to verify
+
+Example .mcp.json with both calendar and tasks:
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "apple-reminders": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
+    }
+  }
+}
+```
+
+**If both calendar and tasks are configured (MCP or legacy):**
+→ Report: "✓ Calendar: Configured" and "✓ Tasks: Configured"
+→ Skip guidance and proceed directly to Step 3
+
+**If one or both integrations have errors:**
+→ Display troubleshooting:
+  - Check if MCP server package exists and is accessible
+  - Verify .mcp.json syntax is valid JSON
+  - Suggest restart of Claude Cowork/Code
+  - Continue anyway (don't block setup)
+
+**Ask user before proceeding:**
+If calendar and/or tasks are not configured, ask:
+"I notice calendar and/or tasks are not configured. You can:
+1. Exit now to configure .mcp.json and restart Claude
+2. Continue with reduced functionality (you can set up integrations later)
+
+What would you like to do?"
+
+If user chooses to continue, proceed to Step 3. If user chooses to exit, display:
+"Setup incomplete. To configure integrations:
+1. Create/edit .mcp.json in your workspace root with the examples above
+2. Restart Claude Cowork/Code
+3. Re-run /welcome
+
+See GETTING-STARTED.md 'Essential Integrations' section for more details."
+
 ### Step 3: Interactive setup wizard
 
 Gather context through bounded questions (max 3 questions per round):
@@ -261,14 +374,20 @@ Display summary:
 - CLAUDE.md (root config)
 - reference/replacements.md ({N} entries)
 - reference/kpis.md ({N} teams, {N} initiatives)
-- Task integration verified (configured lists accessible)
-- Calendar integration verified (calendar access)
 - memory/ ({N} people created, {N} category indexes)
 - journal/ (ready)
 - contexts/ (products index, artifacts index ready)
 
+### Integration status
+- Calendar: {✓ Configured (MCP) | ✓ Configured (legacy) | ⚠ Not configured | ✗ Error}
+- Tasks: {✓ Configured (MCP) | ✓ Configured (legacy) | ⚠ Not configured | ✗ Error}
+
+{If any integration is not configured or errored:}
+⚠ Missing integrations will limit functionality. See GETTING-STARTED.md "Essential Integrations" section for setup instructions.
+
 ### Next steps
-1. Run `/daily-briefing` to see your first morning briefing
+1. {If integrations configured:} Run `/daily-briefing` to see your first morning briefing
+   {If not:} Configure calendar and tasks in .mcp.json, restart Claude, and re-run /welcome
 2. Run `/process-meeting` with your next meeting transcript
 3. Add more people and context as you use TARS
 4. Edit `reference/kpis.md` to define your team metrics

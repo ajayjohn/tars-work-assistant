@@ -79,6 +79,81 @@ During this setup, TARS will:
 
 **Pro tip**: Have your integration details (like calendar or task server URLs/API keys) ready before starting the setup to streamline the process.
 
+### 2.5. Essential Integrations (Calendar & Tasks)
+
+TARS works best when connected to your calendar and task manager. These integrations are **mandatory for core features** like daily briefings, meeting processing, and schedule awareness.
+
+#### Why Calendar and Tasks Matter
+
+**Without calendar integration:**
+- No daily/weekly briefings with schedule awareness
+- No meeting attendee context or calendar lookups
+- No "When did I last meet X?" queries
+- Limited meeting processing (transcript-only, no attendee list)
+
+**Without tasks integration:**
+- No automatic action item creation from meetings
+- No task tracking in briefings
+- No task triage or prioritization
+- Manual task management only
+
+#### Recommended Setup: MCP Servers (v2.1+)
+
+TARS uses the Model Context Protocol (MCP) for integrations. MCP servers provide standardized access to external tools.
+
+**Calendar Options:**
+- **Apple Calendar** (via `@modelcontextprotocol/server-apple-calendar`)
+- **Google Calendar** (via `@modelcontextprotocol/server-google-calendar`)
+- **Microsoft 365 Calendar** (via `@modelcontextprotocol/server-microsoft-365`)
+
+**Tasks Options:**
+- **Apple Reminders** (via `@modelcontextprotocol/server-apple-reminders`)
+- **Todoist** (via `@modelcontextprotocol/server-todoist`)
+- **TickTick** (via `@modelcontextprotocol/server-ticktick`)
+- **Microsoft To-Do** (via `@modelcontextprotocol/server-microsoft-todo`)
+- **Linear** (via `@modelcontextprotocol/server-linear` - for engineering teams)
+
+#### Configuration: .mcp.json
+
+MCP servers are configured in a `.mcp.json` file in your workspace root. Here's an example for Apple Calendar and Apple Reminders:
+
+```json
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "apple-reminders": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
+    }
+  }
+}
+```
+
+**Finding MCP Servers:**
+Search for MCP servers in the [MCP marketplace](https://github.com/modelcontextprotocol) or GitHub. Common patterns:
+- `@modelcontextprotocol/server-<platform>`
+- `mcp-server-<platform>`
+
+**After Configuration:**
+1. Restart Claude Cowork/Code to load MCP servers
+2. Run `/welcome` to verify integration status
+3. Test with "Daily briefing" to confirm calendar and tasks are working
+
+#### What If I Skip This?
+
+TARS will still work with reduced functionality:
+- Memory system (people, initiatives, decisions)
+- Meeting processing (transcript-only, no calendar context)
+- Strategic analysis (think skill)
+- Communication drafting
+
+But you'll miss the core value: schedule-aware briefings, automatic task creation, and calendar-integrated workflows.
+
 ### 3. Your First Win
 
 Once setup is complete, try these commands to experience TARS's immediate value:
@@ -177,7 +252,17 @@ Slash commands (`/briefing`, `/meeting`) are optional shortcuts.
 Ask TARS: "What can you do?", "How do I process a meeting?", "Help with tasks"
 
 ### "What if TARS doesn't have calendar access?"
-Check `reference/integrations.md` Calendar section. Run `/welcome` to reconfigure. TARS works with Apple Calendar, Google Calendar, Microsoft 365 via MCP servers.
+1. Create or update `.mcp.json` in your workspace root with a calendar MCP server (see "Essential Integrations" section above)
+2. Restart Claude Cowork/Code to load the MCP server
+3. Run `/welcome` to verify the integration
+4. Test with "What's on my calendar today?"
+
+If you see "Calendar not configured" errors, check:
+- `.mcp.json` exists and has valid JSON syntax
+- MCP server package is available (e.g., run `npx -y @modelcontextprotocol/server-apple-calendar` without errors)
+- You've restarted Claude after adding the MCP server
+
+See `reference/integrations.md` and the "Essential Integrations" section for detailed examples.
 
 ### "Can I use TARS without calendar/tasks?"
 Yes, reduced functionality. TARS still provides:
@@ -222,14 +307,18 @@ Ask TARS: "What can you do?", "Help with meetings", "How do I process a transcri
 ### Troubleshooting
 
 **"Calendar not configured"**:
-→ Run `/welcome` to set up calendar MCP server
-→ Check `reference/integrations.md` for configuration examples
-→ Verify MCP server path in `.mcp.json`
+→ Add calendar MCP server to `.mcp.json` (see "Essential Integrations" section above)
+→ Restart Claude Cowork/Code to load the MCP server
+→ Run `/welcome` to verify integration status
+→ Test with "What's on my calendar today?"
+→ Check `reference/integrations.md` for detailed platform-specific examples
 
 **"Tasks aren't being created"**:
-→ Check accountability test (concrete + owner + verifiable)
-→ Verify task MCP server in `reference/integrations.md`
-→ Test MCP server connection
+→ Add task/reminders MCP server to `.mcp.json` (see "Essential Integrations" section above)
+→ Restart Claude Cowork/Code to load the MCP server
+→ Verify with "List my tasks" or "What's on my plate?"
+→ Check accountability test: concrete task + specific owner + verifiable outcome
+→ See `reference/integrations.md` for platform options
 
 **"Memory entries aren't showing up"**:
 → Run `/maintain health` to check indexes
