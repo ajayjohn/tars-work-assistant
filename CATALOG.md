@@ -14,7 +14,7 @@ TARS solves three core problems:
 
 2. **Meeting Follow-Through**: Paste a meeting transcript or paste notes. TARS structures it into action items, updates your task system, identifies who owns what, and logs the decision context so six months later you know *why* you made a call, not just *that* you made it.
 
-3. **Strategic Rigor**: Instead of relying on groupthink in meetings, TARS can simulate multiple decision-makers (your CPO, CTO, CFO as "personas"), stress-test ideas from opposing angles, and walk through complex decisions using structured thinking methods. You get better analysis in less time.
+3. **Strategic Rigor**: Instead of relying on groupthink in meetings, TARS can simulate multiple decision-makers (your Brand Persona, Doyle Persona, Romilly Persona as "personas"), stress-test ideas from opposing angles, and walk through complex decisions using structured thinking methods. You get better analysis in less time.
 
 **Bottom line:** TARS saves 3–5 hours per week per knowledge worker by automating context retrieval, meeting processing, and decision analysis. For a 50-person product team, that's 150–250 hours reclaimed weekly — equivalent to hiring 3.5 additional full-time staff for knowledge work.
 
@@ -22,19 +22,19 @@ TARS solves three core problems:
 
 ## Section 2: Capability Overview
 
-### A Day in the Life: Sarah, Senior Product Manager
+### A Day in the Life: Murph, Senior Product Manager
 
-Sarah opens TARS at 8:47 AM. Before she touches Slack or email, she asks: "Give me my morning briefing."
+Murph opens TARS at 8:47 AM. Before she touches Slack or email, she asks: "Give me my morning briefing."
 
 TARS pulls her calendar for the day, grabs her pending tasks, reminds her of the three people she's meeting with and context about their recent concerns, and surfaces the two decisions she left pending yesterday. She drinks her coffee and gets oriented in 90 seconds instead of 20 minutes of context-switching.
 
-By 10 AM, she's in her quarterly planning meeting. The team debates a big roadmap decision. Sarah pulls out her phone and asks TARS: "Play devil's advocate. What could go wrong with prioritizing mobile over API this quarter?" TARS layers in the CTO persona, CIO persona, and finance persona — each challenging the assumption from a different angle. The team debates the counterarguments. It sharpens their thinking. When they make the decision, they've thought through objections they wouldn't have surfaced otherwise.
+By 10 AM, she's in her quarterly planning meeting. The team debates a big roadmap decision. Murph pulls out her phone and asks TARS: "Play devil's advocate. What could go wrong with prioritizing mobile over API this quarter?" TARS layers in the Brand Persona, Doyle Persona, and finance persona — each challenging the assumption from a different angle. The team debates the counterarguments. It sharpens their thinking. When they make the decision, they've thought through objections they wouldn't have surfaced otherwise.
 
-At 11:45 AM, Sarah's meeting ends. She's got 3 action items scribbled in her notes. She pastes them into TARS: "Extract my tasks from this meeting transcript." One minute later, TARS has created them in her task system, assigned owners, set due dates based on context, and updated the knowledge graph with the meeting's decision. She doesn't think about follow-through again — it's automatic.
+At 11:45 AM, Murph's meeting ends. She's got 3 action items scribbled in her notes. She pastes them into TARS: "Extract my tasks from this meeting transcript." One minute later, TARS has created them in her task system, assigned owners, set due dates based on context, and updated the knowledge graph with the meeting's decision. She doesn't think about follow-through again — it's automatic.
 
-At 2 PM, Sarah reads an important article on AI safety and product strategy. Instead of highlighting and hoping she remembers it, she asks TARS: "Extract the wisdom from this. What should I remember?" TARS pulls out the 5 most relevant insights, connects them to decisions she's made, and stores them. When she needs that insight three months later, it will surface.
+At 2 PM, Murph reads an important article on AI safety and product strategy. Instead of highlighting and hoping she remembers it, she asks TARS: "Extract the wisdom from this. What should I remember?" TARS pulls out the 5 most relevant insights, connects them to decisions she's made, and stores them. When she needs that insight three months later, it will surface.
 
-By 5 PM, she sends a status update to her stakeholders. She normally spends 30 minutes writing in the right tone for each audience. Instead, she says: "Draft a status update on our Q2 mobile roadmap. Make it crisp for the CEO, detailed for the engineering lead, and action-focused for my team." TARS generates drafts tailored to each audience, she edits in 5 minutes, and sends. Her CFO thinks it's clearly scoped, her CTO thinks it's technically sound, her team knows what to do Monday.
+By 5 PM, she sends a status update to her stakeholders. She normally spends 30 minutes writing in the right tone for each audience. Instead, she says: "Draft a status update on our Q2 mobile roadmap. Make it crisp for Cooper, detailed for Brand, and action-focused for my team." TARS generates drafts tailored to each audience, she edits in 5 minutes, and sends. Her Doyle Persona thinks it's clearly scoped, her Brand Persona thinks it's technically sound, her team knows what to do Monday.
 
 This isn't magic. It's structure.
 
@@ -75,11 +75,11 @@ One paste. One command. Automatic follow-through. No more "I thought you were ha
 
 The best decisions survive scrutiny from multiple angles. TARS codifies this.
 
-**The experience**: "I'm thinking about pausing the mobile MVP to focus on the API instead. Stress-test this decision as my CTO, my CFO, and my Head of Customer Success. Give me their objections and questions."
+**The experience**: "I'm thinking about pausing the mobile MVP to focus on the API instead. Stress-test this decision as my Brand Persona, my Doyle Persona, and my Head of Customer Success. Give me their objections and questions."
 
 TARS simulates each perspective:
-- **CTO angle**: "This delays our architectural debt paydown. Our API code is brittle. If we don't fix it, we'll be slower in Q3 anyway."
-- **CFO angle**: "This costs us $200K in mobile launch revenue. How do we get that back?"
+- **Brand Persona angle**: "This delays our architectural debt paydown. Our API code is brittle. If we don't fix it, we'll be slower in Q3 anyway."
+- **Doyle Persona angle**: "This costs us $200K in mobile launch revenue. How do we get that back?"
 - **Customer Success angle**: "Mobile is what enterprise customers kept asking for. Pausing it damages trust."
 
 You don't dismiss the objections. You debate them. You update your analysis. Your final decision is stronger because you've heard the counterarguments upfront, not six months later when it's too late.
@@ -102,7 +102,7 @@ Tasks scatter across Slack, email, meetings, and documents. TARS unifies them.
 
 Different stakeholders need different tones, levels of detail, and focuses.
 
-**The experience**: "I need to communicate our decision to pause mobile. Draft three versions: one for the CEO (crisp, business focus), one for the mobile team (detailed, empathetic), one for the board (risk-aware)."
+**The experience**: "I need to communicate our decision to pause mobile. Draft three versions: one for Cooper (crisp, business focus), one for the mobile team (detailed, empathetic), one for the board (risk-aware)."
 
 TARS generates drafts tailored to each audience. You edit them in 5 minutes. You send.
 
@@ -145,7 +145,7 @@ You don't memorize commands. You describe what you need.
 - "Process this meeting transcript" → Meeting skill
 - "Extract tasks from this conversation" → Tasks skill
 - "Stress-test this decision" → Think skill
-- "Draft a message for my CEO" → Communicate skill
+- "Draft a message for Cooper" → Communicate skill
 - "What's our mobile initiative status?" → Initiative skill
 
 **Power users**: Slash commands are available if you prefer explicit invocation. `/briefing`, `/meeting`, `/think`, `/tasks`, `/communicate`, etc. But the natural language interface is the default. You should never have to hunt for a command.
@@ -171,7 +171,7 @@ TARS doesn't store information in silos. It stores it in a persistent knowledge 
 
 **Index-first search**: Instead of querying a database, TARS searches its index. Every entity, every relationship is pre-indexed. Retrieval is fast.
 
-**Durability-tested entries**: Not all knowledge is equal. Recent gossip is ephemeral. Strategic decisions are durable. TARS classifies entries by durability (see Archival System below) so you don't mix up "Joe mentioned we might do X someday" with "We committed to do X this quarter."
+**Durability-tested entries**: Not all knowledge is equal. Recent gossip is ephemeral. Strategic decisions are durable. TARS classifies entries by durability (see Archival System below) so you don't mix up "Doyle mentioned we might do X someday" with "We committed to do X this quarter."
 
 ---
 
@@ -278,11 +278,11 @@ You should never feel like you're "using a system." You should feel like you're 
 You describe what you need. TARS understands the intent and routes to the right skill.
 
 **Examples:**
-- "What should I know before my 2 PM with the mobile team?" → Briefing skill (pulls context about that team and their recent decisions).
+- "What should I know before my 2 PM with the mobile team? " → Briefing skill (pulls context about that team and their recent decisions).
 - "Extract the three key decisions from that meeting" → Meeting skill (parses, structures, links to knowledge graph).
 - "I'm unsure about this. Play devil's advocate." → Think skill (simulates opposing views).
 - "Remind me what we decided about mobile last quarter" → Background skill (searches knowledge graph).
-- "Draft a proposal for the CEO" → Communicate skill (generates audience-aware draft).
+- "Draft a proposal for Cooper" → Communicate skill (generates audience-aware draft).
 
 **Disambiguation**: If your phrasing is ambiguous, TARS asks. "Do you mean the briefing for today, or a briefing on the mobile initiative?"
 
@@ -362,7 +362,7 @@ First value: You're oriented in your day in 90 seconds instead of 20 minutes. Th
 
 ## Summary: Why TARS, Why Now
 
-Knowledge workers spend 10–15 hours per week on context work — finding information, recontextualizing, updating task systems, rewriting the same message for different audiences. It's waste.
+Knowledge workers spend 5–8 hours per week on context work — finding information, recontextualizing, updating task systems, rewriting the same message for different audiences. It's waste.
 
 TARS automates it.
 
