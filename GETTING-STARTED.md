@@ -102,16 +102,12 @@ TARS works best when connected to your calendar and task manager. These integrat
 TARS uses the Model Context Protocol (MCP) for integrations. MCP servers provide standardized access to external tools.
 
 **Calendar Options:**
-- **Apple Calendar** (via `@modelcontextprotocol/server-apple-calendar`)
-- **Google Calendar** (via `@modelcontextprotocol/server-google-calendar`)
-- **Microsoft 365 Calendar** (via `@modelcontextprotocol/server-microsoft-365`)
+- **Apple Calendar (Syncs with local Microsoft Outlook)** (https://github.com/ajayjohn/mcp-server-apple-calendar)
 
 **Tasks Options:**
-- **Apple Reminders** (via `@modelcontextprotocol/server-apple-reminders`)
-- **Todoist** (via `@modelcontextprotocol/server-todoist`)
-- **TickTick** (via `@modelcontextprotocol/server-ticktick`)
-- **Microsoft To-Do** (via `@modelcontextprotocol/server-microsoft-todo`)
-- **Linear** (via `@modelcontextprotocol/server-linear` - for engineering teams)
+- **Apple Reminders (Syncs with local Microsoft To-Do)** (https://github.com/ajayjohn/mcp-server-apple-reminders)
+- **Todoist** (https://developer.todoist.com/api/v1/#tag/Todoist-MCP)
+- **Linear** (https://linear.app/docs/mcp)
 
 #### Configuration: .mcp.json
 
@@ -178,65 +174,72 @@ TARS queries your calendar, leveraging its memory to provide context-rich answer
 
 ## Your First Workflows: The TARS Inbox & Batch Processing
 
-TARS is designed to become an indispensable extension of your professional self. To achieve this, it needs a continuous feed of information about your world. This isn't a burden; it's an easy habit to build, particularly with the power of the **TARS Inbox**.
+TARS becomes more valuable as it learns about your work. The **TARS Inbox** is your primary tool for feeding it information efficiently.
 
-The Inbox is your primary gateway for feeding raw, unstructured information into TARS. Think of it as a smart staging area where you can dump meeting notes, emails, articles, or any other professional collateral. TARS then processes these inputs, automatically identifying and categorizing key information:
+### What is the Inbox?
 
--   **Task Extraction**: Automatically pulls out actionable items and adds them to your task manager.
--   **Decision Recording**: Identifies significant decisions made and stores them in memory, linked to relevant initiatives or people.
--   **Profile Updates**: Enriches profiles of people you interact with, noting preferences, reporting structures, or key projects.
--   **Delegated Items**: Flags tasks or actions that have been delegated to others.
--   **Contextual Linking**: Connects new information to existing memory entries, building a richer, more interconnected knowledge graph.
+The Inbox is a staging area for raw information—meeting notes, emails, articles, or any professional content. Drop content in, and TARS automatically:
 
-This batch processing capability via the Inbox makes feeding TARS context incredibly efficient. Instead of meticulously entering data, you simply provide the raw material, and TARS does the heavy lifting, turning information into actionable intelligence.
+-   **Extracts tasks** and adds them to your task manager
+-   **Records decisions** linked to relevant initiatives or people
+-   **Updates profiles** with preferences, reporting structures, or key projects
+-   **Flags delegated items** for tracking
+-   **Links context** to existing memory entries
 
-**Analogy**: Imagine bringing a new, highly capable teammate up to speed. You wouldn't make them manually input every detail. Instead, you'd provide them with documents, meeting recordings, and discussions, trusting them to synthesize that information and identify what's critical. The TARS Inbox functions similarly, allowing you to "onboard" TARS with the context it needs to become an active, contributing partner.
+### How to Use It
 
-### Essential Habits for Hydrating TARS
+**Add content to the inbox:**
+1. Drop files or paste content into the `inbox/` folder in your workspace
+2. Or simply tell TARS: "Add this to the inbox: [paste content]"
 
-To maximize TARS's value, integrate these simple workflows into your daily routine. These are the habits that keep TARS well-fed and capable of delivering unparalleled insights:
+**Process the inbox:**
+```
+/maintain inbox
+```
 
-1.  **The Daily Briefing (2 min/day)**
-    *   **When**: First thing in the morning.
-    *   **What**: `Daily briefing`
-    *   **Why**: Start your day grounded in your schedule, priorities, and relevant context. TARS surfaces what you need to know *before* your first meeting.
+TARS will batch process all inbox items, extracting insights and updating your knowledge base. Think of it as "onboarding" TARS with the context it needs to be an effective partner.
 
-2.  **Meeting Processing via Inbox (5 min/meeting)**
-    *   **When**: Immediately after important meetings.
-    *   **What**: Feed meeting transcripts (e.g., from Otter.ai, Fireflies, or Grain) directly into the TARS Inbox.
-    *   **Why**: Capture action items, decisions, and people insights while fresh. TARS handles the parsing, ensuring no critical detail is lost and your memory is updated automatically. This is zero-manual-note-taking, context compounding at its best.
+### Essential Habits
 
-3.  **Inbox for Strategic Collateral (variable time)**
-    *   **When**: Whenever you encounter valuable information—whitepapers, help documentation, competitor analyses, internal memos.
-    *   **What**: Drop the content (or summaries/links) into the TARS Inbox.
-    *   **Why**: TARS processes this, extracting key concepts, linking them to initiatives, and enriching its understanding of your strategic landscape. This ensures TARS has the same foundational knowledge you would expect from a seasoned colleague.
+Build these habits to keep TARS effective:
 
-4.  **Proactive Memory Updates (1 min/occurrence)**
-    *   **When**: Any time new information emerges that refines TARS's understanding (e.g., someone corrects you, a project scope changes, a reporting line shifts).
-    *   **What**: `Remember that [fact]`
-    *   **Examples**:
-        *   "Remember that Murph now reports to Brand"
-        *   "Remember that Project Lazarus moved to Q3"
-        *   "Remember that Brand prefers tables in updates"
-    *   **Why**: Keeps TARS's memory current, ensuring its insights are always accurate and relevant.
+1.  **Daily Briefing** (2 min/day)
+    *   **When**: First thing in the morning
+    *   **Command**: `Daily briefing`
+    *   **Value**: See your schedule, priorities, and relevant context before your first meeting
 
-5.  **Weekly Reviews (15 min/week)**
-    *   **When**: Monday morning or Friday afternoon.
-    *   **What**: `Weekly briefing` + review tasks and priorities within TARS.
-    *   **Why**: Gain a strategic overview of your week, identify blockers, and ensure your efforts align with broader goals. TARS helps you see the forest, not just the trees.
+2.  **Process Meetings** (5 min/meeting)
+    *   **When**: After important meetings
+    *   **How**: Add transcript to inbox, then run `/maintain inbox`
+    *   **Value**: Auto-capture action items, decisions, and people insights
 
-### Leveraging TARS with Adequate Context
+3.  **Feed Strategic Content** (as needed)
+    *   **When**: Encounter valuable information (whitepapers, memos, analyses)
+    *   **How**: Add to inbox, run `/maintain inbox` when ready
+    *   **Value**: Build TARS's strategic context and domain knowledge
 
-Once TARS is regularly fed with information through these habits, its capabilities expand dramatically, moving beyond basic scheduling and task management. With a rich understanding of your professional world, TARS can proactively assist you in numerous ways:
+4.  **Quick Memory Updates** (1 min/occurrence)
+    *   **When**: New information emerges
+    *   **Command**: `Remember that [fact]`
+    *   **Examples**: "Remember that Murph now reports to Brand" or "Remember that Project Lazarus moved to Q3"
+    *   **Value**: Keep TARS's memory current
 
--   **Strategic Analysis**: `Help me stress test this plan: [describe plan]`. TARS can apply frameworks like pre-mortem analysis or red team critique, leveraging its memory of past decisions and organizational context to uncover blind spots.
--   **Communication Drafting**: `Draft an email to [[Joseph Cooper]] about the [[DBI Phase 1]] roadmap update`. TARS will tailor the communication, referencing relevant decisions, initiatives, and even Daniel's known preferences.
--   **Decision Support**: `Summarize the pros and cons of [[Project Lazarus]] based on our discussions and past decisions`. TARS synthesizes information from various sources to provide a balanced perspective.
--   **New Team Member Onboarding**: Export relevant sections of TARS's memory to quickly bring a new hire up to speed on key people, projects, and organizational context.
--   **Meeting Preparation**: Beyond the daily briefing, TARS can provide deeper dives into meeting topics, surfacing related documents, people profiles, and historical discussions relevant to the agenda.
--   **Vendor Management**: `What's our relationship history with [[Vendor X]]?`. TARS can pull up past interactions, contracts, and relevant performance notes from its memory.
+5.  **Weekly Review** (15 min/week)
+    *   **When**: Monday morning or Friday afternoon
+    *   **Command**: `Weekly briefing`
+    *   **Value**: Strategic overview, identify blockers, align efforts with goals
 
-By embracing these habits, you transform TARS from a simple tool into a dynamic, intelligent partner that scales with your career, providing the context you wish you had in every meeting and maintaining the institutional memory that often gets lost in the day-to-day.
+### What TARS Can Do With Context
+
+With regular information feeding, TARS unlocks advanced capabilities:
+
+-   **Strategic Analysis**: "Help me stress test this plan" - Apply frameworks like pre-mortem analysis
+-   **Communication Drafting**: "Draft an email to [[Joseph Cooper]] about [[DBI Phase 1]]" - Tailored to recipient preferences
+-   **Decision Support**: "Summarize pros and cons of [[Project Lazarus]]" - Based on past discussions
+-   **Meeting Preparation**: Deep dives on topics, surfacing related documents and profiles
+-   **Relationship Context**: "What's our history with [[Vendor X]]?" - Pull interactions and contracts
+
+These habits transform TARS into an intelligent partner that maintains institutional memory and provides context when you need it.
 
 ## Common Questions
 
