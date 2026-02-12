@@ -111,24 +111,33 @@ TARS uses the Model Context Protocol (MCP) for integrations. MCP servers provide
 
 #### Configuration: .mcp.json
 
-MCP servers are configured in a `.mcp.json` file in your workspace root. Here's an example for Apple Calendar and Apple Reminders:
+MCP servers are configured in a `.mcp.json` file in your workspace root. For these custom servers, you'll need to clone the repositories locally, build them, and then point to the built files.
+
+Here is an example configuration:
 
 ```json
 {
   "mcpServers": {
     "apple-calendar": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-server-apple-calendar/dist/index.js"],
+      "env": {
+        "EVENTLINK_TOKEN": "your_token",
+        "EVENTLINK_URL": "http://localhost:9000"
+      }
     },
     "apple-reminders": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mcp-server-apple-reminders/dist/index.js",
+        "--stdio"
+      ]
     }
   }
 }
 ```
+
+> **Note**: You must replace `/absolute/path/to/...` with the actual path where you cloned and built the repositories. The Calendar server also requires `EVENTLINK_TOKEN` and `EVENTLINK_URL` environment variables (check the repository README for details).
 
 **Finding MCP Servers:**
 Search for MCP servers in the [MCP marketplace](https://github.com/modelcontextprotocol) or GitHub. Common patterns:
@@ -342,5 +351,3 @@ Ask TARS: "What can you do?", "Help with meetings", "How do I process a transcri
     *   `reference/taxonomy.md` (memory structure)
     *   `CATALOG.md` (full feature list)
 5.  **Build the Habit**: Set daily reminder for morning briefings and incorporate meeting processing into your routine.
-
-**Pro tip**: Start small. Use daily briefings for 2 weeks before adding meeting processing and other inputs. Let habits compound to unlock TARS's full potential.
