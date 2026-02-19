@@ -109,6 +109,23 @@ notes: |
   owner: Name
 ```
 
+For EACH task:
+1. Execute the `create_reminder` operation
+2. Check the tool response. If the response indicates an error or does not confirm creation, add the task to the errors list and continue with the next task.
+3. Only count a task as "created" if the tool response confirms success.
+
+---
+
+### Step 7: Verify task creation (MANDATORY)
+
+After all creation attempts, execute `list_reminders` for each list that received new tasks. Confirm each created task appears in the list by matching title.
+
+If any tasks are missing from the list despite a successful creation response:
+- Add them to a "creation_unverified" section in the output
+- Report the discrepancy to the user
+
+NEVER report a task as "Created" in the output table unless it was confirmed present in the verification query.
+
 ---
 
 ### Extract mode output
@@ -117,10 +134,15 @@ notes: |
 ---
 ## Task extraction complete
 
-### Created tasks (X total)
-| Task | Owner | List | Due | Source |
-|------|-------|------|-----|--------|
-| Task description | Name | Active/Delegated/Backlog | YYYY-MM-DD | source |
+### Created tasks (X total, Y verified)
+| Task | Owner | List | Due | Source | Verified |
+|------|-------|------|-----|--------|----------|
+| Task description | Name | Active/Delegated/Backlog | YYYY-MM-DD | source | yes/no |
+
+### Creation unverified
+| Task | Owner | List | Issue |
+|------|-------|------|-------|
+| Task description | Name | Active | Not found in list after creation |
 
 ### Duplicates skipped
 | Task | Owner | Reason |

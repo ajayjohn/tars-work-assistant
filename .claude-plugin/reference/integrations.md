@@ -16,36 +16,18 @@ Run `/welcome` to configure integrations. Run `scripts/verify-integrations.py` t
 
 category: calendar
 required: true
-recommended_provider: mcp
-legacy_providers: eventlink (HTTP)
 
 ### Provider: MCP (Recommended for v2.1+)
 
-**Configuration**: Add calendar MCP server to `.mcp.json`:
+**Configuration**: Add calendar MCP server to `.mcp.json`
 
-```json
-{
-  "mcpServers": {
-    "calendar": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/your/calendar-mcp-server/index.js"],
-      "env": {
-        "CALENDAR_PROVIDER": "apple"
-      }
-    }
-  }
-}
-```
-
-**Note for user**: Replace `/path/to/your/calendar-mcp-server/index.js` with actual path to your built calendar MCP server.
 
 **Operations**: TARS uses MCP server's native tools:
 - `list_events` → Fetch events for date range
 - `create_event` → Create new calendar event
 - `get_event` → Get event details
 
-**Skills usage**: Check `<mcp_servers>` context for calendar MCP server first. If found, use MCP tools directly. If not found, check for legacy eventlink configuration.
+**Skills usage**: Check `<mcp_servers>` context for calendar MCP server first. If found, use MCP tools directly.
 
 **Constraints**:
 - Date format MUST be YYYY-MM-DD
@@ -54,109 +36,28 @@ legacy_providers: eventlink (HTTP)
 - Never update/delete events not created by TARS
 - "Focus time" blocks count as available
 
-### Provider: eventlink (Legacy - v2.0)
-
-Eventlink is a local HTTP API for Apple Calendar.
-
-**Configuration**:
-
-```yaml
-status: configured
-provider: eventlink
-type: http-api
-operations:
-  list_events: "GET {base_url}/events.json?date={date}&offset={offset}&selectCalendar={calendar}"
-  create_event: "POST {base_url}/events/create?calendar={calendar}"
-config:
-  base_url: http://localhost:PORT
-  calendar: Calendar
-  auth: "Bearer TOKEN"
-```
-
-#### Fetching events
-
-```
-GET {base_url}/events.json?date=YYYY-MM-DD&offset=N&selectCalendar={calendar}
-Authorization: Bearer {auth}
-```
-
-- `date`: Start date in YYYY-MM-DD format
-- `offset`: Number of days to include (1 = single day, 7 = one week)
-- `selectCalendar`: Calendar name to filter
-
-Do NOT use `startDate` or `endDate` when fetching events. Those are body fields for the create endpoint only.
-
-#### Creating events
-
-```
-POST {base_url}/events/create?calendar={calendar}
-Authorization: Bearer {auth}
-Content-Type: application/json
-
-{"title": "Event title", "startDate": "YYYY-MM-DD HH:MM", "endDate": "YYYY-MM-DD HH:MM", "notes": "Created by TARS"}
-```
-
 ---
 
 ## Tasks
 
 category: tasks
 required: true
-recommended_provider: mcp
-legacy_providers: remindctl (CLI)
 
 ### Provider: MCP (Recommended for v2.1+)
 
-**Configuration**: Add reminders MCP server to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "reminders": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/your/reminders-mcp-server/index.js"],
-      "env": {
-        "REMINDERS_PROVIDER": "apple"
-      }
-    }
-  }
-}
-```
-
-**Note for user**: Replace `/path/to/your/reminders-mcp-server/index.js` with actual path to your built reminders MCP server.
+**Configuration**: Add reminders MCP server to `.mcp.json`
 
 **Operations**: TARS uses MCP server's native tools:
 - `list_reminders` → Fetch tasks from list
 - `create_reminder` → Create new task
 - `complete_reminder` → Mark task complete
 
-**Skills usage**: Check `<mcp_servers>` context for reminders MCP server first. If found, use MCP tools. If not found, check for legacy remindctl.
+**Skills usage**: Check `<mcp_servers>` context for reminders MCP server first. If found, use MCP tools.
 
 **Constraints**:
 - Parse notes defensively: missing fields = unknown, not error
 - Only create/edit/delete in allowed lists
-
-### Provider: remindctl (Legacy - v2.0)
-
-remindctl is a CLI tool for Apple Reminders.
-
-**Configuration**:
-
-```yaml
-status: configured
-provider: remindctl
-type: cli
-operations:
-  list: "remindctl list {list_name} --json"
-  add: 'remindctl add --title "{title}" --list {list} --due {due} --notes "{notes}"'
-  edit: 'remindctl edit {id} --title "{title}" --due {due}'
-  complete: "remindctl complete {id}"
-  delete: "remindctl delete {id} --force"
-  overdue: "remindctl overdue --json"
-config:
-  lists: [Active, Delegated, Backlog]
-```
+- **Verification requirement**: After creating tasks, skills MUST execute `list_reminders` to confirm tasks appear in the target list by matching title. Never report tasks as created without verification. If a task was reported as created by the tool but is not found in the verification query, flag it as "creation_unverified" and report the discrepancy to the user.
 
 #### List mapping
 
@@ -179,69 +80,91 @@ owner: Name
 
 ---
 
-## Migration Guide: HTTP/CLI → MCP
+## MCP Configuration Examples
 
-### For Calendar (eventlink → MCP)
+Below are copy-paste-ready `.mcp.json` configurations for common platform combinations. Place this file in your workspace root.
 
-**Step 1**: Locate your calendar MCP server (already built)
+**After creating or updating `.mcp.json`, restart Claude Cowork/Code to load the MCP servers.**
 
-**Step 2**: Update `.mcp.json` in your workspace:
+### Apple Calendar + Apple Reminders (macOS)
 
 ```json
 {
   "mcpServers": {
-    "calendar": {
+    "apple-calendar": {
       "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/your/calendar-mcp-server/index.js"],
-      "env": {
-        "CALENDAR_PROVIDER": "apple"
-      }
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "apple-reminders": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
     }
   }
 }
 ```
 
-**Step 3**: Restart Claude Desktop / Cowork
-
-**Step 4**: Test: "What's on my calendar today?"
-
-**Step 5**: Remove eventlink configuration from integrations.md once MCP works
-
-### For Tasks (remindctl → MCP)
-
-**Step 1**: Locate your reminders MCP server (already built)
-
-**Step 2**: Update `.mcp.json` in your workspace:
+### Google Calendar + Todoist (Cross-platform)
 
 ```json
 {
   "mcpServers": {
-    "reminders": {
+    "google-calendar": {
       "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/your/reminders-mcp-server/index.js"],
-      "env": {
-        "REMINDERS_PROVIDER": "apple"
-      }
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-calendar"]
+    },
+    "todoist": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-todoist"]
     }
   }
 }
 ```
 
-**Step 3**: Restart Claude Desktop / Cowork
+### Microsoft 365 Calendar + Microsoft To-Do (Windows/Enterprise)
 
-**Step 4**: Test: "What's on my plate?" or "Create task: Review Q3 roadmap by Friday"
+```json
+{
+  "mcpServers": {
+    "microsoft-365": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-microsoft-365"]
+    }
+  }
+}
+```
 
-**Step 5**: Remove remindctl configuration from integrations.md once MCP works
+**Note**: Microsoft 365 MCP server typically provides both calendar and tasks in one server.
 
-### Testing Migration
+### TickTick (Alternative cross-platform task manager)
 
-After migration, test:
-- **Calendar**: "What's on my calendar today?", "Am I free tomorrow?", "When did I last meet Sarah?"
-- **Tasks**: "What's on my plate?", "Create task: Review Q3 roadmap by Friday"
+```json
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+    },
+    "ticktick": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-ticktick"]
+    }
+  }
+}
+```
 
-All should work identically to HTTP/CLI integrations.
+### Finding Other MCP Servers
+
+Search for MCP servers on:
+- [MCP GitHub Organization](https://github.com/modelcontextprotocol)
+- [Anthropic MCP Repository](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp)
+- NPM packages matching `@modelcontextprotocol/server-*` or `mcp-server-*`
 
 ---
 

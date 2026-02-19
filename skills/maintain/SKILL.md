@@ -1,12 +1,12 @@
 ---
 name: maintain
-description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, and archival
+description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, archival, inbox processing, and reference file updates
 user-invocable: true
 ---
 
-# Maintain skill: health, sync, rebuild, and inbox
+# Maintain skill: health, sync, rebuild, inbox, and update
 
-Comprehensive workspace maintenance with four distinct modes: running health checks, syncing tasks and detecting gaps, rebuilding all index files, and batch-processing inbox items with parallel sub-agents.
+Comprehensive workspace maintenance with five distinct modes: running health checks, syncing tasks and detecting gaps, rebuilding all index files, batch-processing inbox items with parallel sub-agents, and updating workspace reference files to match the latest plugin version.
 
 ---
 
@@ -34,6 +34,7 @@ These operations are more expensive, require user judgment, or have side-effects
 | Full index rebuild | `/maintain rebuild` | Rewrites all `_index.md` files. Expensive for large workspaces. Only needed when indexes are known to be stale or corrupted. |
 | Inbox processing | `/maintain inbox` | Spawns sub-agents that create tasks and memory entries. Requires user to review and confirm the processing plan before execution. |
 | Comprehensive sync | `/maintain sync --comprehensive` | Queries MCP sources (project tracker, calendar), scans last 90 days of journal. Higher cost. Surfaces items that need user triage. |
+| Reference file update | `/maintain update` | Updates workspace reference files to match latest plugin version. Preserves user data. Requires user to review changes before applying. |
 | Unarchive content | (manual) | Requires user to select specific archived files to restore. No bulk unarchive. |
 | Manual health fixes | `/maintain health` | Script-detected issues that require human judgment (file renames, broken wikilink resolution, frontmatter corrections). |
 
@@ -530,116 +531,228 @@ Wait for user confirmation before spawning sub-agents. Allow the user to exclude
 
 ### Step 3: Parallel sub-agent processing
 
-After user confirmation, spawn **one sub-agent per inbox item** using the Task tool. **Launch all sub-agents in a single message** for maximum parallelism.
+After user confirmation:
 
-For each item, move the file from `inbox/pending/` to `inbox/processing/` before spawning the sub-agent.
+1. Move ALL files from `inbox/pending/` to `inbox/processing/` as a sequential batch. Complete all moves before proceeding.
+2. Spawn **one sub-agent per inbox item** using the Task tool. **Launch all sub-agents in a single message** for maximum parallelism.
+
+The move-all-first ordering prevents any concurrent session from double-processing items.
 
 ##### Sub-agent template by content type
 
 **Transcript items:**
 ```
 You are processing a meeting transcript from the inbox.
+Use the meeting skill pipeline (skills/meeting/SKILL.md) as your execution guide.
 
-Move file from: inbox/processing/{filename}
-Read the transcript file.
-Read reference/replacements.md and apply canonical names.
-Read reference/integrations.md for calendar and task integration details.
+Source file: inbox/processing/{filename}
 
-Execute the meeting processing pipeline:
-1. Process transcript and generate structured report
-2. Save to journal/YYYY-MM/YYYY-MM-DD-{slug}.md
-3. Extract tasks and create via task integration
-4. Extract memory and update knowledge graph
+Step 1: Load reference files (MANDATORY before reading transcript)
+- Read reference/replacements.md. Apply canonical names to ALL content.
+- Read reference/integrations.md (Calendar and Tasks sections).
+- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
+  These indexes are required for wikilink validation in Step 4.
 
-After completion, move the source file to inbox/completed/{filename}.
+Step 2: Resolve transcript content
+- Read the transcript file.
+- Resolve speaker names: if speakers are generic ("Speaker 1"), infer real names from context.
+  NEVER use generic speaker labels in output.
+- Query calendar integration for this meeting date to retrieve attendee list, official title, and organizer.
+  If calendar is unavailable, proceed with transcript data and note the gap.
+
+Step 3: Generate structured report
+Produce ALL five sections:
+- Topics: discussion points as bullets
+- Updates: status updates from people other than the user (name, project, date)
+- Concerns: risks raised (who, issue, deadline)
+- Decisions: what was decided and who made the call
+- Action items: classified as For me / For others / Unassigned
+
+Step 4: Save to journal
+- Filename: journal/YYYY-MM/YYYY-MM-DD-meeting-{slug}.md
+- Frontmatter: date, title, type: meeting, participants, organizer, topics, initiatives, source
+- Body: use [[wikilink]] syntax for all entity references (people, initiatives, decisions)
+- BEFORE writing any [[Name]], verify the name exists in the memory indexes read in Step 1.
+  If a name does NOT appear in any index AND is not in replacements.md: add it to reference/replacements.md
+  with placeholder "?? (needs canonical form)" and include it in the unverified_wikilinks field.
+  Do NOT fabricate wikilinks for unverified names.
+
+Step 5: Extract tasks
+- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
+- Check for duplicates across all configured task lists
+- Create via task integration. Resolve relative dates to YYYY-MM-DD.
+- Check each tool response. Only count a task as created if the response confirms success.
+- After all creation attempts, execute list_reminders for each list that received new tasks.
+  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
+  NEVER report tasks as created without verification.
+
+Step 6: Extract memory
+- Apply durability test to each insight
+- Persist durable insights to memory/ using the folder mapping from the core skill
+- Update relevant _index.md files after writing
+- Use .lock files for memory writes (cowork protocol)
+
+After all steps complete, move the source file to inbox/completed/{filename}.
 
 Return JSON:
 {
-  "status": "ok" | "error",
+  "status": "ok" | "partial" | "error",
   "source_file": "{filename}",
   "content_type": "transcript",
   "journal_path": "journal/YYYY-MM/...",
   "tasks_created": 0,
   "memory_updates": 0,
+  "creation_unverified": [],
+  "unverified_wikilinks": [],
   "errors": []
 }
+Status "partial": journal entry was saved but one or more downstream steps failed.
+Status "error": the journal entry could not be saved.
 ```
 
 **Article/wisdom items:**
 ```
 You are extracting wisdom from an article in the inbox.
+Use the wisdom extraction pipeline (skills/learn/SKILL.md, Mode B) as your execution guide.
 
-Read the article file at: inbox/processing/{filename}
-Read reference/replacements.md and apply canonical names.
+Source file: inbox/processing/{filename}
 
-Execute the wisdom extraction pipeline:
-1. Identify key insights, frameworks, and actionable takeaways
-2. Apply durability test to each insight
-3. Persist durable insights to appropriate memory locations
-4. Save extraction report to journal/YYYY-MM/YYYY-MM-DD-wisdom-{slug}.md
-5. Extract any tasks or action items
+Step 1: Load reference files (MANDATORY before reading article)
+- Read reference/replacements.md. Apply canonical names to ALL content.
+- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
+  Required for wikilink validation before writing to memory.
 
-After completion, move the source file to inbox/completed/{filename}.
+Step 2: Read and classify article content.
+
+Step 3: Extract insights
+- Apply durability test to each insight (all four criteria from core skill memory protocol).
+- Discard insights that fail.
+
+Step 4: Persist durable insights to memory
+- Map each passing insight to the correct memory folder (people, initiatives, decisions, etc.)
+- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
+  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
+  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
+  Do NOT fabricate wikilinks for unverified names.
+- Update relevant _index.md after each write.
+- Use .lock files for memory writes (cowork protocol).
+
+Step 5: Save extraction report
+- Filename: journal/YYYY-MM/YYYY-MM-DD-wisdom-{slug}.md
+
+Step 6: Extract tasks
+- Apply accountability test.
+- Create via task integration.
+- Check each tool response. Only count a task as created if the response confirms success.
+- After all creation attempts, execute list_reminders for each list that received new tasks.
+  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
+  NEVER report tasks as created without verification.
+
+After all steps complete, move the source file to inbox/completed/{filename}.
 
 Return JSON:
 {
-  "status": "ok" | "error",
+  "status": "ok" | "partial" | "error",
   "source_file": "{filename}",
   "content_type": "article",
   "journal_path": "journal/YYYY-MM/...",
   "insights_persisted": 0,
   "tasks_created": 0,
+  "creation_unverified": [],
+  "unverified_wikilinks": [],
   "errors": []
 }
+Status "partial": journal entry was saved but one or more downstream steps failed.
+Status "error": the journal entry could not be saved.
 ```
 
 **Notes items:**
 ```
 You are processing notes from the inbox.
 
-Read the notes file at: inbox/processing/{filename}
-Read reference/replacements.md and apply canonical names.
-Read reference/integrations.md Tasks section for task creation.
+Source file: inbox/processing/{filename}
 
-Execute:
-1. Extract tasks (apply accountability test, check duplicates, create via task integration)
-2. Extract durable memory (apply durability test, persist to memory/)
-3. Save summary to journal/YYYY-MM/YYYY-MM-DD-notes-{slug}.md
+Step 1: Load reference files (MANDATORY before reading notes)
+- Read reference/replacements.md. Apply canonical names to ALL content.
+- Read reference/integrations.md Tasks section for task creation.
+- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
+  Required for wikilink validation before writing to memory or journal.
 
-After completion, move the source file to inbox/completed/{filename}.
+Step 2: Read the notes file.
+
+Step 3: Extract tasks
+- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
+- Check for duplicates across all configured task lists
+- Create via task integration. Resolve relative dates to YYYY-MM-DD.
+- Check each tool response. Only count a task as created if the response confirms success.
+- After all creation attempts, execute list_reminders for each list that received new tasks.
+  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
+  NEVER report tasks as created without verification.
+
+Step 4: Extract durable memory
+- Apply durability test to each insight.
+- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
+  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
+  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
+  Do NOT fabricate wikilinks for unverified names.
+- Persist passing insights to memory/. Update relevant _index.md files.
+- Use .lock files for memory writes (cowork protocol).
+
+Step 5: Save notes summary
+- Filename: journal/YYYY-MM/YYYY-MM-DD-notes-{slug}.md
+- Body: use [[wikilink]] syntax for verified entity references only.
+
+After all steps complete, move the source file to inbox/completed/{filename}.
 
 Return JSON:
 {
-  "status": "ok" | "error",
+  "status": "ok" | "partial" | "error",
   "source_file": "{filename}",
   "content_type": "notes",
   "journal_path": "journal/YYYY-MM/...",
   "tasks_created": 0,
   "memory_updates": 0,
+  "creation_unverified": [],
+  "unverified_wikilinks": [],
   "errors": []
 }
+Status "partial": journal entry was saved but one or more downstream steps failed.
+Status "error": the journal entry could not be saved.
 ```
 
 ### Step 4: Collect results and handle failures
 
-After all sub-agents complete:
-1. Collect JSON results from each sub-agent
-2. For any sub-agent that failed, move its file from `inbox/processing/` to `inbox/failed/` and create a companion `.error` file with the error details
-3. Generate consolidated report
+After all sub-agents complete, collect JSON results from each sub-agent and evaluate status:
+
+**Status "ok"**: All steps completed successfully. No action needed beyond reporting.
+
+**Status "partial"**: The journal entry was saved but one or more downstream steps failed.
+- Do NOT move the source file to `inbox/failed/` (the journal entry exists and is valid).
+- Source file is already in `inbox/completed/` (sub-agent moved it).
+- In the consolidated report, flag the item with status "partial" and list which steps failed (derive from the `errors[]` array).
+- Surface any `unverified_wikilinks[]` so the user can resolve them.
+- Surface any `creation_unverified[]` tasks prominently so the user knows to check.
+
+**Status "error"**: The journal entry could not be saved. The sub-agent failed entirely.
+- Move the source file from `inbox/processing/` to `inbox/failed/`.
+- Create a companion `.error` file at `inbox/failed/{filename}.error` containing the `errors[]` array.
+
+Generate consolidated report (format defined in "Inbox mode output" below).
 
 ### Sub-agent input/output contracts (inbox mode)
 
 | Content type | Input | Output | Failure mode |
 |-------------|-------|--------|-------------|
-| Transcript | Source file, replacements.md, integrations.md | JSON: journal path, tasks created, memory updates | Move to inbox/failed/, create .error file |
-| Article | Source file, replacements.md | JSON: journal path, insights persisted, tasks created | Move to inbox/failed/, create .error file |
-| Notes | Source file, replacements.md, integrations.md | JSON: journal path, tasks created, memory updates | Move to inbox/failed/, create .error file |
+| Transcript | Source file, replacements.md, integrations.md, memory indexes (people, initiatives, decisions) | JSON: journal path, tasks created, memory updates, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
+| Article | Source file, replacements.md, memory indexes (people, initiatives, decisions) | JSON: journal path, insights persisted, tasks created, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
+| Notes | Source file, replacements.md, integrations.md, memory indexes (people, initiatives, decisions) | JSON: journal path, tasks created, memory updates, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
 
 **Shared constraints for all inbox sub-agents:**
 - Each sub-agent operates with fully isolated context
 - Each sub-agent reads its own copy of reference files (no shared state)
 - Memory writes must use `.lock` files (see core skill cowork protocol)
 - Task creation checks for duplicates independently per sub-agent
+- Task creation MUST be verified via `list_reminders` after all creation attempts
 - If a sub-agent fails, other sub-agents continue unaffected
 
 ### Inbox mode output
@@ -651,8 +764,13 @@ After all sub-agents complete:
 | # | File | Type | Journal | Tasks | Memory | Status |
 |---|------|------|---------|-------|--------|--------|
 | 1 | meeting-2026-02-05.txt | transcript | journal/2026-02/... | 3 | 2 | ok |
-| 2 | article-ai-strategy.md | article | journal/2026-02/... | 1 | 4 | ok |
+| 2 | article-ai-strategy.md | article | journal/2026-02/... | 0 | 4 | partial (tasks failed) |
 | 3 | notes-from-call.txt | notes | journal/2026-02/... | 2 | 1 | ok |
+
+### Partial items
+| File | Journal saved | Failed steps | Unverified wikilinks | Unverified tasks |
+|------|---------------|-------------|----------------------|------------------|
+| article-ai-strategy.md | journal/2026-02/... | tasks (0 created) | [[Unknown Vendor]] | -- |
 
 ### Failed items
 | File | Error |
@@ -660,11 +778,13 @@ After all sub-agents complete:
 | (none) | |
 
 ### Summary
-- Items processed: N
+- Items processed: N (ok: N, partial: N)
 - Items failed: N
-- Tasks created: N (total across all items)
+- Tasks created: N (total across all items, verified via list_reminders)
+- Tasks unverified: N (created but not confirmed in list)
 - Memory updates: N (total across all items)
 - Journal entries created: N
+- Unverified wikilinks: N (names not found in memory indexes)
 ```
 
 ### Progress tracking (TodoWrite) for inbox mode
@@ -679,6 +799,105 @@ After all sub-agents complete:
 ```
 
 Mark all item-processing todos as `in_progress` simultaneously when spawning sub-agents. Mark each `completed` as its sub-agent returns.
+
+---
+
+## Update mode
+
+Update workspace reference files to match the installed plugin version. Preserves user customizations (name replacements, KPI definitions, schedule items) while applying structural changes from plugin updates.
+
+### Step 1: Version check
+
+Read `reference/.housekeeping-state.yaml` for `plugin_version`.
+Read the plugin's `.claude-plugin/plugin.json` for the current version.
+
+If both versions match, report "Workspace reference files are up to date (v{version})" and exit.
+If the workspace has no `plugin_version` field, this is the first update — proceed.
+
+### Step 2: Dry-run preview
+
+Run the update script in preview mode:
+
+```bash
+python3 scripts/update-reference.py {workspace_path} {plugin_path} --dry-run
+```
+
+Parse the JSON output and present to the user:
+
+```markdown
+## Reference file update preview (v{old} → v{new})
+
+### Files to update
+| File | Action | User data preserved |
+|------|--------|-------------------|
+| taxonomy.md | Full replace | (none — no user data) |
+| integrations.md | Section merge | status: configured (Tasks) |
+
+### New files to create
+| File | Description |
+|------|-------------|
+| shortcuts.md | Command reference |
+
+### Files unchanged
+- replacements.md, schedule.md
+
+### Warnings
+- (any conflicts or issues)
+
+Proceed with update?
+```
+
+Wait for user confirmation.
+
+### Step 3: Apply update
+
+After user confirmation, run without `--dry-run`:
+
+```bash
+python3 scripts/update-reference.py {workspace_path} {plugin_path}
+```
+
+Parse the JSON output and report:
+
+```markdown
+## Reference files updated (v{new})
+
+- Files updated: N
+- Files created: N
+- Files unchanged: N
+- User data preserved: (list)
+- Warnings: (list)
+```
+
+### When the script is not available
+
+If `scripts/update-reference.py` is not found, provide manual update guidance:
+
+1. **Safe to overwrite** (no user data): `taxonomy.md`, `workflows.md`, `shortcuts.md`, `guardrails.yaml`
+   - Copy from plugin source directly
+
+2. **Requires manual merge** (contain user data):
+   - `integrations.md`: Copy new constraint rules from plugin, keep your `status:` fields
+   - `replacements.md`: Copy updated header/instructions from plugin, keep your name/team/product rows
+   - `schedule.md`: Copy updated format spec from plugin, keep your recurring/one-time items
+   - `kpis.md`: Copy updated header/instructions from plugin, keep your team/initiative sections
+
+3. **State files** (machine-managed): `.housekeeping-state.yaml`, `maturity.yaml`
+   - Add any new keys from plugin source, keep existing values
+
+### Update mode output
+
+```markdown
+## Update complete
+
+| Category | Count |
+|----------|-------|
+| Files updated | N |
+| Files created | N |
+| Files unchanged | N |
+| User data preserved | N sections |
+| Warnings | N |
+```
 
 ---
 
@@ -742,7 +961,7 @@ Present the findings using the output format above. For auto-fixes, apply them a
 
 **Inbox mode:**
 - Main agent: Read `inbox/pending/` file list + first 50 lines of each file for classification
-- Each sub-agent: Read its assigned source file + `reference/replacements.md` + `reference/integrations.md` + relevant memory indexes
+- Each sub-agent: Read its assigned source file + `reference/replacements.md` + `reference/integrations.md` + `memory/people/_index.md` + `memory/initiatives/_index.md` + `memory/decisions/_index.md` (all three indexes mandatory for wikilink validation) + `list_reminders` queries for task verification
 - Sub-agents have isolated context; budget is per-item, not cumulative
 
 ---
@@ -775,7 +994,9 @@ Present the findings using the output format above. For auto-fixes, apply them a
 - ALWAYS create .error companion files for failed items
 - ALWAYS use `.lock` files for memory writes from parallel sub-agents
 - NEVER spawn sub-agents for items classified as `unknown` (require manual review)
-- ALWAYS move files to `inbox/processing/` before spawning sub-agents (prevents double-processing)
+- ALWAYS move ALL `inbox/pending/` files to `inbox/processing/` BEFORE spawning any sub-agents
+- NEVER write `[[wikilinks]]` for names not verified against memory indexes (flag as unverified instead)
+- NEVER report tasks as created without verifying via `list_reminders` after creation
 
 ---
 

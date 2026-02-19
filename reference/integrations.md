@@ -57,6 +57,7 @@ required: true
 **Constraints**:
 - Parse notes defensively: missing fields = unknown, not error
 - Only create/edit/delete in allowed lists
+- **Verification requirement**: After creating tasks, skills MUST execute `list_reminders` to confirm tasks appear in the target list by matching title. Never report tasks as created without verification. If a task was reported as created by the tool but is not found in the verification query, flag it as "creation_unverified" and report the discrepancy to the user.
 
 #### List mapping
 

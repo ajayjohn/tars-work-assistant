@@ -258,6 +258,13 @@ After generating wisdom report, automatically:
    - "Need to follow up on Y" -> Task for user
    - Research items -> Backlog tasks
 
+   For EACH task:
+   - Execute the `create_reminder` operation via the task integration
+   - Check the tool response. Only count a task as "created" if the response confirms success.
+   - If the response indicates an error, skip and note in output.
+
+   **After all creation attempts**, execute `list_reminders` for each list that received new tasks. Verify each task appears by matching title. Tasks reported as created but missing from the list are "creation_unverified" — report them to the user. NEVER report a task as created without this verification.
+
 ---
 
 ### Output format (Wisdom mode)
@@ -288,6 +295,10 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 
 ## Task updates
 | Operation | Task | Details |
+
+## Creation unverified
+| Task | List | Issue |
+(Tasks reported created but not found in list_reminders verification)
 ```
 
 ---
@@ -321,6 +332,7 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 - NEVER output without comprehensive explanations
 - NEVER forget to extract memory and tasks
 - NEVER omit the `wisdom-` prefix in filename
+- NEVER report tasks as created without verifying via `list_reminders` after creation
 
 ### Shared constraints
 - NEVER skip frontmatter template requirements

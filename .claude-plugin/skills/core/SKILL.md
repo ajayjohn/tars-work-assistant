@@ -98,6 +98,7 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 | Initiative status, health check | `skills/initiative/` (status mode) | -- |
 | User corrects a fact, shares org context, mentions new person/initiative | `skills/learn/` (memory mode) | Proactive learning: offer to persist |
 | "Process inbox", "check inbox", "batch process" | `skills/maintain/` (inbox mode) | parallel sub-agents per item |
+| "Update workspace", "update reference files", "sync to latest plugin" | `skills/maintain/` (update mode) | update workspace reference files |
 | "Setup", "get started", "configure TARS", "onboard", "welcome" | `skills/welcome/` | scaffold, verify integrations |
 
 ### Routing rules

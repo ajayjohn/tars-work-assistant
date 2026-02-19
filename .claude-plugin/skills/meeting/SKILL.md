@@ -170,16 +170,26 @@ For each action item in the journal:
    - Default to `backlog` if no due date
    - Source: {journal_file_path}
 4. Execute the `add` operation via the task integration with metadata in notes field
-5. Place in appropriate list based on owner and due date:
+5. Check each tool response. Only add to tasks_created if the response confirms success.
+   If the response indicates failure, add to errors[].
+6. Place in appropriate list based on owner and due date:
    - Has due date + owner is user -> `Active` list
    - Has due date + owner is other -> `Delegated` list
    - No due date -> `Backlog` list
+
+After all creation attempts, execute `list_reminders` for each list that received
+new tasks. Verify each task appears by matching title. Add any tasks that were
+reported as created but are missing from the list to the "creation_unverified" array.
+
+NEVER populate tasks_created based on intent. Only include tasks confirmed present
+in the verification query.
 
 Return a JSON summary of tasks created:
 {
   "tasks_created": [
     {"title": "...", "owner": "...", "list": "...", "due": "..."}
   ],
+  "creation_unverified": [],
   "duplicates_skipped": [...],
   "errors": [...]
 }
@@ -206,6 +216,7 @@ You are extracting durable memory from a meeting journal entry.
 
 Read the journal file at: {journal_file_path}
 Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md
+Read reference/replacements.md and apply canonical names.
 
 Apply durability test to insights from the meeting:
 - Stakeholder updates -> memory/people/{name}.md
@@ -214,8 +225,11 @@ Apply durability test to insights from the meeting:
 - Update relevant _index.md files
 
 Do NOT persist: scheduling logistics, temporary blockers, action items.
-Use [[wikilink]] syntax for all entity references.
-Read reference/replacements.md and apply canonical names.
+
+BEFORE writing any [[wikilink]] in a memory file, verify the referenced entity exists
+in one of the memory indexes read above. If the entity does NOT exist in any index,
+do NOT fabricate the wikilink. Instead, write the name as plain text and note it in
+the "skipped" array with reason "unverified entity reference".
 
 Return a JSON summary of memory updates:
 {
@@ -236,7 +250,7 @@ After both sub-agents complete, collect their results and merge into the output 
 
 | Sub-agent | Input | Output | Failure mode |
 |-----------|-------|--------|-------------|
-| Task extraction | Journal file path, integrations.md Tasks section, replacements.md | JSON: tasks created, duplicates skipped, errors | Report errors in summary, do not block memory extraction |
+| Task extraction | Journal file path, integrations.md Tasks section, replacements.md | JSON: tasks created, creation unverified, duplicates skipped, errors | Report errors in summary, do not block memory extraction |
 | Memory extraction | Journal file path, memory indexes, replacements.md | JSON: files created, files updated, insights skipped | Report errors in summary, do not block task extraction |
 
 **Shared constraints for both sub-agents:**

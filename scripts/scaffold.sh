@@ -128,6 +128,30 @@ EOF
     ((indexes_created++))
 fi
 
+# ─── Read plugin version ─────────────────────────────────────────
+
+plugin_version="unknown"
+if [ -f "$PLUGIN_DIR/.claude-plugin/plugin.json" ]; then
+    plugin_version=$(python3 -c "import json; print(json.load(open('$PLUGIN_DIR/.claude-plugin/plugin.json')).get('version', 'unknown'))" 2>/dev/null || echo "unknown")
+fi
+
+# ─── Write plugin version to housekeeping state ──────────────────
+
+state_file="$WORKSPACE/reference/.housekeeping-state.yaml"
+if [ ! -f "$state_file" ]; then
+    cat > "$state_file" << STATEEOF
+last_run: null
+last_success: null
+run_count: 0
+last_archival: null
+last_index_rebuild: null
+pending_inbox_count: 0
+plugin_version: $plugin_version
+STATEEOF
+elif ! grep -q "plugin_version:" "$state_file" 2>/dev/null; then
+    echo "plugin_version: $plugin_version" >> "$state_file"
+fi
+
 # ─── Verify integrations ─────────────────────────────────────────
 
 remindctl_status="not_found"

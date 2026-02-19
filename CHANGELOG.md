@@ -1,10 +1,33 @@
 # Changelog
 
 
+
+## v2.1.0 (2026-02-19)
+
+> Bumped from v2.0.1
+
+
 ## v2.0.1 (2026-02-10)
 
 > Bumped from v2.0.0
 
+### Added
+- **Task creation verification**: All task creation paths (meeting, inbox, tasks skills) now include mandatory post-creation verification via `list_reminders`. Prevents silent failures where tasks are reported as created but never appear in the task manager.
+- **Reference file update mechanism**: New `scripts/update-reference.py` surgically updates workspace reference files when the plugin is updated, preserving user customizations (name replacements, KPI definitions, schedule items). Three merge strategies: `full_replace`, `section_merge`, `additive_merge`.
+- **Maintain update mode**: New `/maintain update` mode checks workspace reference files against the installed plugin version and applies updates with user confirmation.
+- **Plugin version tracking**: `scaffold.sh` now writes `plugin_version` to `.housekeeping-state.yaml` at install time. Used by update-reference.py to detect stale workspaces.
+- **Wikilink validation**: Inbox sub-agent templates now read memory indexes before creating wikilinks. Unverified names are flagged and added to replacements.md with placeholders.
+
+### Changed
+- **Inbox sub-agent templates**: Expanded from thin bullet-point templates to structured 6-step pipelines with memory index reads, speaker resolution, calendar lookup, structured report sections, wikilink validation, and task verification.
+- **Inbox result collection**: Three-way handling (ok/partial/error) replaces binary ok/error. Partial status captures items where the journal was saved but task creation or memory extraction had issues.
+- **Inbox file-move ordering**: Files are now moved from pending to processing as a batch before any sub-agents are spawned (prevents race conditions).
+- **Task skill Step 6**: Now requires checking each `create_reminder` tool response before counting a task as created. New Step 7 calls `list_reminders` for post-creation verification.
+- **Meeting skill Sub-agent A**: Task extraction template now includes response checking and `list_reminders` verification with `creation_unverified` tracking.
+- **Integrations.md Tasks section**: Added verification requirement constraint.
+- **Script count**: 9 → 10 (added update-reference.py)
+
+---
 
 All notable changes to the TARS framework are documented in this file.
 

@@ -1,10 +1,10 @@
 <!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
 
-# TARS 2.0.1 Architecture
+# TARS 2.1.0 Architecture
 
-> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS 2.0.1 framework without re-analyzing every file.
+> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS 2.1.0 framework without re-analyzing every file.
 
-**Version**: 2.0.1
+**Version**: 2.1.0
 **Release**: 2026-02-08
 **Architecture**: Native Claude plugin with consolidated skills, provider-agnostic integrations, and scripted operations
 
@@ -16,7 +16,7 @@ TARS is a **knowledge work assistant plugin** for Claude Code and Claude Cowork.
 
 Target users: executives, senior ICs, and knowledge workers who need structured thinking support across recurring workflows.
 
-**2.0.1 key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~60 (from ~115 in v1.5.0). Deterministic operations extracted to 9 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
+**2.1.0 key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~60 (from ~115 in v1.5.0). Deterministic operations extracted to 10 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
 
 ---
 
@@ -27,7 +27,7 @@ Target users: executives, senior ICs, and knowledge workers who need structured 
 ```
 tars/
 ├── .claude-plugin/
-│   ├── plugin.json                      # 2.0.1 manifest (12 skills, 11 commands)
+│   ├── plugin.json                      # 2.1.0 manifest (12 skills, 11 commands)
 │   └── marketplace.json                 # Marketplace catalog entry
 ├── .mcp.json                            # Filesystem MCP server configured
 ├── skills/
@@ -38,7 +38,7 @@ tars/
 │   ├── think/SKILL.md                   # Workflow: strategic analysis, debate, stress-test, deep, discover (+ manifesto.md)
 │   ├── briefing/SKILL.md                # Workflow: daily + weekly briefings
 │   ├── initiative/SKILL.md              # Workflow: plan, status, performance
-│   ├── maintain/SKILL.md                # Workflow: health-check, sync, rebuild, inbox
+│   ├── maintain/SKILL.md                # Workflow: health-check, sync, rebuild, inbox, update
 │   ├── welcome/SKILL.md                 # Workflow: progressive onboarding (3 phases)
 │   ├── communicate/SKILL.md             # Workflow: stakeholder comms (+ text-refinement.md)
 │   ├── create/SKILL.md                  # Workflow: decks, narratives, speeches
@@ -56,7 +56,8 @@ tars/
 │   ├── verify-integrations.py           # Auto-detect and validate provider status
 │   ├── scan-secrets.py                  # Sensitive data pattern detection
 │   ├── bump-version.py                  # Version management
-│   └── runner.sh                        # Script orchestration (called by maintain skill)
+│   ├── runner.sh                        # Script orchestration (called by maintain skill)
+│   └── update-reference.py              # Workspace reference file updater (preserves user data)
 ├── reference/                           # 11 configuration files (copied to workspace by /welcome)
 │   ├── integrations.md                  # Provider-agnostic registry (category/status/provider/type)
 │   ├── taxonomy.md                      # Memory types, tags, frontmatter templates
@@ -112,7 +113,7 @@ tars/
 └── ROADMAP.md
 ```
 
-**Total**: 12 skills (1 background + 11 workflow), 11 commands, 11 reference templates, 9 scripts, 8 validation tests
+**Total**: 12 skills (1 background + 11 workflow), 11 commands, 11 reference templates, 10 scripts, 8 validation tests
 
 ### Workspace (created by /welcome)
 
@@ -180,7 +181,7 @@ This architecture provides dramatic token savings while maintaining full feature
 
 **Session baseline comparison**:
 - v1.5.0: ~115 tokens (metadata from 28 skills)
-- 2.0.1: ~60 tokens (metadata from 12 skills, plus housekeeping state check)
+- 2.1.0: ~60 tokens (metadata from 12 skills, plus housekeeping state check)
 - **Net savings**: ~55 tokens per session, ~50% skill reduction
 
 ---
@@ -209,7 +210,7 @@ User-invocable skills containing complete workflow logic. Sub-agents handle para
 | **think** | Strategic analysis, debate, stress-test, deep analysis, discovery | Strategic analysis (Tree of Thoughts) • Executive council (CPO/CTO personas) • Validation council (adversarial stress-test) • Discovery mode (no-solution deep) |
 | **briefing** | Daily + weekly briefings | Agenda assembly • Insight synthesis |
 | **initiative** | Initiative planning, status, performance | Plan (structure, timeline, risks) • Status (progress, blockers, adjustments) • Performance (KPI analysis) |
-| **maintain** | Health-check, sync, rebuild, inbox processing | Health checks • Script orchestration via runner.sh/runner.py |
+| **maintain** | Health-check, sync, rebuild, inbox processing, reference file updates | Health checks • Script orchestration via runner.sh/runner.py |
 | **welcome** | Progressive onboarding (3 phases) | Phase 1: Instant setup (directories + CLAUDE.md) • Phase 2: First win (sample memory, journal entry) • Phase 3: Background learning (system walkthrough) |
 | **communicate** | Stakeholder communications | Text refinement (tone, structure, clarity) |
 | **create** | Decks, narratives, speeches | Outline generation • Content assembly • Visual notes |
@@ -249,13 +250,13 @@ The `/welcome` skill auto-detects providers via `verify-integrations.py` and upd
 
 ---
 
-## Key 2.0.1 innovations
+## Key 2.1.0 innovations
 
 ### 1. Skill consolidation
 28 skills → 12 skills (~50% reduction). Related workflow skills merged (e.g., strategic-analysis + executive-council + validation-council + discovery-mode → think). All 7 background skills → core.
 
 ### 2. Script extraction
-9 Python/shell scripts handle deterministic operations:
+10 Python/shell scripts handle deterministic operations:
 - `health-check.py`: Workspace scan
 - `rebuild-indexes.py`: Index regeneration
 - `scaffold.sh`: Directory initialization
@@ -265,6 +266,7 @@ The `/welcome` skill auto-detects providers via `verify-integrations.py` and upd
 - `scan-secrets.py`: Sensitive data pattern detection (via guardrails.yaml)
 - `bump-version.py`: Version management
 - `runner.sh`: Script orchestration
+- `update-reference.py`: Workspace reference file updater (preserves user customizations)
 
 Benefits: Cheaper (no token overhead), more reliable (no hallucination), easier to test, auditable.
 
@@ -352,6 +354,12 @@ patterns:
 
 ### 13. Global communication rules
 BLUF, anti-sycophancy, banned phrases apply to **ALL** skill outputs, not just the communication skill. Enforced by core skill.
+
+### 14. Reference file update mechanism
+`update-reference.py` surgically updates workspace reference files when the plugin is updated, preserving user customizations (name replacements, KPI definitions, schedule items). Three merge strategies: `full_replace` (files with no user data), `section_merge` (markdown files with mixed template/user sections), `additive_merge` (YAML state files). Version tracked via `plugin_version` in `.housekeeping-state.yaml`. Invoked via `/maintain update`.
+
+### 15. Task creation verification
+All task creation paths (meeting, inbox, tasks skills) include mandatory post-creation verification. After creating tasks via MCP, skills call `list_reminders` to confirm tasks actually appear in the target list. Prevents silent failures where tasks are reported as created but never reach the task manager.
 
 ---
 
@@ -490,14 +498,14 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ## Performance characteristics
 
-| Metric | v1.5.0 | 2.0.1 | Change |
+| Metric | v1.5.0 | 2.1.0 | Change |
 |--------|--------|--------|--------|
 | Session baseline tokens | ~115 | ~60 | -47% |
 | Skill count | 28 | 12 | -57% |
 | Command count | 23 | 11 | -52% |
 | Workflow skills | 19 | 11 | -42% |
 | Background skills | 7 | 1 | -86% |
-| Scripts | 0 | 9 | +9 new |
+| Scripts | 0 | 10 | +10 new |
 | Integration coupling | Hardcoded tool names | Provider-agnostic registry | **Decoupled** |
 | Workspace token baseline (at session start) | ~300 tokens (core files) | ~240 tokens (core + state) | -20% |
 
@@ -505,7 +513,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ## Version history
 
-- **2.0.1** (2026-02-08): Architecture overhaul (skill consolidation, script extraction, provider-agnostic integrations, progressive welcome, 4-tier archival, housekeeping automation)
+- **2.1.0** (2026-02-08): Architecture overhaul (skill consolidation, script extraction, provider-agnostic integrations, progressive welcome, 4-tier archival, housekeeping automation, task verification, reference file updates)
 - **v1.5.0** (2026-02-07): Structural compliance, composite skills, heartbeat, source attribution
 - **v1.4.0** (2026-02-06): Protocol-to-skill migration, 3-level loading, provider abstraction
 - **v1.3.0** (2026-02-04): Plugin decomposition, data/ consolidation
@@ -519,12 +527,12 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ### What changed
 
-| v1.5.0 | 2.0.1 | Reason |
+| v1.5.0 | 2.1.0 | Reason |
 |--------|--------|--------|
 | 7 background skills | 1 core skill | Token efficiency, behavioral consolidation |
 | 19 workflow skills | 11 workflow skills | Merge related workflows (e.g., strategic-analysis + councils → think) |
 | 2 composite skills | 0 composite skills (merged into single skills) | Simplification (think skill handles all analysis modes) |
-| 0 scripts | 9 scripts | Deterministic ops (health checks, archival, index rebuild) moved to Python/shell |
+| 0 scripts | 10 scripts | Deterministic ops (health checks, archival, index rebuild, reference updates) moved to Python/shell |
 | Hardcoded tool references | Provider-agnostic registry | Flexibility (users can swap tools) |
 | 5 reference templates | 11 reference templates | Added guardrails.yaml, maturity.yaml, .housekeeping-state.yaml, getting-started.md, workflows.md, shortcuts.md |
 | Single archive/ directory | 4-tier archive (durable/seasonal/transient/ephemeral) | Smart retention, briefing relevance |
