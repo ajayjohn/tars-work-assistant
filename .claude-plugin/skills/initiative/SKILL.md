@@ -2,6 +2,14 @@
 name: initiative
 description: Initiative planning, status reporting, and KPI-based performance reports with trend analysis
 user-invocable: true
+help:
+  purpose: |-
+    Initiative planning, status reporting, and KPI-based performance reports with trend analysis.
+  use_cases:
+    - "Plan a new initiative for [topic]"
+    - "What's the status of [initiative]?"
+    - "Generate a performance report"
+  scope: initiatives,planning,status,kpis,performance
 ---
 
 # Initiative skill: planning, status, and performance
@@ -280,17 +288,18 @@ initiatives: [Initiative names]
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (index-first pattern, journal persistence, integration constraints). Additionally:
+
 **Planning mode:**
 - NEVER provide hour or sprint estimates
 - NEVER create tickets (report only)
-- NEVER skip dependency analysis in planning mode
+- NEVER skip dependency analysis
 
 **Status mode:**
-- NEVER skip project tracker query in status mode (fall back to memory-only if not configured)
+- NEVER skip project tracker query (fall back to memory-only if not configured)
 
 **Performance mode:**
 - NEVER fabricate metric data (if query fails, report the gap)
 - NEVER skip trend calculation
 - NEVER output without the flagged issues section (even if empty)
-- ALWAYS save to journal
 - ALWAYS note data source limitations in the report

@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under Apache 2.0. See LICENSE. -->
 
-# TARS 2.1.0 Architecture
+# TARS 2.2.0 Architecture
 
-> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS 2.1.0 framework without re-analyzing every file.
+> **Read this first.** This document gives any AI session (or human contributor) enough context to understand, modify, and extend the TARS framework without re-analyzing every file.
 
-**Version**: 2.1.0
-**Release**: 2026-02-08
+**Version**: 2.2.0
+**Release**: 2026-02-19
 **Architecture**: Native Claude plugin with consolidated skills, provider-agnostic integrations, and scripted operations
 
 ---
@@ -16,7 +16,7 @@ TARS is a **knowledge work assistant plugin** for Claude Code and Claude Cowork.
 
 Target users: executives, senior ICs, and knowledge workers who need structured thinking support across recurring workflows.
 
-**2.1.0 key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~60 (from ~115 in v1.5.0). Deterministic operations extracted to 10 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
+**Key improvement**: Architecture consolidation. Skills reduced from 28→12 (~50%), commands from 23→11, and session baseline tokens drop to ~48 (from ~115 in v1.5.0). Deterministic operations extracted to 11 Python/shell scripts. Integration patterns provider-agnostic. Welcome flow simplified to 3 phases.
 
 ---
 
@@ -27,7 +27,7 @@ Target users: executives, senior ICs, and knowledge workers who need structured 
 ```
 tars/
 ├── .claude-plugin/
-│   ├── plugin.json                      # 2.1.0 manifest (12 skills, 11 commands)
+│   ├── plugin.json                      # Manifest (12 skills, 11 commands)
 │   └── marketplace.json                 # Marketplace catalog entry
 ├── .mcp.json                            # Filesystem MCP server configured
 ├── skills/
@@ -56,7 +56,8 @@ tars/
 │   ├── verify-integrations.py           # Auto-detect and validate provider status
 │   ├── scan-secrets.py                  # Sensitive data pattern detection
 │   ├── bump-version.py                  # Version management
-│   ├── runner.sh                        # Script orchestration (called by maintain skill)
+│   ├── build-plugin.sh                  # Plugin packaging for distribution
+│   ├── validate-plugin.py               # Plugin structure validation
 │   └── update-reference.py              # Workspace reference file updater (preserves user data)
 ├── reference/                           # 11 configuration files (copied to workspace by /welcome)
 │   ├── integrations.md                  # Provider-agnostic registry (category/status/provider/type)
@@ -113,7 +114,7 @@ tars/
 └── ROADMAP.md
 ```
 
-**Total**: 12 skills (1 background + 11 workflow), 11 commands, 11 reference templates, 10 scripts, 8 validation tests
+**Total**: 12 skills (1 background + 11 workflow), 11 commands, 11 reference templates, 11 scripts, 8 validation tests
 
 ### Workspace (created by /welcome)
 
@@ -129,8 +130,6 @@ tars/
 │   ├── guardrails.yaml          # Sensitive data patterns
 │   ├── maturity.yaml            # Onboarding progress tracking
 │   ├── .housekeeping-state.yaml # Auto-maintenance state
-│   ├── workflows.md             # Multi-skill patterns
-│   └── shortcuts.md             # Command reference
 │   ├── workflows.md             # Multi-skill patterns
 │   └── shortcuts.md             # Command reference
 ├── GETTING-STARTED.md           # New user guide
@@ -181,8 +180,8 @@ This architecture provides dramatic token savings while maintaining full feature
 
 **Session baseline comparison**:
 - v1.5.0: ~115 tokens (metadata from 28 skills)
-- 2.1.0: ~60 tokens (metadata from 12 skills, plus housekeeping state check)
-- **Net savings**: ~55 tokens per session, ~50% skill reduction
+- v2.2.0: ~48 tokens (metadata from 12 skills at ~4 tokens each)
+- **Net savings**: ~67 tokens per session, ~58% reduction
 
 ---
 
@@ -204,17 +203,17 @@ User-invocable skills containing complete workflow logic. Sub-agents handle para
 
 | Skill | Purpose | Sub-agents |
 |-------|---------|-----------|
-| **meeting** | Meeting transcript processing (full pipeline) | Speaker identification • Emotion analysis • Action item extraction |
-| **tasks** | Extract + manage tasks | Priority classification • Dependency mapping |
-| **learn** | Memory persistence + wisdom extraction | Source extraction • Relevance scoring |
-| **think** | Strategic analysis, debate, stress-test, deep analysis, discovery | Strategic analysis (Tree of Thoughts) • Executive council (CPO/CTO personas) • Validation council (adversarial stress-test) • Discovery mode (no-solution deep) |
-| **briefing** | Daily + weekly briefings | Agenda assembly • Insight synthesis |
-| **initiative** | Initiative planning, status, performance | Plan (structure, timeline, risks) • Status (progress, blockers, adjustments) • Performance (KPI analysis) |
-| **maintain** | Health-check, sync, rebuild, inbox processing, reference file updates | Health checks • Script orchestration via runner.sh/runner.py |
-| **welcome** | Progressive onboarding (3 phases) | Phase 1: Instant setup (directories + CLAUDE.md) • Phase 2: First win (sample memory, journal entry) • Phase 3: Background learning (system walkthrough) |
-| **communicate** | Stakeholder communications | Text refinement (tone, structure, clarity) |
-| **create** | Decks, narratives, speeches | Outline generation • Content assembly • Visual notes |
-| **answer** | Fast factual lookups | Query parsing • Source routing • Confidence tiering |
+| **meeting** | Meeting transcript processing (full pipeline) | Task extraction (parallel) • Memory extraction (parallel) |
+| **tasks** | Extract + manage tasks | None (single-threaded pipeline) |
+| **learn** | Memory persistence + wisdom extraction | None (single-threaded pipeline) |
+| **think** | Strategic analysis, debate, stress-test, deep analysis, discovery | Deep mode: Validation council (parallel) • Executive council (parallel) |
+| **briefing** | Daily + weekly briefings | Calendar fetch (parallel) • Task fetch (parallel) • Memory query (parallel) |
+| **initiative** | Initiative planning, status, performance | None (modes: plan, status, performance) |
+| **maintain** | Health-check, sync, rebuild, inbox processing, reference file updates | Inbox mode: one sub-agent per inbox item (parallel) |
+| **welcome** | Progressive onboarding (3 phases) | None (modes: phase 1, phase 2, phase 3) |
+| **communicate** | Stakeholder communications | None (uses text-refinement.md resource) |
+| **create** | Decks, narratives, speeches | None (single-threaded pipeline) |
+| **answer** | Fast factual lookups | None (index-first search hierarchy) |
 
 ---
 
@@ -235,15 +234,15 @@ The `reference/integrations.md` file uses a category-based structure instead of 
 ## Task integration
 **Category**: tasks
 **Status**: connected
-**Provider**: cli
-**Implementation**: remindctl
+**Provider**: mcp
+**Implementation**: [provider-specific details]
 **Operations**: list-tasks, create-task, complete-task, update-task
 ```
 
 Skills reference **categories** (calendar, tasks, email, documents, etc.), not specific tools. This allows users to swap providers without skill modifications:
 
 - **http-api**: REST endpoints (Zapier, custom APIs)
-- **cli**: Command-line tools (remindctl, curl)
+- **cli**: Command-line tools
 - **mcp**: Model Context Protocol servers
 
 The `/welcome` skill auto-detects providers via `verify-integrations.py` and updates status.
@@ -256,7 +255,7 @@ The `/welcome` skill auto-detects providers via `verify-integrations.py` and upd
 28 skills → 12 skills (~50% reduction). Related workflow skills merged (e.g., strategic-analysis + executive-council + validation-council + discovery-mode → think). All 7 background skills → core.
 
 ### 2. Script extraction
-10 Python/shell scripts handle deterministic operations:
+11 Python/shell scripts handle deterministic operations:
 - `health-check.py`: Workspace scan
 - `rebuild-indexes.py`: Index regeneration
 - `scaffold.sh`: Directory initialization
@@ -265,7 +264,8 @@ The `/welcome` skill auto-detects providers via `verify-integrations.py` and upd
 - `verify-integrations.py`: Provider auto-detection
 - `scan-secrets.py`: Sensitive data pattern detection (via guardrails.yaml)
 - `bump-version.py`: Version management
-- `runner.sh`: Script orchestration
+- `build-plugin.sh`: Plugin packaging for distribution
+- `validate-plugin.py`: Plugin structure validation
 - `update-reference.py`: Workspace reference file updater (preserves user customizations)
 
 Benefits: Cheaper (no token overhead), more reliable (no hallucination), easier to test, auditable.
@@ -296,14 +296,14 @@ Replaced pipe tables with YAML frontmatter in index files. Enables editability, 
 Four directories (pending/processing/completed/failed) enable asynchronous processing. Items can be queued for later processing without blocking the user.
 
 ### 8. Sub-agent parallelization
-Skills invoke sub-agents for specific tasks (e.g., meeting skill spawns agents for speaker ID, emotion analysis, action extraction). Reduces latency.
+Skills invoke sub-agents for parallel execution. Meeting skill spawns parallel agents for task extraction and memory extraction. Briefing skill spawns parallel agents for calendar, tasks, and memory queries. Think skill (deep mode) spawns parallel validation and executive council agents. Maintain skill (inbox mode) spawns one agent per inbox item.
 
 ### 9. Automated daily housekeeping
-`maintain` skill runs at session start (via housekeeping check in core routing). Calls `runner.sh` to orchestrate:
-- Health check
-- Sync pending tasks + inbox
-- Archive stale content
-- Scan for sensitive data leaks
+`maintain` skill runs at session start (via housekeeping check in core routing). Executes scripts directly:
+- `health-check.py`: Workspace health scan
+- `sync.py`: Sync pending tasks + inbox
+- `archive.py`: Archive stale content
+- `scan-secrets.py`: Sensitive data detection
 
 State tracked in `.housekeeping-state.yaml` (last run, detected issues).
 
@@ -312,20 +312,15 @@ YAML frontmatter in all skills includes:
 ```yaml
 ---
 name: meeting
-description: Process meeting transcripts
+description: Process meeting transcripts to extract reports, tasks, and memory.
 user-invocable: true
 help:
-  purpose: "Extract actions, decisions, and insights from meeting transcripts"
+  purpose: |-
+    Process meeting transcripts with automatic extraction and calendar integration.
   use_cases:
-    - "Turn recorded call into actionable task list"
-    - "Capture decisions with context for memory"
-  invoke_examples:
-    - "Process this Zoom transcript"
-    - "/meeting"
-  common_questions:
-    - "How do you handle side conversations?"
-    - "Can you identify speakers automatically?"
-  related_skills: [tasks, learn, communicate]
+    - "Process this meeting [transcript]"
+    - "Extract action items from this meeting"
+  scope: meetings,transcripts,action-items
 ---
 ```
 
@@ -369,17 +364,12 @@ Inline help metadata in YAML frontmatter enables contextual help without loading
 
 ```yaml
 help:
-  purpose: "High-level description of what this skill does"
+  purpose: |-
+    High-level description of what this skill does.
   use_cases:
     - "Specific user scenario 1"
     - "Specific user scenario 2"
-  invoke_examples:
-    - "Example voice command"
-    - "/command syntax"
-  common_questions:
-    - "FAQ question 1"
-    - "FAQ question 2"
-  related_skills: [skill_name1, skill_name2]
+  scope: comma,separated,keywords
 ```
 
 When user asks "help think":
@@ -415,9 +405,9 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ### Why merge 7 background skills into core?
 
-**Problem**: Loading 7 separate behavioral skills at session start costs ~28 tokens.
+**Problem**: Loading 7 separate behavioral skills at session start costs ~28 tokens (7 × ~4 tokens each).
 **Solution**: Consolidate into one core skill with internal sections (Identity, Communication, Routing, etc.).
-**Result**: Token savings (~24 tokens/session), single source of truth for behavioral constraints, easier to maintain.
+**Result**: Token savings, single source of truth for behavioral constraints, easier to maintain.
 
 ### Why extract scripts?
 
@@ -452,7 +442,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 ### Why automated housekeeping?
 
 **Problem**: Users forget to run maintenance. Indexes get stale, inbox fills up, sensitive data lingers.
-**Solution**: Maintain skill runs at session start (via housekeeping check in core routing). Calls runner.sh to execute health-check.py, sync.py, archive.py, scan-secrets.py.
+**Solution**: Maintain skill runs at session start (via housekeeping check in core routing). Executes health-check.py, sync.py, archive.py, scan-secrets.py directly.
 **Result**: Consistent state, automatic cleanup, proactive security scanning. State tracked in .housekeeping-state.yaml.
 
 ---
@@ -470,9 +460,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
    help:
      purpose: "..."
      use_cases: [...]
-     invoke_examples: [...]
-     common_questions: [...]
-     related_skills: [...]
+     scope: keyword1,keyword2
    ---
    ```
 2. Add to `.claude-plugin/plugin.json` skills array
@@ -483,9 +471,10 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 ### Adding a new script
 
 1. Create `scripts/new-script.py` or `scripts/new-script.sh`
-2. Add to `scripts/runner.sh` or `scripts/runner.py` orchestration
+2. Reference from the appropriate skill (maintain skill calls scripts directly)
 3. Add test file in `tests/validate-new-script.py`
 4. Add to `.github/workflows/validate.yml`
+5. Update this document's script count and directory listing
 
 ### Adding a new integration category
 
@@ -498,22 +487,22 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 
 ## Performance characteristics
 
-| Metric | v1.5.0 | 2.1.0 | Change |
+| Metric | v1.5.0 | v2.2.0 | Change |
 |--------|--------|--------|--------|
-| Session baseline tokens | ~115 | ~60 | -47% |
+| Session baseline tokens | ~115 | ~48 | -58% |
 | Skill count | 28 | 12 | -57% |
 | Command count | 23 | 11 | -52% |
 | Workflow skills | 19 | 11 | -42% |
 | Background skills | 7 | 1 | -86% |
-| Scripts | 0 | 10 | +10 new |
+| Scripts | 0 | 11 | +11 new |
 | Integration coupling | Hardcoded tool names | Provider-agnostic registry | **Decoupled** |
-| Workspace token baseline (at session start) | ~300 tokens (core files) | ~240 tokens (core + state) | -20% |
 
 ---
 
 ## Version history
 
-- **2.1.0** (2026-02-08): Architecture overhaul (skill consolidation, script extraction, provider-agnostic integrations, progressive welcome, 4-tier archival, housekeeping automation, task verification, reference file updates)
+- **v2.2.0** (2026-02-19): Framework audit — documentation consistency fixes, efficiency improvements, automated validation (validate-docs.py), CONTRIBUTING.md
+- **v2.1.0** (2026-02-08): Task verification, reference file updates, inbox sub-agent expansion
 - **v1.5.0** (2026-02-07): Structural compliance, composite skills, heartbeat, source attribution
 - **v1.4.0** (2026-02-06): Protocol-to-skill migration, 3-level loading, provider abstraction
 - **v1.3.0** (2026-02-04): Plugin decomposition, data/ consolidation
@@ -532,7 +521,7 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 | 7 background skills | 1 core skill | Token efficiency, behavioral consolidation |
 | 19 workflow skills | 11 workflow skills | Merge related workflows (e.g., strategic-analysis + councils → think) |
 | 2 composite skills | 0 composite skills (merged into single skills) | Simplification (think skill handles all analysis modes) |
-| 0 scripts | 10 scripts | Deterministic ops (health checks, archival, index rebuild, reference updates) moved to Python/shell |
+| 0 scripts | 11 scripts | Deterministic ops (health checks, archival, index rebuild, reference updates) moved to Python/shell |
 | Hardcoded tool references | Provider-agnostic registry | Flexibility (users can swap tools) |
 | 5 reference templates | 11 reference templates | Added guardrails.yaml, maturity.yaml, .housekeeping-state.yaml, getting-started.md, workflows.md, shortcuts.md |
 | Single archive/ directory | 4-tier archive (durable/seasonal/transient/ephemeral) | Smart retention, briefing relevance |
@@ -549,5 +538,65 @@ Commands are shortcuts. Natural language is the primary interface. Core skill de
 - Strategic analysis (Tree of Thoughts, councils, discovery)
 - Briefing generation (daily/weekly)
 - Task extraction and management
+
+---
+
+## Maintain skill: internal procedures
+
+> **Developer reference.** These procedures describe what the automated scripts do internally. They are preserved here for maintenance and troubleshooting. The maintain skill references this section for fallback procedures when scripts are unavailable.
+
+### Health check procedures (health-check.py)
+
+**Naming pattern validation (decisions):**
+- Standard pattern: `YYYY-MM-DD-{slug}.md`
+- Violations: missing date prefix, context-first ordering (`topic-YYYY-MM-DD.md`), no date anywhere
+- Auto-fix: if frontmatter contains `date` field, suggest rename command
+
+**Frontmatter validation:**
+| Type | Required fields |
+|------|-----------------|
+| All memory | `title`, `type`, `summary`, `updated` |
+| person | + `tags`, `aliases` |
+| decision | + `status` (proposed/decided/implemented/superseded/rejected), `decision_maker` |
+| product-spec | + `status` (active/planned/deprecated), `owner` |
+
+**Index synchronization:**
+- Compare `_index.md` entries against actual `.md` files in each memory category folder
+- Flag orphan index entries (entry without file) and unlisted files (file without index entry)
+- Flag stale summaries where file `updated` date is newer than index regeneration
+
+**Broken wikilink detection:**
+- Scan all files in `memory/`, `journal/`, `contexts/` for `[[Entity Name]]` patterns
+- Cross-reference against all memory category indexes (people, initiatives, products, decisions)
+- Flag wikilinks referencing non-existent entities
+
+**Replacements coverage:**
+- Scan journal files from last 30 days for capitalized multi-word names and acronyms (2-4 caps)
+- Cross-reference against `reference/replacements.md`
+- Flag names appearing multiple times but not in replacements
+- Auto-fix: add flagged items with placeholder `?? (needs canonical form)`
+
+### Rebuild procedures (rebuild-indexes.py)
+
+**Memory indexes:** For each category (people, initiatives, decisions, products, vendors, competitors, organizational-context): scan `.md` files excluding `_index.md`/`_template.md`, read frontmatter (`title`, `aliases`, `tags`, `summary`, `updated`), generate index table. Initiatives split into Active/Completed sections.
+
+**Master index:** Generate `memory/_index.md` with category paths and file counts.
+
+**Journal indexes:** For each month folder, scan `.md` files, read frontmatter (`date`, `type`, `title`, `participants`, `initiatives`), generate month index table.
+
+**Contexts/products index:** Scan `contexts/products/`, read frontmatter (`title`, `type`, `status`, `owner`, `summary`, `updated`), generate product specs index.
+
+**Decision naming validation:** Check all files in `memory/decisions/` match `YYYY-MM-DD-{slug}.md` pattern. Flag violations with suggested renames.
+
+### Archive tier definitions (archive.py)
+
+| Tier | Retention | Examples |
+|------|-----------|---------|
+| Durable | Indefinite | People profiles, strategic decisions, initiative docs |
+| Seasonal | 6-12 months | Quarterly reports, sprint retrospectives |
+| Transient | 30-90 days | Meeting notes for completed initiatives |
+| Ephemeral | 7-14 days | Draft content, temporary working notes |
+
+Lines with `[expires: YYYY-MM-DD]` markers are removed when past their date. Files matching staleness thresholds for their tier are moved to `archive/`.
 
 ---

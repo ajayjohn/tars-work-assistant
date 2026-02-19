@@ -2,7 +2,18 @@
 name: maintain
 description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, archival, inbox processing, and reference file updates
 user-invocable: true
+help:
+  purpose: |-
+    Workspace maintenance: health checks, index rebuilding, task sync, inbox processing, and reference file updates.
+  use_cases:
+    - "Run a health check"
+    - "Rebuild indexes"
+    - "Process my inbox"
+    - "Sync my tasks"
+  scope: maintenance,health,sync,rebuild,inbox,update
 ---
+<!-- MAINTENANCE: If modifying this skill, run tests/validate-docs.py
+     to check for broken cross-references. See CONTRIBUTING.md. -->
 
 # Maintain skill: health, sync, rebuild, inbox, and update
 
@@ -111,7 +122,7 @@ For each file in memory:
 1. Compare file `updated` date with index entry
 2. Flag if file was modified more recently than index was regenerated
 
-**Auto-fix (safe):** Run `/rebuild-index` to resync all indexes.
+**Auto-fix (safe):** Run `/maintain rebuild` to resync all indexes.
 
 ### Step 5: Broken wikilink detection
 
@@ -165,34 +176,24 @@ Generate report in this format:
 ```markdown
 ## Housekeeping report (YYYY-MM-DD)
 
-### Issues found
-
-| Category | File | Issue | Suggested fix |
-|----------|------|-------|---------------|
-| naming | decisions/ba-role-definition.md | Missing date prefix | Rename to 2026-01-15-ba-role-definition.md |
-| frontmatter | contexts/products/dbi.md | Missing frontmatter | Add standard product-spec template |
-| frontmatter | memory/decisions/old.md | Invalid status "pending" | Change to "proposed" |
-| index | memory/people/_index.md | Orphan entry "Jane Doe" | Entry has no file, remove from index |
-| index | memory/initiatives/new-project.md | Not in index | Add to initiatives/_index.md |
-| wikilink | journal/2026-01/meeting.md | Broken link [[Unknown Person]] | Create memory entry or fix reference |
-| replacements | journal/ | "JT" appears 5 times | Add to reference/replacements.md |
-
 ### Auto-fixed
-
-- Added 2 unknown names to reference/replacements.md with placeholders
-- (List other auto-fixes)
+| Category | File | Issue | Fix applied |
+|----------|------|-------|------------|
+| naming | decisions/ba-role-definition.md | Missing date prefix | Renamed to 2026-01-15-ba-role-definition.md |
+| index | memory/people/_index.md | Orphan entry "Jane Doe" | Removed from index |
+| index | (multiple) | Files not in index | Ran rebuild-indexes.py |
+| replacements | reference/replacements.md | "JT" uncovered (5 uses) | Added placeholder entry |
 
 ### Manual action required
+| Category | File | Issue | Suggested fix |
+|----------|------|-------|---------------|
+| frontmatter | memory/decisions/old.md | Invalid status "pending" | Change to "proposed" |
+| wikilink | journal/2026-01/meeting.md | Broken link [[Unknown Person]] | Create memory entry or fix reference |
 
-- 5 files need frontmatter review (see table above)
-- 2 broken wikilinks need resolution
-- 3 decision files need renaming
-
-### Recommendations
-
-- Run `/rebuild-index` to regenerate all indexes
-- Review stale memory entries (not referenced in 90+ days)
-- Complete placeholder entries in reference/replacements.md
+### Summary
+- Auto-fixed: N issues (N renames, N index fixes, N replacement additions)
+- Manual action required: N issues
+- Workspace health: {healthy | needs attention | degraded}
 ```
 
 ---
@@ -529,6 +530,24 @@ Process all items? (Confirm before proceeding)
 
 Wait for user confirmation before spawning sub-agents. Allow the user to exclude specific items or change detected types.
 
+### Step 2.5: Pre-resolve names across all transcript items
+
+Before spawning sub-agents, perform a single pass of name resolution across ALL confirmed transcript items to ensure consistency and minimize user interruptions.
+
+Apply the **name resolution protocol** (core skill, Memory protocol section):
+1. For each transcript item, scan for person names
+2. Cross-reference all names against `reference/replacements.md` and `memory/people/_index.md`
+3. For transcript items: query calendar integration for each meeting date to retrieve attendee lists
+4. Apply contextual resolution from calendar attendees and document context
+5. If any names remain ambiguous or unknown across ALL files, batch them into a single user clarification
+6. Build a consolidated name resolution table
+
+Pass the resolution table to each sub-agent in its prompt: "Use these resolved canonical names: Christopher = Christopher Smith, Mick = Michael Johnson"
+
+This prevents: (a) each sub-agent independently guessing different resolutions for the same person, (b) the user being asked the same question by multiple sub-agents, (c) wrong names propagating to memory and tasks.
+
+Skip this step if no transcript items are in the confirmed plan.
+
 ### Step 3: Parallel sub-agent processing
 
 After user confirmation:
@@ -549,6 +568,8 @@ Source file: inbox/processing/{filename}
 
 Step 1: Load reference files (MANDATORY before reading transcript)
 - Read reference/replacements.md. Apply canonical names to ALL content.
+- If the main agent provided a name resolution table, apply those resolved names.
+  Do NOT re-resolve names in the table. Only resolve names NOT in the table using replacements.md.
 - Read reference/integrations.md (Calendar and Tasks sections).
 - Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
   These indexes are required for wikilink validation in Step 4.
@@ -619,6 +640,8 @@ Source file: inbox/processing/{filename}
 
 Step 1: Load reference files (MANDATORY before reading article)
 - Read reference/replacements.md. Apply canonical names to ALL content.
+- If the main agent provided a name resolution table, apply those resolved names.
+  Do NOT re-resolve names in the table.
 - Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
   Required for wikilink validation before writing to memory.
 
@@ -674,6 +697,8 @@ Source file: inbox/processing/{filename}
 
 Step 1: Load reference files (MANDATORY before reading notes)
 - Read reference/replacements.md. Apply canonical names to ALL content.
+- If the main agent provided a name resolution table, apply those resolved names.
+  Do NOT re-resolve names in the table.
 - Read reference/integrations.md Tasks section for task creation.
 - Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
   Required for wikilink validation before writing to memory or journal.
@@ -933,7 +958,27 @@ The scripts return JSON. Key fields:
 - `health-check.py`: `issues` array (each with category, file, issue, suggested_fix), `auto_fixes` array, `summary` stats
 - `archive.py`: `files_archived`, `expired_lines_removed`, `archived_files` array with paths and reasons
 
-Present the findings using the output format above. For auto-fixes, apply them and note what was done. For manual-fix items, present to the user for confirmation.
+After parsing health-check.py JSON, classify each issue by fixability and execute safe auto-fixes:
+
+**Auto-fixable (execute immediately):**
+
+| Issue category | Fix action | Safety condition |
+|---------------|-----------|-----------------|
+| `naming` (decision files) | Rename file to the `suggested_fix` target | Only if frontmatter `date` field exists and is valid YYYY-MM-DD |
+| `index` (orphan entries) | Remove orphan row from the category `_index.md` | Only if source file confirmed absent from disk |
+| `index` (files not in index / stale summaries) | Run `python3 scripts/rebuild-indexes.py {workspace_path}` once | Deterministic index regeneration |
+| `replacements` (uncovered names) | Add `??` placeholder entries to `reference/replacements.md` | Existing behavior |
+
+**NOT auto-fixable (present to user):**
+
+| Issue category | Why |
+|---------------|-----|
+| `frontmatter` (missing fields) | Values require user judgment |
+| `frontmatter` (invalid status) | Correct status requires understanding intent |
+| `wikilink` (broken references) | May need entity creation or reference correction |
+| `replacements` (with `??` placeholder) | User must provide canonical name |
+
+If any auto-fix fails (file locked, permission error, target exists), demote it to the manual-fix list with the error reason.
 
 ---
 
@@ -970,9 +1015,9 @@ Present the findings using the output format above. For auto-fixes, apply them a
 
 **Health mode:**
 - NEVER delete files (only suggest deletions with user confirmation)
-- NEVER modify content (only metadata like replacements)
+- NEVER modify file content (only metadata like replacements and index entries)
 - NEVER change wikilink targets without user approval
-- **Auto-fix safety:** Only add to replacements, only suggest renames (don't execute)
+- **Auto-fix scope:** Execute deterministic fixes (file renames from frontmatter dates, index orphan removal, index rebuilds, replacement placeholder additions). Present non-deterministic issues (missing frontmatter values, invalid enums, broken wikilinks) to the user. If an auto-fix fails, demote to manual.
 
 **Sync mode:**
 - NEVER create tasks without user approval

@@ -2,6 +2,42 @@
 
 
 
+## v2.2.0 (2026-02-19)
+
+**Framework audit: efficiency, consistency, and automated validation**
+
+### Added
+- **Documentation consistency validator** (`tests/validate-docs.py`): 5-check validator catching stale skill references, provider-name leaks, count drift, archival tier terminology, and empty changelogs. Prevents semantic drift between docs and implementation.
+- **CI integration for doc validation**: `validate-docs.py` added to `.github/workflows/validate.yml` with change detection for documentation files (ARCHITECTURE.md, README.md, GETTING-STARTED.md, CHANGELOG.md, CATALOG.md, reference/**, skills/**, commands/**, scripts/**).
+- **Universal constraints in core skill**: 9 cross-cutting rules (date resolution, wikilink mandate, name normalization, task verification, integration constraints, index-first pattern, no-deletion, journal persistence, frontmatter compliance) now defined once in core and referenced by all skills.
+- **Maintain skill developer reference**: Internal procedures for health-check.py, rebuild-indexes.py, and archive.py documented in ARCHITECTURE.md for maintainers without inflating the active skill.
+- **CONTRIBUTING.md**: Consistency checklist for skill/script/protocol/integration/version changes, plus local validator run instructions.
+- **Maintenance breadcrumbs**: HTML comments in core and maintain skills pointing to validate-docs.py and CONTRIBUTING.md.
+- **Help metadata**: Added `purpose`, `use_cases`, `scope` help metadata to all 8 skills that were missing it (core, learn, think, maintain, welcome, initiative, create, communicate).
+- **Name resolution protocol** (core skill): Cascading resolution for ambiguous and unknown names. Uses calendar attendees, transcript context, and memory files before asking the user. Batch clarification minimizes interruptions.
+- **Health mode auto-fix** (maintain skill): Deterministic issues (decision file renames, index orphan removal, index rebuilds) are now auto-fixed instead of only suggested. Non-deterministic issues still presented to user.
+- **Inbox name pre-resolution** (maintain skill): Names across all pending transcript files are resolved in a single pass before sub-agents spawn, ensuring consistency and preventing redundant user queries.
+
+### Changed
+- **Skill efficiency (~400 lines reduced)**: Deduplicated shared protocols across skills by referencing core definitions. Consolidated 3 inbox sub-agent templates into shared pipeline + type-specific processing. Streamlined maintain skill health/rebuild modes to script invocation with fallback references. Trimmed per-skill absolute constraints to unique-only (universal constraints in core).
+- **workflows.md**: Rewrote all 8 workflow entries to use v2.2 skill names and reflect current pipeline architecture (was using v1.x names like `process-meeting`, `extract-tasks`).
+- **ARCHITECTURE.md**: Fixed sub-agent descriptions to match actual implementations, corrected token baseline count, fixed script count (10→11), removed duplicate lines in workspace structure, corrected runner.sh reference.
+- **README.md**: Fixed archival tier names from "active/warm/cool/archived" to canonical "durable/seasonal/transient/ephemeral".
+- **welcome skill**: Updated command references (`/daily-briefing`→`/briefing`, `/process-meeting`→`/meeting`), replaced nonexistent `create-shortcut` skill reference with Cowork shortcut mechanism.
+- **shortcuts.md**: Replaced `create-shortcut` skill reference with manual setup instructions.
+- **answer skill**: Replaced hardcoded provider names (`eventlink`, `remindctl`) with generic language per provider-agnostic principle.
+- **CHANGELOG.md**: Fixed wrong file path for getting-started guide (was `reference/getting-started.md`, corrected to `GETTING-STARTED.md`).
+- **ARCHITECTURE.md help schema**: Aligned documented schema with actual implementation (`purpose`, `use_cases`, `scope`).
+- **Script count**: 10→11 (added update-reference.py in v2.1.0, corrected in docs).
+- **Meeting skill pipeline reorder**: Calendar lookup now runs before speaker name resolution so attendee lists inform the resolution cascade.
+- **Meeting skill name resolution**: Enhanced from assumption-based inference to the core name resolution protocol with user clarification for remaining ambiguities.
+- **Learn skill**: Both memory and wisdom modes now check for name ambiguity before processing. Unresolved names block extraction to prevent incorrect memory entries.
+- **Health mode output**: Split into "Auto-fixed" and "Manual action required" sections. Deterministic fixes executed automatically, ambiguous issues presented to user.
+- **Health mode constraint**: Expanded auto-fix scope from "only replacements" to include deterministic file renames, index orphan removal, and index rebuilds.
+- **Version**: 2.1.0 → 2.2.0
+
+---
+
 ## v2.1.0 (2026-02-19)
 
 > Bumped from v2.0.1
@@ -63,7 +99,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - **Test suite**: 6 validation scripts + test runner with dynamic test selection
 - **CATALOG.md**: leadership adoption document for enterprise distribution
 - **Maturity model**: reference/maturity.yaml tracking onboarding progress
-- **Getting started guide**: reference/getting-started.md for new users
+- **Getting started guide**: GETTING-STARTED.md for new users
 - **Workflow patterns**: reference/workflows.md documenting multi-skill patterns
 - **Communication rules go global**: BLUF, anti-sycophancy, banned phrases now apply to ALL TARS outputs
 - **AskUserQuestion integration**: structured UI clarification in Cowork mode

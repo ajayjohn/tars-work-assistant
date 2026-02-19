@@ -89,8 +89,18 @@ Return JSON:
   "scheduled_items": [{"type": "recurring|once", "description": "..."}],
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
-  "maturity": {"level": 1, "people": 0, "meetings_processed": 0}
+  "housekeeping_streak": 0,
+  "plugin_version": "0.0.0",
+  "last_reference_update": "YYYY-MM-DD",
+  "last_index_rebuild": "YYYY-MM-DD",
+  "maturity": {"level": 1, "people": 0, "meetings_processed": 0},
+  "p1_alerts": []
 }
+
+P1 alert detection: populate `p1_alerts` array with string messages if any of these conditions are true:
+- `housekeeping_last_run` is >3 days ago → "Housekeeping hasn't run in {N} days. Run `/maintain health`."
+- `last_index_rebuild` is >30 days ago or null → "Index rebuild recommended. Run `/maintain rebuild`."
+- `inbox_count` > 20 → "Inbox has {N} pending items. Run `/maintain inbox`."
 ```
 
 **Note on attendee names**: If calendar data is not yet available when spawning sub-agents (common case), spawn the memory sub-agent without attendee names. After the calendar sub-agent returns, do a quick targeted lookup for any attendees not covered. Alternatively, the memory sub-agent can load the full people index for cross-referencing after calendar results arrive.
@@ -139,7 +149,11 @@ After all three sub-agents complete, collect their JSON results and proceed to s
 ### System status
 - TARS maturity: Level [N] ([X] people, [Y] meetings). Next: [milestone]
 - Inbox: [N] items pending
-- Last housekeeping: [date]
+- Last housekeeping: [date] (streak: [N] days)
+- Plugin: v[X.Y.Z] (reference files updated: [date])
+
+### Attention needed
+(Only include this section if p1_alerts is non-empty. List each alert as a bullet point.)
 ```
 
 8. **Save and display**
@@ -223,9 +237,18 @@ Return JSON:
   "scheduled_items": [{"type": "recurring|once", "description": "...", "due": "..."}],
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
+  "housekeeping_streak": 0,
+  "plugin_version": "0.0.0",
+  "last_reference_update": "YYYY-MM-DD",
   "last_index_rebuild": "YYYY-MM-DD",
-  "maturity": {"level": 1, "people": 0, "meetings_processed": 0}
+  "maturity": {"level": 1, "people": 0, "meetings_processed": 0},
+  "p1_alerts": []
 }
+
+P1 alert detection: populate `p1_alerts` array with string messages if any of these conditions are true:
+- `housekeeping_last_run` is >3 days ago → "Housekeeping hasn't run in {N} days. Run `/maintain health`."
+- `last_index_rebuild` is >30 days ago or null → "Index rebuild recommended. Run `/maintain rebuild`."
+- `inbox_count` > 20 → "Inbox has {N} pending items. Run `/maintain inbox`."
 ```
 
 ##### Sub-agent input/output contracts (weekly mode)
@@ -280,8 +303,12 @@ After all three sub-agents complete, collect their JSON results and proceed to s
 ### System status
 - TARS maturity: Level [N] ([X] people, [Y] meetings). Next: [milestone]
 - Inbox: [N] items pending
-- Last housekeeping: [date]
+- Last housekeeping: [date] (streak: [N] days)
 - Last index rebuild: [date]
+- Plugin: v[X.Y.Z] (reference files updated: [date])
+
+### Attention needed
+(Only include this section if p1_alerts is non-empty. List each alert as a bullet point.)
 ```
 
 7. **Save and display**
@@ -292,11 +319,10 @@ After all three sub-agents complete, collect their JSON results and proceed to s
 
 ## Progress tracking (TodoWrite)
 
-Use the `TodoWrite` tool to give the user real-time visibility into briefing generation. Create the todo list at the start and update as steps complete:
+Use the `TodoWrite` tool to give the user real-time visibility into briefing generation:
 
-**Daily mode:**
 ```
-1. Determine date and read integrations                  [in_progress → completed]
+1. Determine date/range and read integrations            [in_progress → completed]
 2. Fetch calendar data (parallel sub-agent)              [pending → completed]
 3. Fetch task data (parallel sub-agent)                  [pending → completed]
 4. Query memory and context (parallel sub-agent)         [pending → completed]
@@ -304,17 +330,7 @@ Use the `TodoWrite` tool to give the user real-time visibility into briefing gen
 6. Generate and save briefing                            [pending → completed]
 ```
 
-**Weekly mode:**
-```
-1. Determine date range and read integrations            [in_progress → completed]
-2. Fetch calendar data (parallel sub-agent)              [pending → completed]
-3. Fetch task data (parallel sub-agent)                  [pending → completed]
-4. Query memory and context (parallel sub-agent)         [pending → completed]
-5. Cross-reference and enrich data                       [pending → completed]
-6. Generate and save briefing                            [pending → completed]
-```
-
-**Parallelization note**: Steps 2, 3, and 4 run concurrently as sub-agents. Mark ALL THREE as `in_progress` when spawning them. Mark each `completed` as its sub-agent returns. Do not wait for all three before updating individual statuses.
+**Parallelization note**: Steps 2, 3, and 4 run concurrently as sub-agents. Mark ALL THREE as `in_progress` when spawning them. Mark each `completed` as its sub-agent returns.
 
 ---
 
@@ -342,9 +358,8 @@ type: briefing-daily | briefing-weekly
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (date resolution, integration constraints, journal persistence, index-first pattern). Additionally:
+
 - NEVER skip calendar lookup (fall back to tasks-only if calendar integration is unreachable)
-- NEVER output briefing without saving to journal
-- ALWAYS resolve dates to `YYYY-MM-DD` format before any calendar query
 - ALWAYS look up memory profiles for meeting attendees
 - ALWAYS flag overdue tasks (via task integration `overdue` operation)
-- ALWAYS check calendar integration constraints in reference/integrations.md before querying

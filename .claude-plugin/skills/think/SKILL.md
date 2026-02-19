@@ -2,6 +2,15 @@
 name: think
 description: Strategic analysis, adversarial validation, executive council debate, and discovery mode for complex decisions
 user-invocable: true
+help:
+  purpose: |-
+    Strategic analysis, adversarial validation, executive council debate, and discovery mode for complex decisions.
+  use_cases:
+    - "Analyze this strategy"
+    - "Stress-test this decision"
+    - "Launch the council"
+    - "Help me think through [problem]"
+  scope: strategy,analysis,validation,council,discovery
 ---
 
 # Think: Multi-mode strategic analysis protocol
@@ -575,37 +584,32 @@ Tag each evidence point, assumption, and finding with its source tier:
 
 ## Absolute constraints
 
-### Strategic analysis constraints
-- NEVER skip the initial hypothesis (Layer 1)
-- NEVER skip any of the three branches (Layer 2)
-- NEVER omit constraint analysis (Layer 3)
-- NEVER output recommendation without confidence and assumptions
-- NEVER begin without stating framework selection
+Universal constraints from the core skill apply (wikilink mandate, index-first pattern, journal persistence). Additionally:
 
-### Validation council constraints
-- NEVER skip the vulnerability scan
-- NEVER skip any persona in the assault
-- NEVER output without the kill criteria section
-- NEVER be constructive-only. The purpose is adversarial stress-testing.
-
-### Executive council constraints
-- Do not make up external facts
-- Stick to defined personas
-- Be decisive in the verdict
-- Always reference specific organizational context (not generic advice)
-
-### Deep analysis constraints
-- NEVER skip any of the 3 analysis layers
-- NEVER output final recommendation without completing validation
-- ALWAYS include kill criteria
-- ALWAYS specify owners for next steps
-
-### Discovery mode constraints
-- NEVER propose solutions in discovery mode
-- NEVER skip context mapping (always check memory)
-- NEVER ask open-ended questions (use bounded, targeted questions)
-
-### Shared constraints
+### All modes
 - NEVER begin without properly loading required reference files
 - ALWAYS tag evidence and assumptions with source confidence
 - NEVER skip memory persistence for durable insights
+
+### Strategic analysis
+- NEVER skip the initial hypothesis (Layer 1), any branch (Layer 2), or constraint analysis (Layer 3)
+- NEVER output recommendation without confidence and assumptions
+- NEVER begin without stating framework selection
+
+### Validation council
+- NEVER skip the vulnerability scan or any persona in the assault
+- NEVER output without the kill criteria section
+- NEVER be constructive-only. The purpose is adversarial stress-testing.
+
+### Executive council
+- Do not make up external facts. Stick to defined personas.
+- Be decisive in the verdict. Always reference specific organizational context.
+
+### Deep analysis
+- NEVER skip any of the 3 analysis layers or output without completing validation
+- ALWAYS include kill criteria and specify owners for next steps
+
+### Discovery mode
+- NEVER propose solutions in discovery mode
+- NEVER skip context mapping (always check memory)
+- NEVER ask open-ended questions (use bounded, targeted questions)

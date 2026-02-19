@@ -167,7 +167,7 @@ your-project/
 
 **Provider-agnostic integrations**: TARS integrates with your tools (calendar, task systems, Slack, email) through abstracted query patterns in `reference/integrations.md`. Not locked into one platform.
 
-**4-tier archival**: Entries move through 4 states (active, warm, cool, archived) with automated housekeeping. Keeps memory fresh without manual cleanup.
+**4-tier archival**: Entries move through 4 tiers (durable, seasonal, transient, ephemeral) with automated housekeeping. Keeps memory fresh without manual cleanup.
 
 **Sensitive data guardrails**: Flags PII, financial, and security-sensitive entries. Blocks accidental exposure in briefings and comms.
 

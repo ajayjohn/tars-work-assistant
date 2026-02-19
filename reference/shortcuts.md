@@ -1,6 +1,6 @@
 # TARS shortcuts
 
-Shortcut definitions for Cowork scheduled execution. These are created during the welcome flow or manually by the user via the `create-shortcut` skill.
+Shortcut definitions for Cowork scheduled execution. These are created during the welcome flow or manually by the user via Cowork's shortcut settings.
 
 ## daily-housekeeping
 
@@ -38,11 +38,11 @@ File paths:
 
 ### Creating this shortcut
 
-During the welcome flow or at any time, use the `create-shortcut` skill:
+During the welcome flow or at any time, create this shortcut via Cowork settings:
 
-1. Invoke `/create-shortcut`
-2. Use task name: `daily-housekeeping`
-3. Use the task description above
+1. Open Cowork → Settings → Shortcuts
+2. Create a new shortcut with task name: `daily-housekeeping`
+3. Paste the task description above
 4. Set cron schedule: `30 17 * * *` (or user's preferred time)
 
 The session-start check in the core skill serves as a fallback if this shortcut is not configured or the environment does not support scheduled shortcuts.

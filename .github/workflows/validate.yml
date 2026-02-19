@@ -9,6 +9,11 @@ on:
       - 'reference/**'
       - '.claude-plugin/**'
       - 'tests/**'
+      - 'ARCHITECTURE.md'
+      - 'README.md'
+      - 'GETTING-STARTED.md'
+      - 'CHANGELOG.md'
+      - 'CATALOG.md'
 
 jobs:
   validate:
@@ -43,6 +48,7 @@ jobs:
           RUN_ROUTING=false
           RUN_TEMPLATES=false
           RUN_SCRIPTS=false
+          RUN_DOCS=false
 
           while IFS= read -r file; do
             [ -z "$file" ] && continue
@@ -51,20 +57,27 @@ jobs:
                 RUN_FRONTMATTER=true
                 RUN_REFERENCES=true
                 RUN_ROUTING=true
+                RUN_DOCS=true
                 ;;
               commands/*)
                 RUN_STRUCTURE=true
                 RUN_REFERENCES=true
+                RUN_DOCS=true
                 ;;
               scripts/*)
                 RUN_SCRIPTS=true
+                RUN_DOCS=true
                 ;;
               reference/*)
                 RUN_TEMPLATES=true
+                RUN_DOCS=true
                 ;;
               .claude-plugin/plugin.json)
                 RUN_STRUCTURE=true
                 RUN_REFERENCES=true
+                ;;
+              ARCHITECTURE.md|README.md|GETTING-STARTED.md|CHANGELOG.md|CATALOG.md)
+                RUN_DOCS=true
                 ;;
               tests/*)
                 # If tests themselves changed, run all
@@ -74,6 +87,7 @@ jobs:
                 RUN_ROUTING=true
                 RUN_TEMPLATES=true
                 RUN_SCRIPTS=true
+                RUN_DOCS=true
                 ;;
             esac
           done <<< "$CHANGED"
@@ -84,6 +98,7 @@ jobs:
           echo "run_routing=$RUN_ROUTING" >> "$GITHUB_OUTPUT"
           echo "run_templates=$RUN_TEMPLATES" >> "$GITHUB_OUTPUT"
           echo "run_scripts=$RUN_SCRIPTS" >> "$GITHUB_OUTPUT"
+          echo "run_docs=$RUN_DOCS" >> "$GITHUB_OUTPUT"
 
       - name: Validate structure
         if: steps.changes.outputs.run_structure == 'true'
@@ -108,6 +123,10 @@ jobs:
       - name: Validate scripts
         if: steps.changes.outputs.run_scripts == 'true'
         run: python3 tests/validate-scripts.py
+
+      - name: Validate docs consistency
+        if: steps.changes.outputs.run_docs == 'true'
+        run: python3 tests/validate-docs.py
 
       - name: Check version bump
         if: |

@@ -2,6 +2,14 @@
 name: initiative
 description: Initiative planning, status reporting, and KPI-based performance reports with trend analysis
 user-invocable: true
+help:
+  purpose: |-
+    Initiative planning, status reporting, and KPI-based performance reports with trend analysis.
+  use_cases:
+    - "Plan a new initiative for [topic]"
+    - "What's the status of [initiative]?"
+    - "Generate a performance report"
+  scope: initiatives,planning,status,kpis,performance
 ---
 
 # Initiative skill: planning, status, and performance

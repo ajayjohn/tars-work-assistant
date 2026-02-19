@@ -2,6 +2,14 @@
 name: communicate
 description: Draft and refine stakeholder communications with empathy audit, RASCI enforcement, and tone adaptation
 user-invocable: true
+help:
+  purpose: |-
+    Draft and refine stakeholder communications with empathy audit, RASCI enforcement, and tone adaptation.
+  use_cases:
+    - "Draft an email to [person]"
+    - "Help me communicate this decision"
+    - "Write a message to my team about [topic]"
+  scope: communications,email,messaging,stakeholders
 ---
 
 # Stakeholder communications protocol

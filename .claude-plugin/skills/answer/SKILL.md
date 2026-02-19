@@ -176,12 +176,11 @@ When answering, tag each piece of information with its confidence tier:
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (date resolution, integration constraints, index-first pattern, wikilink mandate). Additionally:
+
 - NEVER answer internal questions from web search alone
 - NEVER hallucinate memory that doesn't exist
 - NEVER skip context search when deep detail is clearly needed
 - NEVER claim calendar access is unavailable. TARS has calendar access via configured integration. If integration fails, report the specific error.
 - ALWAYS query calendar integration for any question about schedule, agenda, meetings, availability, or "am I free"
-- ALWAYS resolve dates to `YYYY-MM-DD` format before any calendar query
-- ALWAYS check integration constraints in reference/integrations.md before querying
 - ALWAYS check aliases when entity not found by primary name
-- ALWAYS use index-first pattern (never scan all files)

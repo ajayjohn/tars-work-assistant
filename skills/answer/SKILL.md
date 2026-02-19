@@ -67,8 +67,8 @@ Deep detail beyond memory: full product docs, schemas, org charts, specs.
 **Priority flow**:
 1. Check `<mcp_servers>` context for calendar MCP server (preferred)
 2. If found, use MCP tools (`list_events`, `get_event`, `create_event`)
-3. If not found, check `reference/integrations.md` for legacy provider (eventlink)
-4. If legacy configured, execute HTTP API calls
+3. If not found, check `reference/integrations.md` for legacy provider
+4. If legacy configured, execute provider-specific calls
 5. If neither exists, note unavailable and suggest: "Run /welcome to configure calendar integration"
 
 Always resolve dates to YYYY-MM-DD before querying.
@@ -78,8 +78,8 @@ Always resolve dates to YYYY-MM-DD before querying.
 **Priority flow**:
 1. Check `<mcp_servers>` context for reminders/tasks MCP server (preferred)
 2. If found, use MCP tools (`list_reminders`, `create_reminder`, `complete_reminder`)
-3. If not found, check `reference/integrations.md` for legacy provider (remindctl)
-4. If legacy configured, execute CLI commands
+3. If not found, check `reference/integrations.md` for legacy provider
+4. If legacy configured, execute provider-specific commands
 5. If neither exists, fall back to workspace file data (Active/Delegated/Backlog folders)
 
 ### MCP tools
@@ -176,12 +176,11 @@ When answering, tag each piece of information with its confidence tier:
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (date resolution, index-first pattern, integration constraints). Additionally:
+
 - NEVER answer internal questions from web search alone
 - NEVER hallucinate memory that doesn't exist
 - NEVER skip context search when deep detail is clearly needed
 - NEVER claim calendar access is unavailable. TARS has calendar access via configured integration. If integration fails, report the specific error.
 - ALWAYS query calendar integration for any question about schedule, agenda, meetings, availability, or "am I free"
-- ALWAYS resolve dates to `YYYY-MM-DD` format before any calendar query
-- ALWAYS check integration constraints in reference/integrations.md before querying
 - ALWAYS check aliases when entity not found by primary name
-- ALWAYS use index-first pattern (never scan all files)

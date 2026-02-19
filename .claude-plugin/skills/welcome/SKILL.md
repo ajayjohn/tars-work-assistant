@@ -2,6 +2,14 @@
 name: welcome
 description: Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering
 user-invocable: true
+help:
+  purpose: |-
+    Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering.
+  use_cases:
+    - "Set up TARS"
+    - "Bootstrap my workspace"
+    - "Initialize TARS"
+  scope: setup,bootstrap,onboarding,welcome
 ---
 
 # Welcome to TARS

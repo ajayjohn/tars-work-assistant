@@ -260,9 +260,8 @@ Suggest consolidation but allow user to decide.
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (date resolution, name normalization, task verification, no deletion without instruction). Additionally:
+
 - NEVER create tasks for "Team" or "We" without a specific lead
-- NEVER use relative dates in final output (always resolve to YYYY-MM-DD)
-- NEVER forget name normalization
-- NEVER delete tasks without explicit instruction (archive instead)
 - NEVER mark tasks done without user confirmation
 - ONLY write to Active, Delegated, Backlog lists (person-named lists are read-only)

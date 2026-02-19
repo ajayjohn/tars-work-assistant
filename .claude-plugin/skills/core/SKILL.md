@@ -2,7 +2,13 @@
 name: core
 description: Identity, routing, communication style, memory protocol, task protocol, decision frameworks, and clarification for TARS
 user-invocable: false
+help:
+  purpose: |-
+    Background skill providing identity, routing, protocols, decision frameworks, and universal constraints. Auto-loaded every session.
+  scope: core,routing,protocols,frameworks
 ---
+<!-- MAINTENANCE: If modifying this skill, run tests/validate-docs.py
+     to check for broken cross-references. See CONTRIBUTING.md. -->
 
 # Core framework
 
@@ -140,48 +146,85 @@ These side-effects fire automatically without user intervention:
 | Artifact generated | Save to contexts/artifacts/ |
 | Performance report generated | Save to journal |
 
-### Session-start daily housekeeping
+### Session-start gate
 
-At the start of every session, before responding to the user's request, check `reference/.housekeeping-state.yaml`. If the `last_run` field is not today's date (or is `null`), trigger automatic daily housekeeping.
+At the start of every session, before responding to the user's request, run the session-start gate. This performs version checks, staleness detection, and daily housekeeping. The entire gate completes silently unless it needs to surface a notification.
 
-**Execution logic:**
+**Deferred execution rule:** If the user's first message is clearly urgent (contains words like "urgent", "quick", "asap", "right now", or is a direct question expecting an immediate answer), respond to the user first, then run the gate afterward. The goal is zero disruption to the user's workflow.
+
+#### Step 0: State file resilience
 
 1. Read `reference/.housekeeping-state.yaml`
-2. Compare `last_run` to today's date (YYYY-MM-DD)
-3. If `last_run` equals today, skip housekeeping entirely (zero overhead)
-4. If `last_run` is stale or null, run the automatic daily maintenance:
+2. If the workspace has no `reference/` directory (pre-welcome state), skip the entire gate silently.
+3. If the file is missing or unparseable (empty, corrupted), recreate it from the plugin template at `reference/.housekeeping-state.yaml` with `last_run: null`. Queue a P0 notification: "Housekeeping state was missing or corrupted and has been recreated."
+4. Parse into a key-value map. Apply defaults for any missing keys: `last_run: null`, `last_success: false`, `run_count: 0`, `plugin_version: null`, `housekeeping_streak: 0`, `last_reference_update: null`, `pending_inbox_count: 0`.
 
-**What runs automatically (silent, no user prompt):**
+#### Step 1: Version mismatch check
+
+1. Read `.claude-plugin/plugin.json` and extract `version` (string comparison, near-zero cost).
+2. Compare against `plugin_version` in the state file.
+3. If they match, skip to Step 2 (zero overhead).
+4. If they differ (or state has `plugin_version: null`):
+   a. Run `python3 scripts/update-reference.py {workspace_path}` silently — no `--dry-run`, no user prompt. This is safe because the script preserves all user data via merge strategies (section_merge, additive_merge) and is idempotent.
+   b. The script updates `plugin_version` in the state file automatically.
+   c. Set `last_reference_update` to today's date in the state file.
+   d. Queue a P2 notification: "Reference files auto-updated to v{new_version}."
+   e. If the script fails: queue a P0 notification: "Reference file update failed for v{version}. Run `/maintain update` manually." Do not retry this session — the next session will detect the mismatch again and retry once.
+
+Version check runs before housekeeping because a plugin update may change the scripts themselves. Reference files should be current before scripts use them.
+
+#### Step 2: Staleness check and escalation
+
+1. Parse `last_run` date from the state file. Calculate days since last run.
+2. Determine action based on staleness:
+   - **0 days** (ran today): skip housekeeping entirely, proceed to Step 4.
+   - **1 day** (normal): run housekeeping silently (Step 3).
+   - **2-3 days**: run housekeeping (Step 3), queue P2 notification noting the gap.
+   - **4-7 days**: run housekeeping (Step 3), queue P1 notification: "Housekeeping hasn't run in {N} days. Indexes and scheduled items may be stale. Run `/maintain health` for a full scan."
+   - **>7 days**: run housekeeping (Step 3), queue P1 notification: "Housekeeping hasn't run in {N} days. A full health check is recommended. Run `/maintain health`."
+3. Update `housekeeping_streak`: if `last_run` was yesterday, increment; otherwise reset to 1.
+
+#### Step 3: Run daily housekeeping (silent, no user prompt)
 
 ```bash
-# Step 1: Archive expired content
+# Archive expired content
 python3 scripts/archive.py {workspace_path} --auto
 
-# Step 2: Health check (index validation, broken wikilinks, naming issues)
+# Health check (index validation, broken wikilinks, naming issues)
 python3 scripts/health-check.py {workspace_path}
 
-# Step 3: Sync scheduled items and detect memory gaps
+# Sync scheduled items and detect memory gaps
 python3 scripts/sync.py {workspace_path}
 ```
 
-5. After scripts complete, check `inbox/pending/` for unprocessed items and note the count
-6. Update `reference/.housekeeping-state.yaml`:
+After scripts complete:
+
+1. Check `inbox/pending/` for unprocessed items and note the count
+2. If `pending_inbox_count` > 20: queue P1 notification: "Inbox has {N} pending items. Run `/maintain inbox` to process."
+3. Update `reference/.housekeeping-state.yaml`:
    - Set `last_run` to today's date
    - Set `last_success` to true (or false if any script failed)
    - Increment `run_count`
    - Update `last_archival` if archive.py ran
    - Update `pending_inbox_count` with current inbox count
+4. If scripts fail: set `last_success: false` and proceed. Do not block the session.
 
-**User-facing behavior:**
+#### Step 4: Notification delivery
 
-- If all scripts succeed with no critical issues: proceed silently to the user's request. Do not mention housekeeping ran.
-- If critical issues are found (broken indexes, stale scheduled items due, overdue tasks): append a brief one-line note after responding to the user's primary request. Example: "Note: Daily maintenance found 2 overdue tasks and 1 broken index. Run `/maintain health` for details."
-- If scripts fail: log the failure in `.housekeeping-state.yaml` (set `last_success: false`) and proceed with the user's request. Do not block the session.
-- If the user's request appears urgent or time-sensitive: defer housekeeping to after the response. Run it as a follow-up after addressing the user's need.
+Deliver any queued notifications according to priority:
 
-**Deferred execution rule:** If the user's first message is clearly urgent (contains words like "urgent", "quick", "asap", "right now", or is a direct question expecting an immediate answer), respond to the user first, then run housekeeping afterward. The goal is zero disruption to the user's workflow.
+| Priority | Delivery |
+|----------|----------|
+| **P0 (Blocking)** | Insert before the response to the user's request. Format: `**Maintenance alert:** {message}` |
+| **P1 (Important)** | Append after the response to the user's request. Format: `Note: {message}` |
+| **P2 (Informational)** | Do not display. Available for `/briefing` or `/maintain health` to surface naturally. |
 
-**What does NOT run automatically (user-initiated only):**
+**Delivery rules:**
+- Multiple notifications of the same priority combine into a single line.
+- Maximum one P0 line and one P1 line per session.
+- If the user's request is `/briefing` or `/maintain health`, fold all notifications (including P2) into those outputs naturally instead of using the above format.
+
+#### What does NOT run automatically (user-initiated only)
 
 - Full index rebuild (`/maintain rebuild`): expensive, only when needed
 - Inbox processing (`/maintain inbox`): requires user confirmation of processing plan
@@ -292,6 +335,36 @@ ALL entity references in memory files must use `[[Entity Name]]` wikilink syntax
 ### Name normalization
 
 Before processing any names, read `reference/replacements.md` and apply canonical forms. After generating content, scan output for any variations and correct them.
+
+### Name resolution protocol
+
+When processing content containing person names (meetings, inbox items, learning content), apply this cascade before any downstream processing. Names must be resolved to canonical forms, not assumed.
+
+**Step 1: Exact match**
+If a name or variation maps to exactly one canonical form in `reference/replacements.md`, use it. Done.
+
+**Step 2: Ambiguity detection**
+If a first name, nickname, or partial name matches multiple canonical entries in `reference/replacements.md` or `memory/people/_index.md`, mark it **ambiguous**. If a name has zero matches in both, mark it **unknown**.
+
+**Step 3: Contextual resolution (try before asking user)**
+For each ambiguous or unknown name, attempt resolution using these sources in order:
+1. **Calendar attendees** (if meeting context available): narrow to people actually present
+2. **Document context**: role references ("the PM said"), team mentions, topic-specific expertise
+3. **Memory people files**: recent interactions, team membership, initiative associations
+
+If a source resolves to exactly one candidate with high confidence, use it. If confidence is low or multiple candidates remain, keep it unresolved.
+
+**Step 4: Batch user clarification**
+Collect ALL remaining unresolved names and present them to the user in a **single interaction**. Do not ask one at a time.
+- **Ambiguous**: present as multiple-choice. "Which Christopher? A) Christopher Smith (Engineering), B) Christopher Jones (Sales)"
+- **Unknown**: ask for identification. "Who is 'Mick'? Please provide their full name."
+
+Use AskUserQuestion in Cowork mode. Fall back to inline text clarification in CLI mode.
+
+**Step 5: Apply and record**
+Use resolved canonical names throughout all downstream processing. Add any new name variations discovered to `reference/replacements.md`. Do NOT proceed with processing until all names are resolved.
+
+**Constraint**: NEVER guess when ambiguous. An incorrect name propagates to memory, journal, and tasks, requiring manual cleanup across multiple files.
 
 ### Folder mapping
 
@@ -497,3 +570,19 @@ When users ask "what can you do?", "help", "show me commands", or similar:
 | "help with memory" | Route to `skills/learn/` help section |
 | "help with communication" | Route to `skills/communicate/` help section |
 | General help | List all skills with one-line descriptions and signal routing |
+
+---
+
+## Universal constraints
+
+These constraints apply to ALL skills and sub-agent operations. Individual skills only list constraints unique to their workflow.
+
+1. **Date resolution**: ALWAYS resolve dates to YYYY-MM-DD format before output or querying integrations. Never use relative dates in final output.
+2. **Wikilink mandate**: ALL entity references in memory and journal files must use `[[Entity Name]]` wikilink syntax. BEFORE writing any wikilink, verify the entity exists in a memory index. Do NOT fabricate wikilinks for unverified names.
+3. **Name normalization**: ALWAYS apply canonical name normalization from `reference/replacements.md`. Never output names that appear in replacements without using canonical form.
+4. **Task verification**: NEVER report tasks as "created" without verifying via `list_reminders` after creation. Only count tasks confirmed present in the verification query.
+5. **Integration constraints**: ALWAYS check integration constraints in `reference/integrations.md` before querying any integration. Use provider-agnostic language in all skill output.
+6. **Index-first pattern**: ALWAYS read `_index.md` before opening individual files in any memory, journal, or contexts folder. Never scan all files in a folder.
+7. **No deletion without instruction**: NEVER delete tasks or memory files without explicit user instruction.
+8. **Journal persistence**: ALWAYS save to `journal/` when a skill generates reportable output (briefings, meeting reports, wisdom extractions, performance reports).
+9. **Frontmatter compliance**: ALWAYS include required frontmatter fields when creating or updating memory and journal files. Follow templates from `reference/taxonomy.md`.

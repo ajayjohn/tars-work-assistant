@@ -9,3 +9,6 @@ run_count: 0
 last_archival: null
 last_index_rebuild: null
 pending_inbox_count: 0
+plugin_version: null
+last_reference_update: null
+housekeeping_streak: 0

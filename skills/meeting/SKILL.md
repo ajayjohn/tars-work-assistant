@@ -38,25 +38,34 @@ The transcript may be:
 1. **Plain text** with speaker labels and timestamps
 2. **JSON array** with `SPEAKER`, `LINE_TEXT`, `LINE_ID` fields
 
-### 1.3: Speaker name resolution (MANDATORY)
-
-- If speaker names are generic ("Speaker 1"), infer real names from context
-- Identify the user from role references matching CLAUDE.md identity
-- NEVER use generic speaker labels in output
-
-### 1.4: Calendar lookup (MANDATORY WHEN AVAILABLE)
+### 1.3: Calendar lookup (MANDATORY WHEN AVAILABLE)
 
 Read `reference/integrations.md` Calendar section for provider details and status. If calendar integration is configured, query for this meeting if date/time can be inferred. Resolve the meeting date to `YYYY-MM-DD` format before querying. Execute the `list_events` operation with the meeting date and offset=1.
 
-**Why:** Calendar provides full attendee list (including silent participants), official meeting title, organizer, and meeting notes/agenda.
+**Why:** Calendar provides full attendee list (including silent participants), official meeting title, organizer, and meeting notes/agenda. The attendee list is also critical for name resolution in Step 1.4.
 
 **Extract:**
-- Complete attendee list (for `participants` frontmatter)
+- Complete attendee list (for `participants` frontmatter and name resolution)
 - Meeting time
 - Organizer
 - **Calendar meeting title** (authoritative source for filename and title)
 
 If meeting not found or calendar integration is unreachable, proceed with transcript-only processing and note the gap.
+
+### 1.4: Speaker name resolution (MANDATORY)
+
+Apply the **name resolution protocol** (core skill, Memory protocol section):
+
+1. For each speaker name in the transcript, check `reference/replacements.md` for an exact match
+2. If a name is ambiguous (matches multiple canonical entries) or unknown (no match), attempt contextual resolution using:
+   - Calendar attendees from Step 1.3 (primary source — narrows to people actually present)
+   - Transcript context (role references, team mentions, topic expertise)
+   - Memory people files (recent interactions, team membership)
+3. If any names remain unresolved, batch ALL unresolved names into a single user clarification before proceeding
+4. Identify the user from role references matching CLAUDE.md identity
+5. NEVER use generic speaker labels ("Speaker 1") in output — resolve or ask
+
+Build a name resolution table mapping each raw speaker label to its canonical form. Apply this table to all downstream steps (report, tasks, memory).
 
 ---
 
@@ -217,6 +226,7 @@ You are extracting durable memory from a meeting journal entry.
 Read the journal file at: {journal_file_path}
 Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md
 Read reference/replacements.md and apply canonical names.
+If the main agent provided a name resolution table, use those resolved names.
 
 Apply durability test to insights from the meeting:
 - Stakeholder updates -> memory/people/{name}.md

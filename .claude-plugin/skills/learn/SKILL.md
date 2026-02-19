@@ -2,6 +2,14 @@
 name: learn
 description: Extract durable memory from conversations or wisdom from learning content with strict durability test
 user-invocable: true
+help:
+  purpose: |-
+    Extract durable memory from conversations or wisdom from learning content with strict durability test.
+  use_cases:
+    - "Remember this [insight]"
+    - "Extract wisdom from this article"
+    - "Save what we discussed about [topic]"
+  scope: memory,wisdom,learning,extraction
 ---
 
 # Learn: Memory and Wisdom extraction protocol
@@ -16,9 +24,11 @@ You are a Memory Manager. Extract durable, high-value insights from input and pe
 
 Most inputs will NOT result in memory additions. Memory is for durable insights, NOT a task tracker or event log.
 
-### Step 1: Load replacements (MANDATORY)
+### Step 1: Load replacements and resolve names (MANDATORY)
 
 Read `reference/replacements.md`. Apply canonical names to ALL names in memory entries.
+
+After loading replacements, scan the input for person names. Apply the **name resolution protocol** (core skill, Memory protocol section). If any names are ambiguous (multiple canonical matches) or unknown (no match), resolve using memory indexes and document context first. If still unresolved, ask the user before proceeding. Do not persist memory entries with unresolved or ambiguous names.
 
 ---
 
@@ -74,17 +84,7 @@ If ANY answer is "No", the insight FAILS. Do not persist it. When in doubt, it d
 
 ### Step 5: Categorize and determine folder (MANDATORY)
 
-Map each passing insight to the correct folder using the memory management skill folder mapping:
-
-| Type | Folder |
-|------|--------|
-| person | `memory/people/` |
-| vendor | `memory/vendors/` |
-| competitor | `memory/competitors/` |
-| product | `memory/products/` |
-| initiative | `memory/initiatives/` |
-| decision | `memory/decisions/` |
-| context | `memory/organizational-context/` |
+Map each passing insight to the correct folder using the core skill's folder mapping (Memory protocol section).
 
 #### Vendor vs competitor classification
 | Type | Definition | Examples |
@@ -158,11 +158,13 @@ Process learning-focused content (articles, videos, transcripts, presentations) 
 
 Use this when the user is **learning** rather than **collaborating**. Not for collaborative meetings (use `skills/meeting-processor/` instead).
 
-### Step 0: Load reference files (MANDATORY)
+### Step 0: Load reference files and resolve names (MANDATORY)
 
 Read before proceeding (retry once if failed):
 1. `reference/replacements.md` (name normalization)
 2. `reference/taxonomy.md` (tags and categories)
+
+Scan the source content for person names and apply the **name resolution protocol** (core skill). Resolve ambiguous or unknown names before extraction begins.
 
 ---
 
@@ -317,6 +319,8 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (wikilink mandate, name normalization, task verification, frontmatter compliance, index-first pattern). Additionally:
+
 ### Memory mode constraints
 - NEVER persist scheduling logistics
 - NEVER persist event logs ("met with", "emailed")
@@ -324,7 +328,6 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 - NEVER skip the durability test
 - NEVER skip comparison against existing memory
 - NEVER omit the memory updates output
-- NEVER skip index update after writes
 
 ### Wisdom mode constraints
 - NEVER use isolated bullet points without context
@@ -332,9 +335,3 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 - NEVER output without comprehensive explanations
 - NEVER forget to extract memory and tasks
 - NEVER omit the `wisdom-` prefix in filename
-- NEVER report tasks as created without verifying via `list_reminders` after creation
-
-### Shared constraints
-- NEVER skip frontmatter template requirements
-- ALL entity references must use `[[Entity Name]]` wikilink syntax
-- NEVER skip canonical name normalization

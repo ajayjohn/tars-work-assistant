@@ -2,6 +2,14 @@
 name: welcome
 description: Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering
 user-invocable: true
+help:
+  purpose: |-
+    Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering.
+  use_cases:
+    - "Set up TARS"
+    - "Bootstrap my workspace"
+    - "Initialize TARS"
+  scope: setup,bootstrap,onboarding,welcome
 ---
 
 # Welcome to TARS
@@ -354,11 +362,11 @@ If accepted, run lightweight queries and add findings to memory.
 
 ### Step 6: Offer daily housekeeping shortcut
 
-If the environment supports Cowork shortcuts with schedules (check if the `create-shortcut` skill is available):
+If the environment supports Cowork shortcuts with schedules:
 
 1. Ask the user: "Would you like TARS to run daily maintenance automatically? This keeps indexes healthy, archives stale content, and syncs scheduled items."
 2. If accepted, ask for preferred time (default: 5:30 PM) using AskUserQuestion
-3. Use the `create-shortcut` skill to create a `daily-housekeeping` shortcut with the task description from `reference/shortcuts.md` and the user's preferred cron schedule
+3. Create the shortcut manually using the task description from `reference/shortcuts.md` and the user's preferred cron schedule (see shortcuts.md for the Cowork shortcut creation steps)
 4. Note: Even without the shortcut, TARS runs a session-start housekeeping check as a fallback (see core skill)
 
 If the environment does not support scheduled shortcuts, skip this step. The session-start check will handle daily housekeeping.
@@ -386,9 +394,9 @@ Display summary:
 ⚠ Missing integrations will limit functionality. See GETTING-STARTED.md "Essential Integrations" section for setup instructions.
 
 ### Next steps
-1. {If integrations configured:} Run `/daily-briefing` to see your first morning briefing
+1. {If integrations configured:} Run `/briefing` to see your first morning briefing
    {If not:} Configure calendar and tasks in .mcp.json, restart Claude, and re-run /welcome
-2. Run `/process-meeting` with your next meeting transcript
+2. Run `/meeting` with your next meeting transcript
 3. Add more people and context as you use TARS
 4. Edit `reference/kpis.md` to define your team metrics
 5. Daily housekeeping runs automatically (shortcut or session-start check)

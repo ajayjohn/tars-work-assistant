@@ -2,7 +2,13 @@
 name: core
 description: Identity, routing, communication style, memory protocol, task protocol, decision frameworks, and clarification for TARS
 user-invocable: false
+help:
+  purpose: |-
+    Background skill providing identity, routing, protocols, decision frameworks, and universal constraints. Auto-loaded every session.
+  scope: core,routing,protocols,frameworks
 ---
+<!-- MAINTENANCE: If modifying this skill, run tests/validate-docs.py
+     to check for broken cross-references. See CONTRIBUTING.md. -->
 
 # Core framework
 
@@ -209,6 +215,22 @@ python3 scripts/sync.py {workspace_path}
 
 ---
 
+## Universal constraints
+
+These rules apply to ALL skills. Individual skills define additional skill-specific constraints but must not contradict these universal rules.
+
+1. **NEVER use relative dates in output** — always resolve to YYYY-MM-DD (see Date resolution table above)
+2. **ALL entity references must use `[[Entity Name]]` wikilink syntax** — this enables graph connectivity (see Wikilink mandate above)
+3. **NEVER skip canonical name normalization** — read `reference/replacements.md` and apply canonical forms before and after processing
+4. **NEVER report tasks as created without verification** — after creating tasks via the task integration, call the list operation to confirm the task appears. Report only verified tasks as created.
+5. **NEVER write wikilinks for entities not verified against memory indexes** — if an entity cannot be confirmed in `memory/*/_index.md`, flag it as unverified rather than creating a potentially broken wikilink
+6. **ALWAYS check integration constraints in `reference/integrations.md` before querying** — respect rate limits, data format requirements, and provider-specific limitations
+7. **Index-first pattern is MANDATORY** — every search reads `_index.md` before opening individual files; never scan all files in a folder
+8. **NEVER delete files or tasks without explicit user instruction** — suggest deletions, archive instead, or ask for confirmation
+9. **ALWAYS save skill outputs to journal** — briefings, meeting reports, wisdom extractions, and performance reports are saved to `journal/YYYY-MM/`
+
+---
+
 ## Communication style
 
 ### Anti-sycophancy mandate
@@ -292,6 +314,36 @@ ALL entity references in memory files must use `[[Entity Name]]` wikilink syntax
 ### Name normalization
 
 Before processing any names, read `reference/replacements.md` and apply canonical forms. After generating content, scan output for any variations and correct them.
+
+### Name resolution protocol
+
+When processing content containing person names (meetings, inbox items, learning content), apply this cascade before any downstream processing. Names must be resolved to canonical forms, not assumed.
+
+**Step 1: Exact match**
+If a name or variation maps to exactly one canonical form in `reference/replacements.md`, use it. Done.
+
+**Step 2: Ambiguity detection**
+If a first name, nickname, or partial name matches multiple canonical entries in `reference/replacements.md` or `memory/people/_index.md`, mark it **ambiguous**. If a name has zero matches in both, mark it **unknown**.
+
+**Step 3: Contextual resolution (try before asking user)**
+For each ambiguous or unknown name, attempt resolution using these sources in order:
+1. **Calendar attendees** (if meeting context available): narrow to people actually present
+2. **Document context**: role references ("the PM said"), team mentions, topic-specific expertise
+3. **Memory people files**: recent interactions, team membership, initiative associations
+
+If a source resolves to exactly one candidate with high confidence, use it. If confidence is low or multiple candidates remain, keep it unresolved.
+
+**Step 4: Batch user clarification**
+Collect ALL remaining unresolved names and present them to the user in a **single interaction**. Do not ask one at a time.
+- **Ambiguous**: present as multiple-choice. "Which Christopher? A) Christopher Smith (Engineering), B) Christopher Jones (Sales)"
+- **Unknown**: ask for identification. "Who is 'Mick'? Please provide their full name."
+
+Use AskUserQuestion in Cowork mode. Fall back to inline text clarification in CLI mode.
+
+**Step 5: Apply and record**
+Use resolved canonical names throughout all downstream processing. Add any new name variations discovered to `reference/replacements.md`. Do NOT proceed with processing until all names are resolved.
+
+**Constraint**: NEVER guess when ambiguous. An incorrect name propagates to memory, journal, and tasks, requiring manual cleanup across multiple files.
 
 ### Folder mapping
 

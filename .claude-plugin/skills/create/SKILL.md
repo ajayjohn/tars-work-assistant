@@ -2,6 +2,14 @@
 name: create
 description: Generate presentation-grade decks, narratives, and speeches with audience adaptation
 user-invocable: true
+help:
+  purpose: |-
+    Generate presentation-grade decks, narratives, speeches, and thought leadership content with audience adaptation.
+  use_cases:
+    - "Create a deck for [topic]"
+    - "Write a speech for [event]"
+    - "Draft a narrative for the board"
+  scope: presentations,decks,speeches,narratives,content
 ---
 
 # Artifact generation protocol

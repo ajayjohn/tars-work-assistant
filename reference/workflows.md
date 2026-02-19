@@ -7,23 +7,23 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Meeting processing
 
 **Trigger**: "Process this meeting" or paste a transcript.
-**Skills**: process-meeting → extract-tasks → extract-memory
+**Skills**: `meeting` (single unified skill with parallel sub-agents)
 **Flow**:
 1. Transcript analysis produces structured journal entry with attendees, topics, decisions, and action items.
-2. Action items are extracted and created as tasks via the task integration.
-3. New people, initiative references, and durable facts are offered for memory persistence.
-4. If attendees are unknown, TARS offers to create memory entries.
-**Output**: Journal entry saved to `journal/YYYY-MM/`, tasks created, memory updated.
+2. Two sub-agents run in parallel: task extraction (creates tasks via task integration) and memory extraction (offers durable facts for persistence).
+3. If attendees are unknown, TARS offers to create memory entries.
+4. Task creation is verified via list operation after each creation.
+**Output**: Journal entry saved to `journal/YYYY-MM/`, tasks created and verified, memory updated.
 
 ---
 
 ## Weekly review
 
 **Trigger**: "Weekly briefing" or "What happened this week?"
-**Skills**: briefing (weekly mode) → manage-tasks → update
+**Skills**: `briefing` (weekly mode, with parallel sub-agents for calendar, tasks, and memory)
 **Flow**:
-1. Calendar events from the past 7 days are retrieved and cross-referenced with journal entries.
-2. Task lists are reviewed: overdue items flagged, completed items noted, stale items triaged.
+1. Three sub-agents run in parallel: calendar events from the past 7 days, task list review, and memory context query.
+2. Results are cross-referenced: overdue items flagged, completed items noted, stale items triaged.
 3. Memory gaps are detected (people or initiatives referenced but not in memory).
 4. Upcoming week preview highlights key meetings and deadlines.
 **Output**: Comprehensive weekly summary with action items for the week ahead.
@@ -33,12 +33,11 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Strategic decision
 
 **Trigger**: "Help me think through X" or "Analyze this decision."
-**Skills**: deep-analysis (strategic-analysis → validation-council → executive-council)
+**Skills**: `think` (deep mode orchestrates strategic analysis, validation council, and executive council)
 **Flow**:
 1. Strategic analysis uses Tree of Thoughts methodology with framework selection.
-2. Validation council stress-tests the analysis with adversarial personas.
-3. Executive council (CPO/CTO brain trust) debates trade-offs and priorities.
-4. Final synthesis combines all perspectives into actionable recommendations.
+2. Two sub-agents run in parallel: validation council (adversarial stress-test) and executive council (CPO/CTO brain trust debate).
+3. Final synthesis combines all perspectives into actionable recommendations.
 **Output**: Multi-perspective analysis with clear recommendation and dissenting views.
 
 ---
@@ -46,7 +45,7 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Initiative onboarding
 
 **Trigger**: "Set up tracking for Project X" or "New initiative: ..."
-**Skills**: initiative → extract-memory → extract-tasks
+**Skills**: `initiative` (planning mode) — cascades to `learn` (memory persistence) and `tasks` (task extraction) as side effects
 **Flow**:
 1. Initiative scoping captures goals, stakeholders, timeline, and success metrics.
 2. Memory entry created in `memory/initiatives/` with full frontmatter.
@@ -59,7 +58,7 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Stakeholder communication
 
 **Trigger**: "Draft an email to X about Y" or "Help me communicate this change."
-**Skills**: communicate → quick-answer (for context lookup)
+**Skills**: `communicate` (uses `answer` internally for context lookup)
 **Flow**:
 1. TARS looks up the recipient in memory for communication preferences and context.
 2. Draft is composed with BLUF structure, appropriate tone, and relevant background.
@@ -72,7 +71,7 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Knowledge extraction
 
 **Trigger**: "Extract insights from this article" or share a podcast transcript.
-**Skills**: extract-wisdom → extract-memory
+**Skills**: `learn` (wisdom mode — extracts insights and cascades to memory persistence)
 **Flow**:
 1. Content is analyzed for key insights, frameworks, and actionable takeaways.
 2. Insights are structured into a journal entry with proper attribution.
@@ -84,10 +83,10 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Daily startup
 
 **Trigger**: Start of day or "Good morning."
-**Skills**: briefing (daily mode) → manage-tasks → housekeeping
+**Skills**: `briefing` (daily mode, with parallel sub-agents) — automatic housekeeping via `maintain` if not already run today
 **Flow**:
 1. Automatic housekeeping runs if not already done today (health check, archival sweep, sync).
-2. Today's calendar is retrieved with attendee context from memory.
+2. Three sub-agents run in parallel: today's calendar with attendee context, task priorities, and relevant memory context.
 3. Task priorities are presented: overdue first, then today's due items, then upcoming.
 4. Inbox is checked for pending items requiring processing.
 **Output**: Morning briefing with calendar, tasks, people context, and pending inbox items.
@@ -97,7 +96,7 @@ Multi-skill patterns for recurring scenarios. Each workflow describes the skills
 ## Performance review prep
 
 **Trigger**: "Performance report for [team/initiative]" or "How is X doing?"
-**Skills**: performance-report → quick-answer (for KPI lookup)
+**Skills**: `initiative` (performance mode) — uses `answer` internally for KPI lookup
 **Flow**:
 1. KPI data is gathered from memory, task completion rates, and meeting participation.
 2. Trend analysis identifies improvements and regressions over the reporting period.

@@ -2,6 +2,15 @@
 name: think
 description: Strategic analysis, adversarial validation, executive council debate, and discovery mode for complex decisions
 user-invocable: true
+help:
+  purpose: |-
+    Strategic analysis, adversarial validation, executive council debate, and discovery mode for complex decisions.
+  use_cases:
+    - "Analyze this strategy"
+    - "Stress-test this decision"
+    - "Launch the council"
+    - "Help me think through [problem]"
+  scope: strategy,analysis,validation,council,discovery
 ---
 
 # Think: Multi-mode strategic analysis protocol

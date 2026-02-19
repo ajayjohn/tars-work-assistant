@@ -64,13 +64,7 @@ For each passing task:
 | `initiative` | Extract if related to known initiative |
 | `owner` | Canonical name of responsible person |
 
-**Date resolution table:**
-- "today" -> YYYY-MM-DD (current date)
-- "tomorrow" -> YYYY-MM-DD (current date + 1)
-- "next week" -> YYYY-MM-DD (current date + 7)
-- "end of month" -> YYYY-MM-DD (last day of current month)
-- "next [day]" (e.g., "next Friday") -> YYYY-MM-DD (first occurrence of that day after today)
-- No date specified -> `backlog`
+Use the core skill's date resolution table (Task protocol section). Default to `backlog` if no date is specified.
 
 ---
 
@@ -260,9 +254,8 @@ Suggest consolidation but allow user to decide.
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (date resolution, name normalization, task verification, index-first pattern, no deletion without instruction). Additionally:
+
 - NEVER create tasks for "Team" or "We" without a specific lead
-- NEVER use relative dates in final output (always resolve to YYYY-MM-DD)
-- NEVER forget name normalization
-- NEVER delete tasks without explicit instruction (archive instead)
 - NEVER mark tasks done without user confirmation
 - ONLY write to Active, Delegated, Backlog lists (person-named lists are read-only)

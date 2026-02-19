@@ -2,7 +2,18 @@
 name: maintain
 description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, archival, inbox processing, and reference file updates
 user-invocable: true
+help:
+  purpose: |-
+    Workspace maintenance: health checks, index rebuilding, task sync, inbox processing, and reference file updates.
+  use_cases:
+    - "Run a health check"
+    - "Rebuild indexes"
+    - "Process my inbox"
+    - "Sync my tasks"
+  scope: maintenance,health,sync,rebuild,inbox,update
 ---
+<!-- MAINTENANCE: If modifying this skill, run tests/validate-docs.py
+     to check for broken cross-references. See CONTRIBUTING.md. -->
 
 # Maintain skill: health, sync, rebuild, inbox, and update
 
@@ -22,8 +33,9 @@ These operations run silently at the start of the first session each day via the
 | Health check | `scripts/health-check.py` | Validate indexes vs files on disk, check for broken wikilinks, flag naming violations | Log failure, continue session |
 | Task sync | `scripts/sync.py` | Check `reference/schedule.md` for due recurring/one-time items, scan for orphan tasks | Log failure, continue session |
 | Inbox count | (directory listing) | Count files in `inbox/pending/` and update `.housekeeping-state.yaml` | Non-critical, skip on error |
+| Reference file update | `scripts/update-reference.py` | Auto-runs when plugin version differs from workspace `plugin_version`. Preserves user data via merge strategies. Idempotent. | Queue P0 notification suggesting manual `/maintain update` |
 
-**Triggering:** The core skill reads `reference/.housekeeping-state.yaml` at session start. If `last_run` is not today, it runs the above scripts in sequence, updates the state file, and proceeds to the user's request.
+**Triggering:** The core skill's session-start gate reads `reference/.housekeeping-state.yaml` at session start. It first checks for a plugin version mismatch (auto-updates reference files if needed), then checks staleness and runs the above scripts if `last_run` is not today. See the core skill's session-start gate for the full sequence and priority-based notification delivery.
 
 ### User-initiated (explicit command only)
 
@@ -34,7 +46,7 @@ These operations are more expensive, require user judgment, or have side-effects
 | Full index rebuild | `/maintain rebuild` | Rewrites all `_index.md` files. Expensive for large workspaces. Only needed when indexes are known to be stale or corrupted. |
 | Inbox processing | `/maintain inbox` | Spawns sub-agents that create tasks and memory entries. Requires user to review and confirm the processing plan before execution. |
 | Comprehensive sync | `/maintain sync --comprehensive` | Queries MCP sources (project tracker, calendar), scans last 90 days of journal. Higher cost. Surfaces items that need user triage. |
-| Reference file update | `/maintain update` | Updates workspace reference files to match latest plugin version. Preserves user data. Requires user to review changes before applying. |
+| Reference file update | `/maintain update` | Shows dry-run preview and asks for confirmation. Use to inspect changes, force a re-run, or troubleshoot after an auto-update failure. Auto-updates run at session start when a version mismatch is detected (see Automatic table above). |
 | Unarchive content | (manual) | Requires user to select specific archived files to restore. No bulk unarchive. |
 | Manual health fixes | `/maintain health` | Script-detected issues that require human judgment (file renames, broken wikilink resolution, frontmatter corrections). |
 
@@ -60,89 +72,60 @@ Read the following indexes:
 - `contexts/products/_index.md` (if exists)
 - `reference/replacements.md`
 
-### Step 2: Naming pattern validation
+### Step 2: Run health-check.py
 
-#### Decision files
-
-Scan `memory/decisions/` for naming violations:
-
-**Standard pattern:** `YYYY-MM-DD-{slug}.md`
-
-| Violation | Example | Suggested fix |
-|-----------|---------|---------------|
-| Missing date prefix | `ba-role-definition.md` | Extract date from frontmatter, rename |
-| Context-first | `ai-strategy-2026-01-20.md` | Reorder to `2026-01-20-ai-strategy.md` |
-| No date anywhere | `legacy-decision.md` | Check frontmatter `date` field, rename |
-
-**Auto-fix (safe):** If frontmatter contains `date` field, suggest rename command.
-
-### Step 3: Frontmatter validation
-
-Scan all memory files for required fields:
-
-| Type | Required fields |
-|------|-----------------|
-| All memory | `title`, `type`, `summary`, `updated` |
-| person | + `tags`, `aliases` |
-| decision | + `status`, `decision_maker` |
-| product-spec | + `status`, `owner` |
-
-#### Status value validation
-
-For decisions, verify `status` is one of: `proposed`, `decided`, `implemented`, `superseded`, `rejected`
-
-For products/product-specs, verify `status` is one of: `active`, `planned`, `deprecated`
-
-Report invalid values.
-
-### Step 4: Index synchronization
-
-#### Check for orphaned entries
-
-For each category index:
-1. List entries in `_index.md`
-2. List actual `.md` files in folder
-3. Flag entries in index that don't have corresponding files
-4. Flag files that aren't in the index
-
-#### Check for stale summaries
-
-For each file in memory:
-1. Compare file `updated` date with index entry
-2. Flag if file was modified more recently than index was regenerated
-
-**Auto-fix (safe):** Run `/rebuild-index` to resync all indexes.
-
-### Step 5: Broken wikilink detection
-
-Scan all files in `memory/`, `journal/`, and `contexts/` for wikilinks:
-
-Pattern: `[[Entity Name]]`
-
-For each wikilink:
-1. Check if entity exists in `memory/people/_index.md`
-2. Check if entity exists in `memory/initiatives/_index.md`
-3. Check if entity exists in `memory/products/_index.md`
-4. Check if entity exists in `memory/decisions/_index.md`
-
-Flag broken wikilinks (reference to non-existent entity).
-
-### Step 6: Replacements coverage
-
-Scan all journal files from the last 30 days for names:
-
-1. Extract all capitalized multi-word names (potential person names)
-2. Extract all acronyms (2-4 capital letters)
-3. Cross-reference against `reference/replacements.md`
-
-Flag names/acronyms that appear multiple times but aren't in replacements.
-
-**Auto-fix (safe):** Add flagged items to `reference/replacements.md` with placeholder:
-```markdown
-| NewName | ?? (needs canonical form) |
+```bash
+python3 scripts/health-check.py {workspace_path}
 ```
 
-### Step 7: Information redundancy check
+This script performs deterministic validation: naming pattern checks, frontmatter validation, index synchronization, broken wikilink detection, and replacements coverage (see ARCHITECTURE.md "Maintain skill internals" for detailed procedures). Parse the JSON output:
+- `issues` array: each with `category`, `file`, `issue`, `suggested_fix`
+- `auto_fixes` array: safe fixes already applied
+- `summary` stats: counts by category
+
+If `scripts/health-check.py` is not available, fall back to manual workspace inspection using the categories in the output format below.
+
+### Step 2.5: Auto-fix deterministic issues
+
+After parsing health-check.py JSON, classify each issue by fixability and execute safe auto-fixes.
+
+**Auto-fixable (execute immediately):**
+
+| Issue category | Fix action | Safety condition |
+|---------------|-----------|-----------------|
+| `naming` (decision files) | Rename file to the `suggested_fix` target | Only if frontmatter `date` field exists and is valid YYYY-MM-DD |
+| `index` (orphan entries) | Remove orphan row from the category `_index.md` | Only if source file confirmed absent from disk |
+| `index` (files not in index / stale summaries) | Run `python3 scripts/rebuild-indexes.py {workspace_path}` once | Deterministic index regeneration |
+| `replacements` (uncovered names) | Add `??` placeholder entries to `reference/replacements.md` | Existing behavior |
+
+**NOT auto-fixable (present to user):**
+
+| Issue category | Why |
+|---------------|-----|
+| `frontmatter` (missing fields) | Values require user judgment |
+| `frontmatter` (invalid status) | Correct status requires understanding intent |
+| `wikilink` (broken references) | May need entity creation or reference correction |
+| `replacements` (with `??` placeholder) | User must provide canonical name |
+
+**Execution procedure:**
+1. Separate `issues` into `auto_fixable` and `manual_fix` lists using the table above
+2. For naming fixes: parse `suggested_fix` to extract target filename, rename via filesystem, verify new path exists
+3. For index orphan fixes: read the `_index.md`, remove the orphan entry row, write updated index
+4. For index rebuilds: if any "files not in index" or "stale summaries" issues exist, run `rebuild-indexes.py` once (covers all index issues in one pass)
+5. For replacements: add `??` placeholder entries
+6. Record all executed fixes in an `auto_fixed` list for the report
+
+If any auto-fix fails (file locked, permission error, target exists), demote it to the manual-fix list with the error reason.
+
+### Step 3: Run archive.py (optional)
+
+```bash
+python3 scripts/archive.py {workspace_path} --dry-run
+```
+
+Preview staleness-based archival. If user confirms, run without `--dry-run`. Parse JSON output: `files_archived`, `expired_lines_removed`, `archived_files` array.
+
+### Step 4: Information redundancy check
 
 #### Duplicate detection
 
@@ -165,34 +148,24 @@ Generate report in this format:
 ```markdown
 ## Housekeeping report (YYYY-MM-DD)
 
-### Issues found
-
-| Category | File | Issue | Suggested fix |
-|----------|------|-------|---------------|
-| naming | decisions/ba-role-definition.md | Missing date prefix | Rename to 2026-01-15-ba-role-definition.md |
-| frontmatter | contexts/products/dbi.md | Missing frontmatter | Add standard product-spec template |
-| frontmatter | memory/decisions/old.md | Invalid status "pending" | Change to "proposed" |
-| index | memory/people/_index.md | Orphan entry "Jane Doe" | Entry has no file, remove from index |
-| index | memory/initiatives/new-project.md | Not in index | Add to initiatives/_index.md |
-| wikilink | journal/2026-01/meeting.md | Broken link [[Unknown Person]] | Create memory entry or fix reference |
-| replacements | journal/ | "JT" appears 5 times | Add to reference/replacements.md |
-
 ### Auto-fixed
-
-- Added 2 unknown names to reference/replacements.md with placeholders
-- (List other auto-fixes)
+| Category | File | Issue | Fix applied |
+|----------|------|-------|------------|
+| naming | decisions/ba-role-definition.md | Missing date prefix | Renamed to 2026-01-15-ba-role-definition.md |
+| index | memory/people/_index.md | Orphan entry "Jane Doe" | Removed from index |
+| index | (multiple) | Files not in index | Ran rebuild-indexes.py |
+| replacements | reference/replacements.md | "JT" uncovered (5 uses) | Added placeholder entry |
 
 ### Manual action required
+| Category | File | Issue | Suggested fix |
+|----------|------|-------|---------------|
+| frontmatter | memory/decisions/old.md | Invalid status "pending" | Change to "proposed" |
+| wikilink | journal/2026-01/meeting.md | Broken link [[Unknown Person]] | Create memory entry or fix reference |
 
-- 5 files need frontmatter review (see table above)
-- 2 broken wikilinks need resolution
-- 3 decision files need renaming
-
-### Recommendations
-
-- Run `/rebuild-index` to regenerate all indexes
-- Review stale memory entries (not referenced in 90+ days)
-- Complete placeholder entries in reference/replacements.md
+### Summary
+- Auto-fixed: N issues (N renames, N index fixes, N replacement additions)
+- Manual action required: N issues
+- Workspace health: {healthy | needs attention | degraded}
 ```
 
 ---
@@ -358,86 +331,22 @@ Append to default report:
 
 Regenerate all _index.md files from current file contents and frontmatter.
 
-### Step 1: Memory indexes
+### Step 1: Run rebuild-indexes.py
 
-For each category in `memory/` (people, initiatives, decisions, products, vendors, competitors, organizational-context):
-
-1. Scan all `.md` files in the folder (excluding `_index.md` and `_template.md`)
-2. Read frontmatter from each file: `title`, `aliases`, `tags`, `summary`, `updated`
-3. Generate `_index.md` with format:
-
-```markdown
-# [Category] index
-
-| Name | Aliases | File | Summary | Updated |
-|------|---------|------|---------|---------|
-| Entity Name | alias1, alias2 | filename.md | One-line summary | YYYY-MM-DD |
+```bash
+python3 scripts/rebuild-indexes.py {workspace_path}
 ```
 
-For initiatives, separate into Active and Completed sections based on tags.
+This script performs deterministic index generation: memory category indexes, master memory index, journal month indexes, contexts/products index, and decision naming validation (see ARCHITECTURE.md "Maintain skill internals" for detailed procedures). Parse the JSON output:
+- `stats`: counts of memory categories, journal months, context products, and total entries rebuilt
+- `issues`: array of problems found (missing-frontmatter, naming-violation, missing-required fields)
+- `total_issues`: count of all issues
 
-### Step 2: Master memory index
+Present `stats` as the "Indexes regenerated" table. Present `issues` as the "Issues found" table. The script handles all file I/O — do not duplicate its work by manually reading and rewriting index files.
 
-Generate `memory/_index.md`:
+If `scripts/rebuild-indexes.py` is not available, fall back to manual index regeneration: scan each memory category, read frontmatter, rebuild `_index.md` files.
 
-```markdown
-# Memory index
-
-| Category | Path | Count |
-|----------|------|-------|
-| People | memory/people/ | N |
-| Initiatives | memory/initiatives/ | N |
-| Decisions | memory/decisions/ | N |
-| Products | memory/products/ | N |
-| Vendors | memory/vendors/ | N |
-| Competitors | memory/competitors/ | N |
-| Organizational context | memory/organizational-context/ | N |
-```
-
-### Step 3: Journal indexes
-
-For each month folder in `journal/`:
-
-1. Scan all `.md` files (excluding `_index.md`)
-2. Read frontmatter: `date`, `type`, `title`, `participants`, `initiatives`
-3. Generate `journal/YYYY-MM/_index.md`:
-
-```markdown
-# [Month Year] journal index
-
-| Date | Type | Title | Participants | Initiatives |
-|------|------|-------|-------------|-------------|
-| YYYY-MM-DD | meeting | Title | Names | Initiatives |
-```
-
-### Step 4: Contexts/products index
-
-Scan `contexts/products/` for product specification files:
-
-1. Scan all `.md` files in the folder (excluding `_index.md`)
-2. Read frontmatter: `title`, `type`, `status`, `owner`, `summary`, `updated`
-3. Generate `contexts/products/_index.md`:
-
-```markdown
-# Product specifications index
-
-| Name | Status | Owner | Summary | Updated |
-|------|--------|-------|---------|---------|
-| Product Name | active | [[Owner Name]] | One-line summary | YYYY-MM-DD |
-```
-
-### Step 5: Decision file validation
-
-For files in `memory/decisions/`:
-
-1. Check naming convention: should be `YYYY-MM-DD-{slug}.md`
-2. Flag files that don't match the pattern:
-   - Missing date prefix
-   - Non-standard date format
-   - Context-first naming (e.g., `topic-YYYY-MM-DD.md`)
-3. Report suggested renames
-
-### Step 6: Annual rollup (if applicable)
+### Step 2: Annual rollup (if applicable)
 
 For completed years, generate `journal/YYYY-annual-index.md` consolidating all month indexes.
 
@@ -462,38 +371,6 @@ Report what was regenerated and any issues found:
 | naming-violation | decisions/file.md | Missing date prefix | Rename to YYYY-MM-DD-slug.md |
 | missing-required | path/file.md | Missing `summary` field | Add summary for index |
 ```
-
-### Script invocation
-
-Run the automated rebuild script for deterministic index generation:
-
-```bash
-python3 scripts/rebuild-indexes.py {workspace_path}
-```
-
-This script performs Steps 1-5 deterministically (memory indexes, master index, journal indexes, contexts index, decision naming validation). Parse the JSON output and use it to populate the rebuild report.
-
-#### Interpreting script output
-
-The script returns JSON with:
-- `stats`: counts of memory categories, journal months, context products, and total entries rebuilt
-- `issues`: array of problems found (missing-frontmatter, naming-violation, missing-required fields)
-- `total_issues`: count of all issues
-
-Present the `stats` as the "Indexes regenerated" table. Present `issues` as the "Issues found" table. The script handles all file I/O — do not duplicate its work by manually reading and rewriting index files.
-
-#### When to skip the script
-
-If `scripts/rebuild-indexes.py` is not available (e.g., workspace predates script extraction), fall back to the manual procedure above.
-
-### Post-execution checklist
-- [ ] All memory category indexes regenerated
-- [ ] Master memory index regenerated
-- [ ] All journal month indexes regenerated
-- [ ] Contexts/products index regenerated
-- [ ] Decision naming validated
-- [ ] Any missing frontmatter flagged to user
-- [ ] Suggested fixes presented
 
 ---
 
@@ -529,6 +406,24 @@ Process all items? (Confirm before proceeding)
 
 Wait for user confirmation before spawning sub-agents. Allow the user to exclude specific items or change detected types.
 
+### Step 2.5: Pre-resolve names across all transcript items
+
+Before spawning sub-agents, perform a single pass of name resolution across ALL confirmed transcript items to ensure consistency and minimize user interruptions.
+
+Apply the **name resolution protocol** (core skill, Memory protocol section):
+1. For each transcript item, scan for person names
+2. Cross-reference all names against `reference/replacements.md` and `memory/people/_index.md`
+3. For transcript items: query calendar integration for each meeting date to retrieve attendee lists
+4. Apply contextual resolution from calendar attendees and document context
+5. If any names remain ambiguous or unknown across ALL files, batch them into a single user clarification
+6. Build a consolidated name resolution table
+
+Pass the resolution table to each sub-agent in its prompt: "Use these resolved canonical names: Christopher = Christopher Smith, Mick = Michael Johnson"
+
+This prevents: (a) each sub-agent independently guessing different resolutions for the same person, (b) the user being asked the same question by multiple sub-agents, (c) wrong names propagating to memory and tasks.
+
+Skip this step if no transcript items are in the confirmed plan.
+
 ### Step 3: Parallel sub-agent processing
 
 After user confirmation:
@@ -538,177 +433,49 @@ After user confirmation:
 
 The move-all-first ordering prevents any concurrent session from double-processing items.
 
-##### Sub-agent template by content type
+##### Sub-agent common pipeline
 
-**Transcript items:**
+Each sub-agent follows this shared pipeline. Type-specific steps are noted below.
+
 ```
-You are processing a meeting transcript from the inbox.
-Use the meeting skill pipeline (skills/meeting/SKILL.md) as your execution guide.
-
 Source file: inbox/processing/{filename}
 
-Step 1: Load reference files (MANDATORY before reading transcript)
+STEP A: Load reference files (MANDATORY before reading source)
 - Read reference/replacements.md. Apply canonical names to ALL content.
-- Read reference/integrations.md (Calendar and Tasks sections).
+- If the main agent provided a name resolution table, apply those resolved names.
+  Do NOT re-resolve names in the table. Only resolve names NOT in the table using replacements.md.
+- Read reference/integrations.md (Calendar and Tasks sections) [transcript and notes only].
 - Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  These indexes are required for wikilink validation in Step 4.
+  Required for wikilink validation.
 
-Step 2: Resolve transcript content
-- Read the transcript file.
-- Resolve speaker names: if speakers are generic ("Speaker 1"), infer real names from context.
-  NEVER use generic speaker labels in output.
-- Query calendar integration for this meeting date to retrieve attendee list, official title, and organizer.
-  If calendar is unavailable, proceed with transcript data and note the gap.
+STEP B: Read and process source file (TYPE-SPECIFIC — see below)
 
-Step 3: Generate structured report
-Produce ALL five sections:
-- Topics: discussion points as bullets
-- Updates: status updates from people other than the user (name, project, date)
-- Concerns: risks raised (who, issue, deadline)
-- Decisions: what was decided and who made the call
-- Action items: classified as For me / For others / Unassigned
-
-Step 4: Save to journal
-- Filename: journal/YYYY-MM/YYYY-MM-DD-meeting-{slug}.md
-- Frontmatter: date, title, type: meeting, participants, organizer, topics, initiatives, source
-- Body: use [[wikilink]] syntax for all entity references (people, initiatives, decisions)
-- BEFORE writing any [[Name]], verify the name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index AND is not in replacements.md: add it to reference/replacements.md
-  with placeholder "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
-
-Step 5: Extract tasks
-- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
-- Check for duplicates across all configured task lists
+STEP C: Extract tasks
+- Apply accountability test (never create tasks for "Team" or "We" without a specific lead).
+- Check for duplicates across all configured task lists.
 - Create via task integration. Resolve relative dates to YYYY-MM-DD.
 - Check each tool response. Only count a task as created if the response confirms success.
 - After all creation attempts, execute list_reminders for each list that received new tasks.
   Verify each task appears by matching title. Add any missing tasks to creation_unverified.
   NEVER report tasks as created without verification.
 
-Step 6: Extract memory
-- Apply durability test to each insight
-- Persist durable insights to memory/ using the folder mapping from the core skill
-- Update relevant _index.md files after writing
-- Use .lock files for memory writes (cowork protocol)
-
-After all steps complete, move the source file to inbox/completed/{filename}.
-
-Return JSON:
-{
-  "status": "ok" | "partial" | "error",
-  "source_file": "{filename}",
-  "content_type": "transcript",
-  "journal_path": "journal/YYYY-MM/...",
-  "tasks_created": 0,
-  "memory_updates": 0,
-  "creation_unverified": [],
-  "unverified_wikilinks": [],
-  "errors": []
-}
-Status "partial": journal entry was saved but one or more downstream steps failed.
-Status "error": the journal entry could not be saved.
-```
-
-**Article/wisdom items:**
-```
-You are extracting wisdom from an article in the inbox.
-Use the wisdom extraction pipeline (skills/learn/SKILL.md, Mode B) as your execution guide.
-
-Source file: inbox/processing/{filename}
-
-Step 1: Load reference files (MANDATORY before reading article)
-- Read reference/replacements.md. Apply canonical names to ALL content.
-- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  Required for wikilink validation before writing to memory.
-
-Step 2: Read and classify article content.
-
-Step 3: Extract insights
-- Apply durability test to each insight (all four criteria from core skill memory protocol).
-- Discard insights that fail.
-
-Step 4: Persist durable insights to memory
-- Map each passing insight to the correct memory folder (people, initiatives, decisions, etc.)
-- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
-  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
-- Update relevant _index.md after each write.
-- Use .lock files for memory writes (cowork protocol).
-
-Step 5: Save extraction report
-- Filename: journal/YYYY-MM/YYYY-MM-DD-wisdom-{slug}.md
-
-Step 6: Extract tasks
-- Apply accountability test.
-- Create via task integration.
-- Check each tool response. Only count a task as created if the response confirms success.
-- After all creation attempts, execute list_reminders for each list that received new tasks.
-  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
-  NEVER report tasks as created without verification.
-
-After all steps complete, move the source file to inbox/completed/{filename}.
-
-Return JSON:
-{
-  "status": "ok" | "partial" | "error",
-  "source_file": "{filename}",
-  "content_type": "article",
-  "journal_path": "journal/YYYY-MM/...",
-  "insights_persisted": 0,
-  "tasks_created": 0,
-  "creation_unverified": [],
-  "unverified_wikilinks": [],
-  "errors": []
-}
-Status "partial": journal entry was saved but one or more downstream steps failed.
-Status "error": the journal entry could not be saved.
-```
-
-**Notes items:**
-```
-You are processing notes from the inbox.
-
-Source file: inbox/processing/{filename}
-
-Step 1: Load reference files (MANDATORY before reading notes)
-- Read reference/replacements.md. Apply canonical names to ALL content.
-- Read reference/integrations.md Tasks section for task creation.
-- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  Required for wikilink validation before writing to memory or journal.
-
-Step 2: Read the notes file.
-
-Step 3: Extract tasks
-- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
-- Check for duplicates across all configured task lists
-- Create via task integration. Resolve relative dates to YYYY-MM-DD.
-- Check each tool response. Only count a task as created if the response confirms success.
-- After all creation attempts, execute list_reminders for each list that received new tasks.
-  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
-  NEVER report tasks as created without verification.
-
-Step 4: Extract durable memory
+STEP D: Extract durable memory
 - Apply durability test to each insight.
-- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
-  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
+- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes from Step A.
+  If not found: add to reference/replacements.md with "?? (needs canonical form)" placeholder
+  and include in unverified_wikilinks. Do NOT fabricate wikilinks.
 - Persist passing insights to memory/. Update relevant _index.md files.
 - Use .lock files for memory writes (cowork protocol).
 
-Step 5: Save notes summary
-- Filename: journal/YYYY-MM/YYYY-MM-DD-notes-{slug}.md
-- Body: use [[wikilink]] syntax for verified entity references only.
+STEP E: Save to journal (TYPE-SPECIFIC filename — see below)
 
-After all steps complete, move the source file to inbox/completed/{filename}.
+STEP F: Move source file to inbox/completed/{filename}.
 
 Return JSON:
 {
   "status": "ok" | "partial" | "error",
   "source_file": "{filename}",
-  "content_type": "notes",
+  "content_type": "transcript" | "article" | "notes",
   "journal_path": "journal/YYYY-MM/...",
   "tasks_created": 0,
   "memory_updates": 0,
@@ -719,6 +486,20 @@ Return JSON:
 Status "partial": journal entry was saved but one or more downstream steps failed.
 Status "error": the journal entry could not be saved.
 ```
+
+##### Type-specific processing (Step B and Step E)
+
+**Transcript** — Use the meeting skill pipeline (skills/meeting/SKILL.md) as execution guide:
+- Step B: Resolve speaker names (never use generic labels). Query calendar for attendee list, title, organizer. Generate 5-section structured report (Topics, Updates, Concerns, Decisions, Action items).
+- Step E: Save as `journal/YYYY-MM/YYYY-MM-DD-meeting-{slug}.md` with frontmatter: date, title, type: meeting, participants, organizer, topics, initiatives, source.
+
+**Article** — Use the wisdom extraction pipeline (skills/learn/SKILL.md, Mode B) as execution guide:
+- Step B: Classify source type. Apply durability test to each extracted insight. Discard failures.
+- Step E: Save as `journal/YYYY-MM/YYYY-MM-DD-wisdom-{slug}.md`.
+
+**Notes** — Direct extraction:
+- Step B: Read notes. Identify tasks and durable insights.
+- Step E: Save as `journal/YYYY-MM/YYYY-MM-DD-notes-{slug}.md`.
 
 ### Step 4: Collect results and handle failures
 
@@ -968,24 +749,22 @@ Present the findings using the output format above. For auto-fixes, apply them a
 
 ## Absolute constraints
 
+Universal constraints from the core skill apply (wikilink mandate, task verification, integration constraints, no deletion without instruction). Additionally:
+
 **Health mode:**
 - NEVER delete files (only suggest deletions with user confirmation)
-- NEVER modify content (only metadata like replacements)
+- NEVER modify file content (only metadata like replacements and index entries)
 - NEVER change wikilink targets without user approval
-- **Auto-fix safety:** Only add to replacements, only suggest renames (don't execute)
+- **Auto-fix scope:** Execute deterministic fixes (file renames from frontmatter dates, index orphan removal, index rebuilds, replacement placeholder additions). Present non-deterministic issues (missing frontmatter values, invalid enums, broken wikilinks) to the user. If an auto-fix fails, demote to manual.
 
 **Sync mode:**
-- NEVER create tasks without user approval
+- NEVER create or modify tasks without user approval
 - NEVER fabricate data from missing integrations (report gaps)
-- NEVER modify tasks without user confirmation
-- ALWAYS use provider-agnostic language (no hardcoded Jira/Asana terminology)
 - NEVER skip memory gap detection
 
 **Rebuild mode:**
 - NEVER modify file content (only regenerate indexes)
-- NEVER delete files
-- ALWAYS validate decision naming patterns
-- ALWAYS report missing frontmatter
+- ALWAYS validate decision naming patterns and report missing frontmatter
 - NEVER skip any category
 
 **Inbox mode:**
@@ -995,8 +774,6 @@ Present the findings using the output format above. For auto-fixes, apply them a
 - ALWAYS use `.lock` files for memory writes from parallel sub-agents
 - NEVER spawn sub-agents for items classified as `unknown` (require manual review)
 - ALWAYS move ALL `inbox/pending/` files to `inbox/processing/` BEFORE spawning any sub-agents
-- NEVER write `[[wikilinks]]` for names not verified against memory indexes (flag as unverified instead)
-- NEVER report tasks as created without verifying via `list_reminders` after creation
 
 ---
 
