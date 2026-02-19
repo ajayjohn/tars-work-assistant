@@ -2,6 +2,7 @@
 """Validate TARS plugin structure for marketplace compatibility."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -47,6 +48,20 @@ def validate_plugin(plugin_dir: Path):
                 errors.append(f"Command file not found: {cmd_path}")
     
     return errors, warnings
+
+def validate_scripts(repo_root: Path):
+    """Validate all scripts in scripts/ are executable."""
+    errors = []
+    scripts_dir = repo_root / "scripts"
+    if not scripts_dir.exists():
+        return errors
+
+    for script in sorted(scripts_dir.iterdir()):
+        if script.suffix in (".py", ".sh") and not os.access(script, os.X_OK):
+            errors.append(f"{script.relative_to(repo_root)}: Not executable (chmod +x needed)")
+
+    return errors
+
 
 def validate_marketplace(repo_root: Path):
     """Validate marketplace.json schema (always in .claude-plugin/)."""
@@ -113,6 +128,17 @@ def main():
         for warning in warnings:
             print(f"  - {warning}")
 
+    # Validate script permissions
+    print("\nChecking script permissions...")
+    script_errors = validate_scripts(repo_root)
+
+    if script_errors:
+        print("ERRORS (1):")
+        for error in script_errors:
+            print(f"  ✗ {error}")
+    else:
+        print("✓ All scripts executable")
+
     # Validate marketplace configuration
     print("\nChecking marketplace.json...")
     mk_errors, mk_warnings = validate_marketplace(repo_root)
@@ -130,7 +156,7 @@ def main():
             print(f"  - {warning}")
 
     # Summary
-    total_errors = len(errors) + len(mk_errors)
+    total_errors = len(errors) + len(script_errors) + len(mk_errors)
     total_warnings = len(warnings) + len(mk_warnings)
 
     print(f"\n{'='*60}")
