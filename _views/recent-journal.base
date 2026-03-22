@@ -1,0 +1,32 @@
+filters:
+  file.hasTag("tars/journal")
+
+views:
+  - type: table
+    name: "Recent Entries"
+    limit: 50
+    order:
+      - file.name
+      - file.tags
+      - tars-date
+      - tars-participants
+      - tars-initiatives
+  - type: table
+    name: "Meetings"
+    filters:
+      and:
+        - file.hasTag("tars/meeting")
+    order:
+      - file.name
+      - tars-date
+      - tars-participants
+      - tars-topics
+  - type: table
+    name: "Briefings"
+    filters:
+      and:
+        - file.hasTag("tars/briefing")
+    order:
+      - file.name
+      - tars-date
+      - tars-briefing-type

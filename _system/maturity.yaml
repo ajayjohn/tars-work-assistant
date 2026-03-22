@@ -1,0 +1,29 @@
+# TARS Maturity Tracking
+# Tracks onboarding progress and system hydration
+
+onboarding:
+  completed: false
+  completed_date: null
+  steps:
+    vault_scaffold: false
+    integrations_configured: false
+    initial_people: false
+    initial_initiatives: false
+    schedule_configured: false
+    cron_registered: false
+    first_briefing: false
+    first_meeting: false
+
+hydration:
+  people_count: 0
+  initiative_count: 0
+  decision_count: 0
+  journal_count: 0
+  task_count: 0
+  last_checked: null
+
+maturity_level: new  # new | developing | established | mature
+# new: < 5 people, < 2 initiatives
+# developing: 5-20 people, 2-5 initiatives, first briefing done
+# established: 20-50 people, 5+ initiatives, weekly briefings active
+# mature: 50+ people, regular maintenance, full workflow usage

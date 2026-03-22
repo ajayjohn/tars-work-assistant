@@ -1,6 +1,56 @@
 # Changelog
 
+## v3.0.0 (2026-03-22)
 
+**TARS 3.0: Obsidian-native rebuild — complete architecture redesign**
+
+### Architecture
+- **Obsidian-native**: All vault mutations via `obsidian-cli` (create, append, property:set, search). No direct filesystem writes for content.
+- **Bases replace indexes**: 15 live `.base` query files replace all hand-maintained `_index.md` files. Zero drift, always accurate.
+- **Schema-validated frontmatter**: All TARS notes use `tars-` prefixed properties validated against `_system/schemas.yaml` (14 entity types).
+- **Single source tree**: No duplicate distribution folders. The vault IS the source of truth.
+- **Tag-driven filterability**: Hierarchical `tars/` tags on all managed notes for reliable search and base filtering.
+
+### New capabilities (10 real-world issues addressed)
+- **Transcript format detection + mandatory calendar check** (Issue 1): Meeting processing always queries calendar even when transcript provides a date. Multiple-choice confirmation for ambiguous matches.
+- **Task review UX** (Issue 2): All task extraction presents numbered lists with selection syntax (`all`, `1,3,7`, `all except 4`, `none`). No silent task creation.
+- **Ask don't assume** (Issue 3): Core principle — multiple-choice questions, max 3-4 per round, always check vault first, always include skip option.
+- **File organization + companion files** (Issue 4): Non-markdown files get companion `.md` notes with metadata. Maintenance auto-organizes user-added files by date.
+- **Quick capture / screenshot processing** (Issue 5): Multimodal image analysis with calendar context inference for screenshots captured during meetings.
+- **Transcript-linked fallback lookup** (Issue 6): Transcripts archived with bidirectional journal links. Answer skill falls back to raw transcript when summaries lack detail.
+- **Check before writing** (Issue 7): Knowledge inventory before all extraction — NEW/UPDATE/REDUNDANT/CONTRADICTS classification prevents stale overwrites.
+- **Negative statement capture + cleanup** (Issue 8): Sentiment detection with inline flags. Periodic maintenance review with numbered removal. `flagged-content.base` view.
+- **Self-evaluation backlog** (Issue 9): Auto-detected framework errors logged to `_system/backlog/issues/` (deduplicated). User ideas captured separately. `backlog.base` view.
+- **Scheduled execution** (Issue 10): CronCreate for daily briefings, weekly briefings, and maintenance. Cron self-check at every session start.
+
+### Added
+- `_system/` directory: config, integrations, alias-registry, taxonomy, kpis, schedule, guardrails.yaml, maturity.yaml, housekeeping-state.yaml, schemas.yaml, changelog/, backlog/
+- `_views/` directory: 15 `.base` files (all-people, all-initiatives, all-decisions, all-products, all-vendors, all-competitors, recent-journal, active-tasks, overdue-tasks, stale-memory, inbox-pending, all-documents, all-transcripts, flagged-content, backlog)
+- `templates/` directory: 15 Obsidian templates (person, vendor, competitor, product, initiative, decision, org-context, meeting-journal, daily-briefing, weekly-briefing, wisdom-journal, companion, transcript, issue, idea)
+- `scripts/validate-schema.py`: Schema validation against schemas.yaml with PyYAML fallback
+- `scripts/scan-flagged.py`: Negative sentiment scanner for people notes
+- `scripts/health-check.py`: Rewritten for v3 schema, broken links, alias consistency, staleness
+- `scripts/scan-secrets.py`: Rewritten for v3 guardrails.yaml format
+- `scripts/sync.py`: Rewritten for v3 meeting journals, memory freshness, task drift
+- `scripts/archive.py`: Rewritten with guardrails (never archive backlinked or task-referenced notes)
+- `tests/smoke-tests.py`: 13-point verification suite
+- `tests/fixtures/`: 6 schema validation fixtures (valid + invalid examples)
+- `CLAUDE.md`: Vault-level agent configuration for v3
+- `DECISIONS.md`: Architectural decisions and deviation log
+- `.claude/skills/`: obsidian-cli, obsidian-bases, obsidian-markdown, json-canvas, defuddle skill references
+
+### Changed
+- **All 12 skills rewritten** for Obsidian-native operation (core, welcome, learn, tasks, meeting, briefing, answer, maintain, think, communicate, initiative, create)
+- **Name resolution**: 3-layer system (Obsidian aliases → context-aware registry → search fallback) replaces flat `replacements.md`
+- **Inbox processing**: Simplified to pending/processed (no processing/failed intermediate states)
+- **Think modes**: All 5 modes (A-E) check existing vault knowledge before analyzing
+- **Communication drafting**: Loads stakeholder memory, checks for flagged negative content
+
+### Removed (by design)
+- `_index.md` files: Replaced by `.base` live queries
+- `reference/` directory: Replaced by `_system/`
+- `commands/` directory: Skills handle routing directly
+- Duplicate distribution trees: Single source tree
 
 ## v2.2.0 (2026-02-19)
 

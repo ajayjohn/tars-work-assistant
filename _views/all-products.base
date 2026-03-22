@@ -1,0 +1,17 @@
+filters:
+  and:
+    - file.hasTag("tars/product")
+    - not:
+        - file.hasTag("tars/archived")
+
+views:
+  - type: table
+    name: "All Products"
+    order:
+      - file.name
+      - tars-summary
+      - tars-status
+      - tars-owner
+      - tars-modified
+    groupBy:
+      property: tars-status

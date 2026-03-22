@@ -1,0 +1,63 @@
+# TARS Guardrails Configuration
+# Used by scan-secrets.py and scan-flagged.py
+
+# Block patterns: content matching these is NEVER persisted. Redact and notify.
+block_patterns:
+  - name: ssn
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    description: Social Security Number
+  - name: api_key
+    pattern: '(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{20,}'
+    description: API key assignment
+  - name: bearer_token
+    pattern: '(?i)bearer\s+[a-zA-Z0-9_\-\.]{20,}'
+    description: Bearer token
+  - name: jwt
+    pattern: 'eyJ[a-zA-Z0-9_\-]+\.eyJ[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+'
+    description: JSON Web Token
+  - name: private_key
+    pattern: '-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'
+    description: Private key block
+  - name: password_assignment
+    pattern: '(?i)(password|passwd|pwd)\s*[:=]\s*["\']?[^\s"'']{8,}'
+    description: Password assignment
+  - name: connection_string
+    pattern: '(?i)(mongodb|postgres|mysql|redis|amqp)://[^\s]+'
+    description: Database connection string
+  - name: aws_key
+    pattern: 'AKIA[A-Z0-9]{16}'
+    description: AWS access key
+
+# Warn patterns: flag for user review before persisting
+warn_patterns:
+  - name: date_of_birth
+    pattern: '(?i)(date of birth|dob|born on)\s*[:=]?\s*\d'
+    description: Date of birth
+  - name: salary
+    pattern: '(?i)(salary|compensation|pay|wage)\s*[:=]?\s*\$?\d'
+    description: Salary/compensation information
+  - name: pip
+    pattern: '(?i)\b(performance improvement plan|PIP)\b'
+    description: Performance improvement plan
+  - name: termination
+    pattern: '(?i)\b(terminat(ed|ion|ing)|fired|let go)\b'
+    description: Termination reference
+  - name: diagnosis
+    pattern: '(?i)\b(diagnos(ed|is)|medical condition|disability)\b'
+    description: Medical diagnosis
+  - name: lawsuit
+    pattern: '(?i)\b(lawsuit|litigation|legal action|settlement)\b'
+    description: Legal proceedings
+
+# Negative sentiment patterns: flag for periodic cleanup (Issue 8)
+negative_sentiment_patterns:
+  - pattern: '(?i)\b(slow to deliver|underperform|unreliable|checked out|disengaged)\b'
+    category: performance
+  - pattern: '(?i)\b(political|playing politics|power grab|empire building)\b'
+    category: political
+  - pattern: '(?i)\b(difficult to work with|toxic|hostile|combative|passive.aggressive)\b'
+    category: interpersonal
+  - pattern: '(?i)\b(incompetent|clueless|out of their depth|over their head)\b'
+    category: competence
+  - pattern: '(?i)\b(old.fashioned|resistant to change|stuck in their ways|blocker)\b'
+    category: adaptability

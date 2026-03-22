@@ -1,0 +1,233 @@
+# TARS Frontmatter Schema Definitions
+# Used by scripts/validate-schema.py to enforce data quality
+# All TARS properties use the tars- prefix
+
+person:
+  required_tags: [tars/person]
+  required_properties:
+    - tars-summary
+    - tars-staleness
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+    - tars-has-flagged-content
+  property_rules:
+    tars-staleness:
+      enum: [durable, seasonal, transient]
+    tars-has-flagged-content:
+      type: checkbox
+
+initiative:
+  required_tags: [tars/initiative]
+  required_properties:
+    - tars-summary
+    - tars-status
+    - tars-owner
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+    - tars-health
+    - tars-target-date
+  property_rules:
+    tars-status:
+      enum: [planning, active, paused, completed, cancelled]
+    tars-health:
+      enum: [green, yellow, red]
+
+decision:
+  required_tags: [tars/decision]
+  required_properties:
+    - tars-summary
+    - tars-status
+    - tars-date
+    - tars-decided-by
+    - tars-created
+  optional_properties:
+    - tars-stakeholders
+    - tars-affects
+    - tars-modified
+  property_rules:
+    tars-status:
+      enum: [proposed, decided, implemented, superseded, rejected]
+
+meeting:
+  required_tags: [tars/journal, tars/meeting]
+  required_properties:
+    - tars-date
+    - tars-participants
+    - tars-source
+    - tars-created
+  optional_properties:
+    - tars-meeting-datetime
+    - tars-organizer
+    - tars-topics
+    - tars-initiatives
+    - tars-calendar-title
+    - tars-transcript
+    - tars-transcript-format
+  property_rules:
+    tars-source:
+      enum: [calendar, transcript, notes, manual]
+    tars-transcript-format:
+      enum: [otter, fireflies, zoom, teams, raw_text, unknown]
+
+task:
+  required_tags: [tars/task]
+  required_properties:
+    - tars-status
+    - tars-owner
+    - tars-priority
+    - tars-source
+    - tars-created
+  optional_properties:
+    - tars-due
+    - tars-project
+    - tars-modified
+  property_rules:
+    tars-status:
+      enum: [open, in-progress, done, cancelled]
+    tars-priority:
+      enum: [critical, high, medium, low]
+
+briefing:
+  required_tags: [tars/journal, tars/briefing]
+  required_properties:
+    - tars-date
+    - tars-briefing-type
+    - tars-created
+  optional_properties:
+    - tars-week-start
+    - tars-week-end
+  property_rules:
+    tars-briefing-type:
+      enum: [daily, weekly]
+
+wisdom:
+  required_tags: [tars/journal, tars/wisdom]
+  required_properties:
+    - tars-date
+    - tars-source-type
+    - tars-created
+  optional_properties:
+    - tars-author
+    - tars-topics
+  property_rules:
+    tars-source-type:
+      enum: [article, podcast, book, transcript, video, conversation]
+
+vendor:
+  required_tags: [tars/vendor]
+  required_properties:
+    - tars-summary
+    - tars-staleness
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+    - tars-key-contact
+    - tars-contract-renewal
+  property_rules:
+    tars-staleness:
+      enum: [durable, seasonal, transient]
+
+competitor:
+  required_tags: [tars/competitor]
+  required_properties:
+    - tars-summary
+    - tars-staleness
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+  property_rules:
+    tars-staleness:
+      enum: [durable, seasonal, transient]
+
+product:
+  required_tags: [tars/product]
+  required_properties:
+    - tars-summary
+    - tars-status
+    - tars-owner
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+    - tars-staleness
+  property_rules:
+    tars-status:
+      enum: [active, planned, deprecated]
+
+org_context:
+  required_tags: [tars/org-context]
+  required_properties:
+    - tars-summary
+    - tars-staleness
+    - tars-created
+    - tars-modified
+  property_rules:
+    tars-staleness:
+      enum: [durable, seasonal, transient]
+
+transcript:
+  required_tags: [tars/transcript]
+  required_properties:
+    - tars-journal-entry
+    - tars-date
+    - tars-created
+  optional_properties:
+    - tars-meeting-datetime
+    - tars-participants
+    - tars-format
+  property_rules:
+    tars-format:
+      enum: [otter, fireflies, zoom, teams, raw_text, unknown]
+
+companion:
+  required_tags: [tars/companion]
+  required_properties:
+    - tars-original-file
+    - tars-original-type
+    - tars-added-date
+    - tars-created
+  optional_properties:
+    - tars-file-size
+    - tars-source
+    - tars-summary
+    - tars-topics
+  property_rules:
+    tars-original-type:
+      enum: [pdf, docx, png, jpg, xlsx, pptx, other]
+
+issue:
+  required_tags: [tars/backlog, tars/issue]
+  required_properties:
+    - tars-issue-type
+    - tars-severity
+    - tars-occurrence-count
+    - tars-status
+    - tars-first-seen
+    - tars-created
+  optional_properties:
+    - tars-last-seen
+    - tars-context
+  property_rules:
+    tars-issue-type:
+      enum: [mcp-error, cli-error, skill-error, data-error, other]
+    tars-severity:
+      enum: [critical, warning, info]
+    tars-status:
+      enum: [open, acknowledged, resolved]
+
+idea:
+  required_tags: [tars/backlog, tars/idea]
+  required_properties:
+    - tars-status
+    - tars-created
+  optional_properties:
+    - tars-requested-by
+  property_rules:
+    tars-status:
+      enum: [proposed, accepted, implemented, rejected]

@@ -1,0 +1,23 @@
+filters:
+  and:
+    - file.hasTag("tars/task")
+    - 'tars-status != "done"'
+    - 'tars-status != "cancelled"'
+
+formulas:
+  is_overdue: 'if(tars-due, date(tars-due) < today(), false)'
+  days_overdue: 'if(tars-due, (today() - date(tars-due)).days, 0)'
+
+views:
+  - type: table
+    name: "Overdue Tasks"
+    filters:
+      and:
+        - 'formula.is_overdue == true'
+    order:
+      - file.name
+      - tars-owner
+      - tars-due
+      - formula.days_overdue
+      - tars-priority
+      - tars-project

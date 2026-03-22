@@ -1,269 +1,271 @@
 #!/usr/bin/env python3
-"""TARS archival sweep script.
+"""
+TARS v3 Archive Script
+Identifies content past its staleness threshold for archival.
+Does NOT perform archival directly — outputs JSON candidates for agent review.
+Agent applies changes via obsidian-cli after user approval.
 
-Scans memory files for staleness, moves expired content to archive/,
-expires ephemeral lines with [expires: YYYY-MM-DD] tags, and maintains
-the archive index.
-
-Staleness tiers:
-  - durable:   Never auto-archives
-  - seasonal:  180 days without update
-  - transient: 90 days without access
-  - ephemeral: Date-based expiry via [expires:] tags
-
-Output: JSON report of archived files, expired lines, and stats.
-Uses only Python standard library.
+Usage: python3 scripts/archive.py [vault_path]
 """
 
-import json
-import os
-import re
-import shutil
 import sys
-from datetime import datetime, timedelta
+import os
+import json
+import re
 from pathlib import Path
+from datetime import datetime, date
+
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 
-def parse_frontmatter(filepath):
-    """Extract YAML frontmatter from a markdown file."""
+def parse_frontmatter(file_path):
+    """Extract YAML frontmatter."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
-    except (OSError, UnicodeDecodeError):
-        return None, ""
+    except (UnicodeDecodeError, IOError):
+        return None, None
 
-    if not content.startswith('---'):
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if not match:
         return None, content
 
-    end = content.find('---', 3)
-    if end == -1:
-        return None, content
-
-    fm_text = content[3:end].strip()
-    body = content[end + 3:]
-
-    fm = {}
-    for line in fm_text.split('\n'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        match = re.match(r'^(\w[\w-]*)\s*:\s*(.+)$', line)
-        if match:
-            key = match.group(1)
-            value = match.group(2).strip()
-            if value.startswith('[') and value.endswith(']'):
-                value = [v.strip().strip('"').strip("'") for v in value[1:-1].split(',') if v.strip()]
-            elif value.startswith('"') and value.endswith('"'):
-                value = value[1:-1]
-            elif value.startswith("'") and value.endswith("'"):
-                value = value[1:-1]
-            fm[key] = value
-
-    return fm, body
-
-
-def get_staleness_tier(fm):
-    """Determine staleness tier from frontmatter."""
-    staleness = fm.get('staleness', 'seasonal')
-    if isinstance(staleness, str):
-        staleness = staleness.lower().strip()
-    if staleness in ('durable', 'seasonal', 'transient', 'ephemeral'):
-        return staleness
-    return 'seasonal'  # default
-
-
-def check_staleness(filepath, fm, today):
-    """Check if a file should be archived based on its staleness tier."""
-    tier = get_staleness_tier(fm)
-
-    if tier == 'durable':
-        return False, tier
-
-    updated_str = fm.get('updated', '')
-    if not updated_str:
-        return False, tier
-
     try:
-        updated = datetime.strptime(str(updated_str)[:10], '%Y-%m-%d')
-    except (ValueError, TypeError):
-        return False, tier
-
-    if tier == 'seasonal' and (today - updated).days > 180:
-        return True, tier
-    elif tier == 'transient' and (today - updated).days > 90:
-        return True, tier
-
-    return False, tier
-
-
-def expire_ephemeral_lines(filepath, today_str):
-    """Remove lines with expired [expires: YYYY-MM-DD] tags."""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-    except (OSError, UnicodeDecodeError):
-        return 0
-
-    expires_pattern = re.compile(r'\[expires:\s*(\d{4}-\d{2}-\d{2})\]')
-    expired_count = 0
-    new_lines = []
-
-    for line in lines:
-        match = expires_pattern.search(line)
-        if match:
-            expire_date = match.group(1)
-            if expire_date <= today_str:
-                expired_count += 1
-                continue  # Skip this line (expired)
-        new_lines.append(line)
-
-    if expired_count > 0:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
-
-    return expired_count
-
-
-def archive_file(filepath, workspace, archive_dir, today):
-    """Move a file to the archive directory."""
-    rel_path = filepath.relative_to(workspace)
-    month_str = today.strftime('%Y-%m')
-
-    # Determine category from path
-    parts = rel_path.parts
-    if len(parts) >= 2:
-        category = parts[1]  # e.g., 'people' from 'memory/people/file.md'
-    else:
-        category = 'uncategorized'
-
-    target_dir = archive_dir / month_str / category
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    target_path = target_dir / filepath.name
-    # Avoid overwriting existing archived files
-    if target_path.exists():
-        stem = filepath.stem
-        suffix = filepath.suffix
-        counter = 1
-        while target_path.exists():
-            target_path = target_dir / f"{stem}_{counter}{suffix}"
-            counter += 1
-
-    shutil.move(str(filepath), str(target_path))
-    return str(target_path.relative_to(workspace))
-
-
-def update_archive_index(archive_dir, archived_files):
-    """Update or create the archive index."""
-    index_path = archive_dir / '_archive_index.yaml'
-
-    existing_entries = []
-    if index_path.exists():
-        try:
-            with open(index_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            # Simple parse: each entry is a "- " line
-            for line in content.split('\n'):
+        if HAS_YAML:
+            fm = yaml.safe_load(match.group(1))
+        else:
+            fm = {}
+            for line in match.group(1).split("\n"):
                 line = line.strip()
-                if line.startswith('- '):
-                    existing_entries.append(line[2:])
-        except (OSError, UnicodeDecodeError):
-            pass
+                if ":" in line and not line.startswith("#"):
+                    key, _, val = line.partition(":")
+                    val = val.strip().strip("'\"")
+                    fm[key.strip()] = val
 
-    # Add new entries
-    for entry in archived_files:
-        line = f"file: {entry['archive_path']} | original: {entry['original_path']} | date: {entry['date']} | reason: {entry['reason']}"
-        existing_entries.append(line)
+        body = content[match.end():]
+        return fm if isinstance(fm, dict) else None, body
+    except Exception:
+        return None, content
 
-    # Write index
-    with open(index_path, 'w', encoding='utf-8') as f:
-        f.write('# Archive index\n\n')
-        for entry in existing_entries:
-            f.write(f'- {entry}\n')
+
+def extract_wikilinks(text):
+    """Extract all wikilinks."""
+    if not text:
+        return []
+    return [m.group(1) for m in re.finditer(r'\[\[([^\]|]+?)(?:\|[^\]]+?)?\]\]', text)]
+
+
+def find_active_task_references(vault_path):
+    """Find all entities referenced by active tasks."""
+    vault = Path(vault_path)
+    referenced = set()
+
+    for scan_dir in ["memory"]:
+        dir_path = vault / scan_dir
+        if not dir_path.exists():
+            continue
+
+        for md_file in dir_path.rglob("*.md"):
+            fm, body = parse_frontmatter(md_file)
+            if not fm:
+                continue
+
+            tags = fm.get("tags", [])
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+
+            if "tars/task" not in tags:
+                continue
+
+            status = fm.get("tars-status", "")
+            if status in ("done", "cancelled"):
+                continue
+
+            # This task is active — collect all its references
+            if body:
+                for link in extract_wikilinks(body):
+                    referenced.add(link.lower())
+
+            # Also check frontmatter references
+            for key in ("tars-owner", "tars-project", "tars-source"):
+                val = fm.get(key, "")
+                if isinstance(val, str):
+                    for link in extract_wikilinks(val):
+                        referenced.add(link.lower())
+
+    return referenced
+
+
+def find_recent_backlinks(vault_path, days=90):
+    """Find entities that have incoming links from recent notes."""
+    vault = Path(vault_path)
+    today = date.today()
+    cutoff = today - __import__("datetime").timedelta(days=days)
+    linked = set()
+
+    for scan_dir in ["journal", "memory"]:
+        dir_path = vault / scan_dir
+        if not dir_path.exists():
+            continue
+
+        for md_file in dir_path.rglob("*.md"):
+            # Check if file is recent
+            try:
+                mtime = datetime.fromtimestamp(md_file.stat().st_mtime).date()
+                if mtime < cutoff:
+                    continue
+            except OSError:
+                continue
+
+            _, body = parse_frontmatter(md_file)
+            if body:
+                for link in extract_wikilinks(body):
+                    linked.add(link.lower())
+
+    return linked
+
+
+def find_archive_candidates(vault_path):
+    """Find memory notes past their staleness threshold."""
+    vault = Path(vault_path)
+    today = date.today()
+    candidates = []
+
+    thresholds = {
+        "durable": None,
+        "seasonal": 180,
+        "transient": 90,
+        "ephemeral": 30,
+    }
+
+    # Get protection sets
+    active_refs = find_active_task_references(vault_path)
+    recent_links = find_recent_backlinks(vault_path, days=90)
+
+    memory_dir = vault / "memory"
+    if not memory_dir.exists():
+        return candidates
+
+    for md_file in memory_dir.rglob("*.md"):
+        if md_file.name.startswith("_") or md_file.name.startswith("."):
+            continue
+
+        fm, _ = parse_frontmatter(md_file)
+        if not fm:
+            continue
+
+        tags = fm.get("tags", [])
+        if not isinstance(tags, list):
+            tags = [tags] if tags else []
+
+        # Skip already archived
+        if "tars/archived" in tags:
+            continue
+
+        staleness = fm.get("tars-staleness", "seasonal")
+        threshold = thresholds.get(staleness)
+        if threshold is None:
+            continue  # Durable, never auto-archive
+
+        modified = fm.get("tars-modified")
+        if not modified:
+            continue
+
+        try:
+            if isinstance(modified, str):
+                mod_date = datetime.strptime(modified, "%Y-%m-%d").date()
+            elif isinstance(modified, date):
+                mod_date = modified
+            else:
+                continue
+
+            age_days = (today - mod_date).days
+            if age_days <= threshold:
+                continue
+
+            # Check guardrails
+            note_name = md_file.stem.lower()
+            protected_by = []
+
+            if note_name in active_refs:
+                protected_by.append("referenced by active task")
+            if note_name in recent_links:
+                protected_by.append("has recent backlinks (< 90 days)")
+
+            candidates.append({
+                "file": str(md_file.relative_to(vault)),
+                "name": md_file.stem,
+                "staleness": staleness,
+                "threshold_days": threshold,
+                "age_days": age_days,
+                "last_modified": str(modified),
+                "protected": len(protected_by) > 0,
+                "protection_reasons": protected_by,
+            })
+        except (ValueError, TypeError):
+            continue
+
+    # Sort by age descending
+    candidates.sort(key=lambda c: c["age_days"], reverse=True)
+    return candidates
+
+
+def find_processed_inbox_items(vault_path, days_old=7):
+    """Find processed inbox items older than N days for cleanup."""
+    vault = Path(vault_path)
+    processed_dir = vault / "inbox" / "processed"
+    candidates = []
+    today = date.today()
+
+    if not processed_dir.exists():
+        return candidates
+
+    for f in processed_dir.iterdir():
+        if f.name.startswith("."):
+            continue
+
+        try:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime).date()
+            age = (today - mtime).days
+            if age >= days_old:
+                candidates.append({
+                    "file": str(f.relative_to(vault)),
+                    "age_days": age,
+                })
+        except OSError:
+            continue
+
+    return candidates
 
 
 def main():
-    if len(sys.argv) > 1:
-        workspace = Path(sys.argv[1])
-    else:
-        workspace = Path('.')
+    vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
 
-    dry_run = '--dry-run' in sys.argv
+    archive_candidates = find_archive_candidates(vault_path)
+    inbox_cleanup = find_processed_inbox_items(vault_path)
 
-    if not workspace.exists():
-        print(json.dumps({'error': f'Workspace not found: {workspace}'}))
-        sys.exit(1)
+    archivable = [c for c in archive_candidates if not c["protected"]]
+    protected = [c for c in archive_candidates if c["protected"]]
 
-    today = datetime.now()
-    today_str = today.strftime('%Y-%m-%d')
-    archive_dir = workspace / 'archive'
-
-    archived_files = []
-    expired_lines_total = 0
-    skipped_durable = 0
-    scanned = 0
-
-    memory_dir = workspace / 'memory'
-    if memory_dir.exists():
-        for root, dirs, files in os.walk(memory_dir):
-            for fname in files:
-                if fname.startswith('_') or fname.startswith('.') or not fname.endswith('.md'):
-                    continue
-
-                filepath = Path(root) / fname
-                scanned += 1
-                fm, body = parse_frontmatter(filepath)
-
-                if fm is None:
-                    continue
-
-                # Check ephemeral lines
-                expired = expire_ephemeral_lines(filepath, today_str)
-                expired_lines_total += expired
-
-                # Check staleness
-                should_archive, tier = check_staleness(filepath, fm, today)
-
-                if tier == 'durable':
-                    skipped_durable += 1
-                    continue
-
-                if should_archive:
-                    original_path = str(filepath.relative_to(workspace))
-                    if dry_run:
-                        archived_files.append({
-                            'original_path': original_path,
-                            'archive_path': f'(dry run)',
-                            'reason': f'{tier} staleness threshold exceeded',
-                            'date': today_str,
-                        })
-                    else:
-                        archive_path = archive_file(filepath, workspace, archive_dir, today)
-                        archived_files.append({
-                            'original_path': original_path,
-                            'archive_path': archive_path,
-                            'reason': f'{tier} staleness threshold exceeded',
-                            'date': today_str,
-                        })
-
-    # Update archive index if we archived anything
-    if archived_files and not dry_run:
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        update_archive_index(archive_dir, archived_files)
-
-    report = {
-        'workspace': str(workspace),
-        'timestamp': today.isoformat(),
-        'dry_run': dry_run,
-        'files_scanned': scanned,
-        'files_archived': len(archived_files),
-        'expired_lines_removed': expired_lines_total,
-        'durable_skipped': skipped_durable,
-        'archived_files': archived_files,
+    output = {
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "archive_candidates": len(archivable),
+            "protected_from_archive": len(protected),
+            "inbox_cleanup_candidates": len(inbox_cleanup),
+        },
+        "archive_candidates": archivable,
+        "protected": protected,
+        "inbox_cleanup": inbox_cleanup,
     }
 
-    print(json.dumps(report, indent=2))
+    print(json.dumps(output, indent=2))
+    sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

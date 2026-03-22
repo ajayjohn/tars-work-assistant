@@ -1,225 +1,347 @@
 ---
 name: briefing
-description: Daily and weekly briefings with calendar, tasks, and people context. Handles "Daily briefing", "What's my day look like?", "Weekly planning", "Plan my week". Morning and weekly planning workflows.
+description: Daily and weekly briefings with calendar, tasks, people context, and system status
+triggers: ["daily briefing", "what's my day look like", "weekly briefing", "plan my week", "weekly planning"]
 user-invocable: true
 help:
   purpose: |-
-    Daily and weekly briefings with calendar, tasks, and context.
+    Daily and weekly briefings combining calendar, tasks, people context, initiative status, and system health into actionable intelligence.
   use_cases:
     - "Daily briefing"
     - "What's my day look like?"
     - "Weekly briefing"
     - "Plan my week"
-  scope: briefing,calendar,tasks,planning
+  scope: briefing,calendar,tasks,planning,initiatives
 ---
 
-# Briefing protocol
+# Briefing Protocol
 
 Unified protocol for daily and weekly briefings. Mode is determined by the request signal.
 
-**Parallelization**: Data gathering (calendar, tasks, memory) runs as **three parallel sub-agents** using the Task tool. This reduces wall-clock time for briefing generation, since calendar queries, task queries, and memory lookups are independent operations.
+| Signal | Mode |
+|--------|------|
+| "daily briefing", "what's my day look like?", "morning briefing" | Daily |
+| "weekly briefing", "plan my week", "weekly planning", "what's my week" | Weekly |
+| Ambiguous | Default to daily unless the user mentions "week" |
+
+**Parallelization**: Data gathering (calendar, tasks, memory) runs as **three parallel sub-agents** using the Task tool. This reduces wall-clock time since calendar queries, task queries, and memory lookups are independent operations. Launch all three in a single message.
 
 ---
 
-## Daily mode
+# Daily Briefing
 
 Generate a focused morning briefing for clarity and prioritization.
 
-### Steps
+---
 
-1. **Determine date and read integrations**
-   - Today's date (if after 5 PM, brief for tomorrow)
-   - Output folder: `journal/YYYY-MM/`
-   - Read `reference/integrations.md` to determine available integrations and their status
+## Step 1: Determine date and load configuration
 
-2-4. **Parallel data gathering (sub-agents)**
+- Determine target date: if current time is after 5 PM, brief for tomorrow. Otherwise, brief for today.
+- Resolve target date to `YYYY-MM-DD` format.
+- Output folder: `journal/YYYY-MM/`
+
+---
+
+## Steps 2-4: Parallel data gathering (sub-agents)
 
 Spawn **three parallel sub-agents** using the Task tool. **Launch all three in a single message** using multiple Task tool calls.
 
-##### Sub-agent A: Fetch calendar
+### Sub-agent A: Fetch calendar
 
 ```
-Read reference/integrations.md Calendar section for provider details.
-Check calendar integration status; if not configured, return {"status": "not_configured"}.
+Check <mcp_servers> context for calendar MCP server (preferred).
+If found, use MCP tools (list_events, get_event).
+If not found, read _system/integrations.md Calendar section for legacy provider.
+If neither configured, return {"status": "not_configured"}.
+
 Resolve {target_date} to YYYY-MM-DD format.
-Execute the list_events operation with {target_date} and offset=1.
-For each event extract: time, title, attendee names.
+Execute list_events for {target_date} with offset=1.
+For each event extract: time, title, duration, attendee names.
 
 Return JSON:
 {
   "status": "ok" | "not_configured" | "error",
-  "events": [{"time": "...", "title": "...", "attendees": ["..."]}],
+  "events": [{"time": "HH:MM", "end_time": "HH:MM", "title": "...", "attendees": ["..."], "location": "..."}],
   "error": null | "description"
 }
 ```
 
-##### Sub-agent B: Fetch tasks
+### Sub-agent B: Fetch tasks
 
 ```
-Read reference/integrations.md Tasks section for provider details.
-Execute the list operation for the primary task list (default: Active).
+Check <mcp_servers> context for tasks/reminders MCP server (preferred).
+If found, use MCP tools (list_reminders).
+If not found, read _system/integrations.md Tasks section for legacy provider.
+
+Execute list operation for primary task list (default: Active).
 Identify tasks due {target_date} or highest priority.
-Execute the overdue operation to check for overdue tasks.
+Execute overdue check for tasks past due date.
 
 Return JSON:
 {
   "status": "ok" | "not_configured" | "error",
-  "tasks_due_today": [{"title": "...", "due": "...", "list": "..."}],
-  "overdue": [{"title": "...", "due": "...", "list": "..."}],
+  "tasks_due_today": [{"title": "...", "due": "...", "list": "...", "priority": "high|medium|low"}],
+  "overdue": [{"title": "...", "due": "...", "list": "...", "days_overdue": 0}],
   "top_priority": [{"title": "...", "due": "...", "list": "..."}],
   "error": null | "description"
 }
 ```
 
-##### Sub-agent C: Query memory
+### Sub-agent C: Query memory and context
 
 ```
-Read memory/people/_index.md.
-Look up profiles for these meeting attendees: {attendee_names_if_known}
-Read memory/initiatives/_index.md and find relevant initiative context.
-Read reference/schedule.md if it exists; identify [RECURRING] and [ONCE] items due {target_date}.
-Read inbox/pending/ and count pending items.
-Read reference/.housekeeping-state.yaml for last housekeeping run.
-Read reference/maturity.yaml for maturity level.
+Read memory/people/ via: obsidian search query="tag:tars/person" limit=100
+  Build a people lookup table: name → summary, open items.
+
+Read memory/initiatives/ via: obsidian search query="tag:tars/initiative tars-status:active" limit=20
+  Extract: initiative name, status, upcoming milestones.
+
+Read _system/schedule.md if it exists:
+  Identify [RECURRING] and [ONCE] items due {target_date}.
+
+Count inbox items: obsidian search query="path:inbox/pending" limit=1
+  (Result count indicates pending items.)
+
+Read _system/housekeeping-state.yaml for last housekeeping run date.
+Read _system/maturity.yaml for maturity level.
 
 Return JSON:
 {
   "people_context": [{"name": "...", "summary": "...", "open_items": ["..."]}],
-  "initiative_context": [{"name": "...", "status": "..."}],
-  "scheduled_items": [{"type": "recurring|once", "description": "..."}],
+  "initiative_context": [{"name": "...", "status": "...", "next_milestone": "..."}],
+  "scheduled_items": [{"type": "recurring|once", "description": "...", "due": "..."}],
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
   "maturity": {"level": 1, "people": 0, "meetings_processed": 0}
 }
 ```
 
-**Note on attendee names**: If calendar data is not yet available when spawning sub-agents (common case), spawn the memory sub-agent without attendee names. After the calendar sub-agent returns, do a quick targeted lookup for any attendees not covered. Alternatively, the memory sub-agent can load the full people index for cross-referencing after calendar results arrive.
-
-##### Sub-agent input/output contracts (daily mode)
+### Sub-agent contracts (daily)
 
 | Sub-agent | Input | Output | Failure mode |
 |-----------|-------|--------|-------------|
-| Calendar | integrations.md, target date | JSON: events list with times, titles, attendees | Return `status: error`, briefing proceeds without calendar data |
-| Tasks | integrations.md, target date | JSON: due today, overdue, top priority tasks | Return `status: error`, briefing proceeds without task data |
-| Memory | people index, initiatives index, schedule.md, inbox/, maturity.yaml | JSON: people context, initiative context, scheduled items, system status | Return partial data, briefing uses what is available |
+| Calendar | MCP server or integrations.md, target date | JSON: events with times, titles, attendees | Return `status: error`, briefing proceeds without calendar |
+| Tasks | MCP server or integrations.md, target date | JSON: due today, overdue, top priority | Return `status: error`, briefing proceeds without tasks |
+| Memory | People search, initiatives search, schedule, inbox, system state | JSON: people context, initiatives, scheduled items, system status | Return partial data, briefing uses what is available |
 
-After all three sub-agents complete, collect their JSON results and proceed to synthesis.
-
-5. **Cross-reference and enrich**
-   - Match calendar attendees against memory people context
-   - For any attendees not covered by the memory sub-agent, do a targeted memory lookup
-   - Link tasks to upcoming meetings where relevant
-
-6. **Check inbox**
-   - Use inbox count from memory sub-agent results
-   - Offer to process pending items if any exist
-
-7. **Generate briefing**
-
-```markdown
-### Today's schedule
-- Chronological list with time, title, prep needed
-
-### Scheduled items due today
-- Recurring and one-time items from reference/schedule.md
-
-### Priority tasks
-- Top 3-5 tasks for today
-- Flag tasks that should be done before specific meetings
-
-### People I'm meeting
-- Brief context for each person
-- Open items or follow-ups with them
-- Questions to ask or responses owed
-
-### Focus opportunities
-- Open time slots for deep work
-- Suggested task for each slot
-
-### System status
-- TARS maturity: Level [N] ([X] people, [Y] meetings). Next: [milestone]
-- Inbox: [N] items pending
-- Last housekeeping: [date]
-```
-
-8. **Save and display**
-   - Save to `journal/YYYY-MM/YYYY-MM-DD-daily-briefing.md`
-   - Display directly to user
+**Attendee note**: Calendar data may not be available when spawning the memory sub-agent. Spawn without attendee names. After calendar sub-agent returns, do a quick targeted lookup for any attendees not covered by the initial people search.
 
 ---
 
-## Weekly mode
+## Step 5: Cross-reference and enrich
 
-Generate a comprehensive weekly briefing for strategic planning.
+After all three sub-agents complete:
 
-### Steps
+1. **Match attendees to memory**: For each person in today's calendar events, find their memory profile. Extract: summary, recent interactions, open items, responses owed.
+2. **Targeted lookups**: For attendees not covered by the initial search, do targeted reads:
+   ```
+   obsidian read file="[person name]"
+   ```
+3. **Link tasks to meetings**: Match tasks to meetings by initiative, person, or topic overlap.
+4. **Flag unrecognized people**: Calendar attendees with no memory profile get flagged:
+   ```
+   "3 people not in memory: [names]. Add profiles? [Y/N]"
+   ```
+5. **Identify focus opportunities**: Find calendar gaps of 30+ minutes for deep work.
 
-1. **Determine date range and read integrations**
-   - Current week: Monday through Sunday
-   - Last week: Previous Monday through Sunday
-   - Output folder: `journal/YYYY-MM/`
-   - Read `reference/integrations.md` to determine available integrations and their status
+---
 
-2-4. **Parallel data gathering (sub-agents)**
+## Step 6: Generate briefing
+
+```markdown
+# Daily Briefing — YYYY-MM-DD
+
+## Today's schedule
+| Time | Meeting | Key attendees | Prep needed |
+|------|---------|---------------|-------------|
+| 9:00 | Q1 Planning | [[Jane Smith]], [[Bob Chen]] | Review Q1 metrics |
+| 11:00 | 1:1 with Sarah | [[Sarah Park]] | Discuss hiring plan |
+| 2:00 | — Open — | | *Focus block: 2 hours* |
+
+## Scheduled items due today
+- [RECURRING] Weekly report submission
+- [ONCE] Submit vendor evaluation by EOD
+
+## Priority tasks
+1. **[OVERDUE]** Review hiring plan — due Mar 19 (2 days overdue)
+2. Share migration report with [[Bob Chen]] — due today
+3. Follow up with [[Sarah Park]] on API contract — due today
+
+> Tasks linked to meetings: #2 relates to Q1 Planning at 9:00
+
+## People I'm meeting
+### [[Jane Smith]] — VP Engineering
+- **Context**: Leading [[Platform Rewrite]], approved 2 backend hires
+- **Open items**: Waiting on Q3 timeline estimate
+- **Ask about**: Mobile team staffing decision
+
+### [[Sarah Park]] — Engineering Manager
+- **Context**: New hire, started Jan 2026
+- **Response owed**: She asked about API vendor shortlist on Mar 18
+
+## Initiative pulse
+| Initiative | Health | Today's relevance |
+|------------|--------|-------------------|
+| [[Platform Rewrite]] | On track | Discussed in Q1 Planning |
+| [[API Migration]] | At risk | Follow-up with Sarah |
+
+## Focus opportunities
+- 2:00-4:00 PM: 2-hour open block → Suggested: Review hiring plan (overdue)
+
+## Unrecognized people
+- john.doe@external.com (in Q1 Planning) — not in memory
+
+## System status
+- TARS maturity: Level 2 (15 people, 42 meetings). Next: 50 meetings for Level 3
+- Inbox: 3 items pending
+- Last housekeeping: 2026-03-18
+
+---
+*Data freshness: 4 meetings, 8 tasks, 12 memory files queried.*
+*Stale: [[Tom Richards]] not updated in 65 days.*
+```
+
+---
+
+## Step 7: Save and display
+
+```
+obsidian create name="YYYY-MM-DD Daily Briefing" \
+  path="journal/YYYY-MM/YYYY-MM-DD-daily-briefing.md" \
+  template="daily-briefing" silent
+```
+
+Set frontmatter properties:
+
+```yaml
+---
+tags: [tars/journal, tars/briefing]
+tars-date: YYYY-MM-DD
+tars-briefing-type: daily
+tars-created: YYYY-MM-DD
+---
+```
+
+Append the generated briefing content. Display the full briefing directly to the user.
+
+---
+
+## Step 8: Cron self-check — Issue 10
+
+After generating the briefing, verify scheduled automation:
+
+1. Execute `CronList` to check all registered cron jobs
+2. Verify expected jobs are active:
+   - Daily briefing (if configured)
+   - Weekly briefing (if configured)
+   - Maintenance/housekeeping (if configured)
+3. If any scheduled jobs have expired or are missing:
+   - Re-register via `CronCreate`
+   - Update `_system/housekeeping-state.yaml` with new cron job IDs
+   - Note in briefing: "Re-registered expired cron job: [description]"
+
+---
+
+## Step 9: Log to daily note
+
+```
+obsidian daily:append content="- Briefing: daily briefing generated → [[YYYY-MM-DD Daily Briefing]]
+  - Meetings: N scheduled
+  - Tasks: N due today, M overdue
+  - Unrecognized: N people"
+```
+
+---
+
+# Weekly Briefing
+
+Generate a comprehensive weekly briefing for strategic planning and review.
+
+---
+
+## Step 1: Determine date range and load configuration
+
+- Current week: Monday through Sunday of the current week
+- Last week: Previous Monday through Sunday
+- Resolve all dates to `YYYY-MM-DD` format
+- Output folder: `journal/YYYY-MM/`
+
+---
+
+## Steps 2-4: Parallel data gathering (sub-agents)
 
 Spawn **three parallel sub-agents** using the Task tool. **Launch all three in a single message.**
 
-##### Sub-agent A: Fetch calendar (weekly)
+### Sub-agent A: Fetch calendar (weekly)
 
 ```
-Read reference/integrations.md Calendar section for provider details.
-Check calendar integration status; if not configured, return {"status": "not_configured"}.
+Check <mcp_servers> context for calendar MCP server (preferred).
+If not found, read _system/integrations.md Calendar section.
+
 Resolve {monday_date} to YYYY-MM-DD format.
-Execute the list_events operation with {monday_date} and offset=7.
-Identify high-priority meetings (executives, leadership, key stakeholders).
-Identify open time slots.
+Execute list_events with {monday_date} and offset=7.
+Identify high-priority meetings (executives, leadership, clients, key stakeholders).
+Identify open time slots of 60+ minutes.
 
 Return JSON:
 {
   "status": "ok" | "not_configured" | "error",
-  "events": [{"date": "...", "time": "...", "title": "...", "attendees": ["..."], "priority": "high|normal"}],
+  "events": [{"date": "...", "time": "...", "end_time": "...", "title": "...", "attendees": ["..."], "priority": "high|normal"}],
   "open_slots": [{"date": "...", "start": "...", "end": "...", "duration_minutes": 0}],
   "error": null | "description"
 }
 ```
 
-##### Sub-agent B: Fetch tasks (weekly)
+### Sub-agent B: Fetch tasks (weekly)
 
 ```
-Read reference/integrations.md Tasks section for provider details.
-Execute the list operation for all configured lists (default: Active, Delegated, Backlog).
-Execute the overdue operation.
+Check <mcp_servers> context for tasks/reminders MCP server (preferred).
+If not found, read _system/integrations.md Tasks section.
+
+Execute list operation for ALL configured lists (default: Active, Delegated, Backlog).
+Execute overdue check.
 Identify tasks due this week ({monday_date} through {sunday_date}).
-Identify tasks related to meeting topics if known.
+Identify backlog items older than 90 days (flag as stale).
+Identify tasks completed last week (if integration supports it).
 
 Return JSON:
 {
   "status": "ok" | "not_configured" | "error",
   "tasks_due_this_week": [{"title": "...", "due": "...", "list": "...", "owner": "..."}],
-  "overdue": [{"title": "...", "due": "...", "list": "..."}],
+  "overdue": [{"title": "...", "due": "...", "list": "...", "days_overdue": 0}],
   "backlog_stale": [{"title": "...", "created": "...", "days_old": 0}],
   "completed_last_week": [{"title": "...", "completed": "..."}],
   "error": null | "description"
 }
 ```
 
-##### Sub-agent C: Query memory and context (weekly)
+### Sub-agent C: Query memory and context (weekly)
 
 ```
-Read memory/people/_index.md + profiles of frequent meeting attendees.
-Read memory/initiatives/_index.md + active initiative details.
-Identify responses owed and follow-ups needed.
-Read journal/{last_week_month}/_index.md for last week entries.
-Read reference/schedule.md if it exists; identify items due this week.
-Read inbox/pending/ and count pending items.
-Read reference/.housekeeping-state.yaml for last housekeeping and index rebuild dates.
-Read reference/maturity.yaml for maturity level.
+Read memory/people/ via: obsidian search query="tag:tars/person" limit=100
+  For frequent meeting attendees, read full profiles.
+  Identify responses owed and follow-ups needed across all people.
+
+Read memory/initiatives/ via: obsidian search query="tag:tars/initiative tars-status:active" limit=20
+  Extract: name, status, milestones due this week, health indicators.
+
+Read journal entries from last week:
+  obsidian search query="tag:tars/journal tars-date:>={last_monday}" limit=50
+  Summarize: meetings held, decisions made, tasks completed.
+
+Read _system/schedule.md:
+  Identify recurring and one-time items due this week.
+
+Count inbox items: obsidian search query="path:inbox/pending" limit=1
+
+Read _system/housekeeping-state.yaml for system dates.
+Read _system/maturity.yaml for maturity level.
 
 Return JSON:
 {
   "people_context": [{"name": "...", "summary": "...", "responses_owed": ["..."], "follow_ups": ["..."]}],
-  "initiatives": [{"name": "...", "status": "...", "milestones_this_week": ["..."]}],
-  "last_week_entries": [{"date": "...", "type": "...", "title": "..."}],
+  "initiatives": [{"name": "...", "status": "...", "health": "on_track|at_risk|blocked", "milestones_this_week": ["..."]}],
+  "last_week_entries": [{"date": "...", "type": "meeting|briefing|wisdom", "title": "...", "key_outcomes": ["..."]}],
   "scheduled_items": [{"type": "recurring|once", "description": "...", "due": "..."}],
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
@@ -228,123 +350,266 @@ Return JSON:
 }
 ```
 
-##### Sub-agent input/output contracts (weekly mode)
+### Sub-agent contracts (weekly)
 
 | Sub-agent | Input | Output | Failure mode |
 |-----------|-------|--------|-------------|
-| Calendar | integrations.md, monday date, offset=7 | JSON: events, open slots, priority flags | Return `status: error`, briefing proceeds without calendar |
-| Tasks | integrations.md, date range | JSON: due this week, overdue, stale backlog, completed last week | Return `status: error`, briefing proceeds without tasks |
-| Memory/Context | people index, initiatives index, journal index, schedule, inbox, system state | JSON: people context, initiatives, last week summary, system status | Return partial data, briefing uses what is available |
-
-After all three sub-agents complete, collect their JSON results and proceed to synthesis.
-
-5. **Cross-reference and enrich**
-   - Match calendar attendees against memory people context
-   - Link tasks to meeting topics
-   - Identify preparation needed for high-priority meetings
-   - Match open time slots with highest priority tasks
-
-6. **Generate briefing**
-
-```markdown
-### Last week summary
-- Achievements (completed tasks, delivered items)
-- Planned but incomplete (with reasons if known)
-
-### This week's meetings
-- **High-priority**: Leadership, clients, board meetings (flag)
-- **All meetings**: Chronological with date/time, title, purpose
-
-### Open tasks
-- **Due this week**: Tasks with explicit due dates
-- **Meeting-related**: Tasks connected to meeting topics
-- **Preparation needed**: Items requiring work before meetings
-
-### Milestones and initiatives
-- Current week milestones
-- Upcoming milestones needing advance preparation
-- Initiative status updates
-
-### People context
-- **Responses owed**: Promises or follow-ups to people I'm meeting
-- **Questions to ask**: Follow-up items or open threads
-
-### Recommended focus time
-- Open slots matched with highest priority tasks
-- Specific time blocks with suggested assignments
-
-### Backlog review
-- Backlog items older than 90 days (flag as stale)
-- Suggest: keep, reprioritize, or remove
-
-### System status
-- TARS maturity: Level [N] ([X] people, [Y] meetings). Next: [milestone]
-- Inbox: [N] items pending
-- Last housekeeping: [date]
-- Last index rebuild: [date]
-```
-
-7. **Save and display**
-   - Save to `journal/YYYY-MM/YYYY-MM-DD-weekly-briefing.md`
-   - Display key highlights to user
+| Calendar | MCP server or integrations.md, monday date, offset=7 | JSON: events, open slots, priority flags | Return `status: error`, briefing proceeds without calendar |
+| Tasks | MCP server or integrations.md, date range | JSON: due this week, overdue, stale backlog, completed last week | Return `status: error`, briefing proceeds without tasks |
+| Memory/Context | People search, initiatives search, journal entries, schedule, inbox, system state | JSON: people context, initiatives, last week summary, system status | Return partial data, briefing uses what is available |
 
 ---
 
-## Progress tracking (TodoWrite)
+## Step 5: Cross-reference and enrich
 
-Use the `TodoWrite` tool to give the user real-time visibility into briefing generation. Create the todo list at the start and update as steps complete:
+After all three sub-agents complete:
+
+1. **Match attendees to memory**: For all people appearing in this week's meetings, find memory profiles.
+2. **Targeted lookups**: Read full profiles for high-priority meeting attendees.
+3. **Link tasks to meetings**: Match tasks to meeting topics and initiatives.
+4. **Identify preparation needs**: Flag meetings that require advance preparation (docs, reports, decisions).
+5. **Match focus time to priorities**: Pair open calendar slots with highest-priority tasks.
+6. **Flag responses owed**: People who are owed a response and appear in this week's meetings.
+7. **Review last week**: Cross-reference completed tasks against planned tasks for gap analysis.
+
+---
+
+## Step 6: Generate briefing
+
+```markdown
+# Weekly Briefing — Week of YYYY-MM-DD
+
+## Last week summary
+### Completed
+- Processed 5 meetings, created 12 tasks
+- Completed: Review hiring plan, Share migration report, 3 others
+- Decision made: REST over GraphQL for public API
+
+### Incomplete
+- Vendor evaluation — carried over (blocked on pricing data)
+- API contract review — pushed to this week
+
+---
+
+## This week's meetings
+
+### High-priority (flag)
+| Date | Time | Meeting | Attendees | Prep needed |
+|------|------|---------|-----------|-------------|
+| Mon | 10:00 | Board Update | [[CEO]], [[CFO]] | Prepare Q1 summary deck |
+| Thu | 14:00 | Client Review | [[Client PM]] | Review deliverables status |
+
+### Full schedule
+| Date | Time | Meeting | Attendees |
+|------|------|---------|-----------|
+| Mon | 10:00 | Board Update | [[CEO]], [[CFO]] |
+| Mon | 14:00 | Team Standup | Engineering team |
+| Tue | 09:00 | 1:1 with [[Sarah Park]] | |
+| ... | ... | ... | ... |
+
+---
+
+## Open tasks
+
+### Due this week
+| Task | Due | Owner | Related meeting |
+|------|-----|-------|----------------|
+| Vendor evaluation | Mon | You | Board Update |
+| API contract review | Wed | You | Client Review |
+
+### Overdue
+| Task | Due | Days overdue |
+|------|-----|-------------|
+| Review hiring plan | Mar 19 | 5 days |
+
+### Meeting preparation
+- **Board Update (Mon)**: Prepare Q1 summary deck, review initiative health
+- **Client Review (Thu)**: Collect deliverables status from [[Bob Chen]]
+
+---
+
+## Milestones and initiatives
+| Initiative | Health | This week | Next milestone |
+|------------|--------|-----------|----------------|
+| [[Platform Rewrite]] | On track | Sprint review Wed | Beta launch Apr 15 |
+| [[API Migration]] | At risk | Client review Thu | Contract sign-off Mar 30 |
+| [[Hiring Push]] | On track | 2 interviews this week | Offers by Apr 1 |
+
+---
+
+## People context
+
+### Responses owed
+| Person | What | When promised | Meeting this week |
+|--------|------|--------------|-------------------|
+| [[Sarah Park]] | API vendor shortlist | Mar 18 | 1:1 Tuesday |
+| [[Bob Chen]] | Migration timeline | Mar 20 | Team standup Mon |
+
+### Questions to ask
+- [[Jane Smith]]: Q3 timeline estimate (open since Mar 15)
+- [[Client PM]]: Budget approval status
+
+---
+
+## Recommended focus time
+| Date | Slot | Duration | Suggested task |
+|------|------|----------|----------------|
+| Tue | 13:00-16:00 | 3 hours | Vendor evaluation (due Mon — overdue!) |
+| Wed | 10:00-12:00 | 2 hours | API contract review (due Wed) |
+| Fri | 09:00-17:00 | Full day | Deep work on Q2 planning |
+
+---
+
+## Backlog review (>90 days stale)
+| Task | Created | Days old | Recommendation |
+|------|---------|----------|----------------|
+| Research cloud migration options | Dec 2025 | 95 days | Reprioritize or remove |
+| Draft team handbook | Nov 2025 | 120 days | Remove — superseded by wiki |
+
+---
+
+## System status
+- TARS maturity: Level 2 (15 people, 42 meetings). Next: 50 meetings for Level 3
+- Inbox: 3 items pending
+- Last housekeeping: 2026-03-18
+- Last schema validation: 2026-03-20
+- Cron jobs: 3 active (daily briefing, weekly briefing, housekeeping)
+
+---
+*Data freshness: 12 meetings this week, 24 tasks across 3 lists, 15 memory profiles queried.*
+*Stale memory: [[Tom Richards]] (65 days), [[Vendor X]] (90 days).*
+```
+
+---
+
+## Step 7: Save and display
+
+```
+obsidian create name="YYYY-MM-DD Weekly Briefing" \
+  path="journal/YYYY-MM/YYYY-MM-DD-weekly-briefing.md" \
+  template="weekly-briefing" silent
+```
+
+Set frontmatter properties:
+
+```yaml
+---
+tags: [tars/journal, tars/briefing]
+tars-date: YYYY-MM-DD
+tars-briefing-type: weekly
+tars-week-start: YYYY-MM-DD
+tars-week-end: YYYY-MM-DD
+tars-created: YYYY-MM-DD
+---
+```
+
+Append the generated briefing content. Display key highlights to the user (full briefing is saved to journal).
+
+---
+
+## Step 8: Cron self-check — Issue 10
+
+Same as daily briefing Step 8. Verify all scheduled cron jobs are active, re-register any that expired.
+
+---
+
+## Step 9: Log to daily note
+
+```
+obsidian daily:append content="- Briefing: weekly briefing generated → [[YYYY-MM-DD Weekly Briefing]]
+  - Meetings this week: N
+  - Tasks due this week: N, overdue: M
+  - Stale backlog items: N flagged
+  - Initiatives tracked: N"
+```
+
+---
+
+# Progress tracking
+
+Use the `TodoWrite` tool to give the user real-time visibility into briefing generation. Create the todo list at the start and update as steps complete.
 
 **Daily mode:**
 ```
-1. Determine date and read integrations                  [in_progress → completed]
-2. Fetch calendar data (parallel sub-agent)              [pending → completed]
-3. Fetch task data (parallel sub-agent)                  [pending → completed]
-4. Query memory and context (parallel sub-agent)         [pending → completed]
-5. Cross-reference and enrich data                       [pending → completed]
-6. Generate and save briefing                            [pending → completed]
+1. Determine date and load configuration              [in_progress → completed]
+2. Fetch calendar data (parallel sub-agent)            [pending → in_progress → completed]
+3. Fetch task data (parallel sub-agent)                [pending → in_progress → completed]
+4. Query memory and context (parallel sub-agent)       [pending → in_progress → completed]
+5. Cross-reference and enrich data                     [pending → in_progress → completed]
+6. Generate and save briefing                          [pending → in_progress → completed]
+7. Cron self-check                                     [pending → completed]
 ```
 
 **Weekly mode:**
 ```
-1. Determine date range and read integrations            [in_progress → completed]
-2. Fetch calendar data (parallel sub-agent)              [pending → completed]
-3. Fetch task data (parallel sub-agent)                  [pending → completed]
-4. Query memory and context (parallel sub-agent)         [pending → completed]
-5. Cross-reference and enrich data                       [pending → completed]
-6. Generate and save briefing                            [pending → completed]
+1. Determine date range and load configuration         [in_progress → completed]
+2. Fetch calendar data (parallel sub-agent)            [pending → in_progress → completed]
+3. Fetch task data (parallel sub-agent)                [pending → in_progress → completed]
+4. Query memory and context (parallel sub-agent)       [pending → in_progress → completed]
+5. Cross-reference and enrich data                     [pending → in_progress → completed]
+6. Generate and save briefing                          [pending → in_progress → completed]
+7. Cron self-check                                     [pending → completed]
 ```
 
 **Parallelization note**: Steps 2, 3, and 4 run concurrently as sub-agents. Mark ALL THREE as `in_progress` when spawning them. Mark each `completed` as its sub-agent returns. Do not wait for all three before updating individual statuses.
 
 ---
 
-## Frontmatter (both modes)
+# Frontmatter (both modes)
 
 ```yaml
 ---
-date: YYYY-MM-DD
-title: Daily Briefing | Weekly Briefing
-type: briefing-daily | briefing-weekly
+tags: [tars/journal, tars/briefing]
+tars-date: YYYY-MM-DD
+tars-briefing-type: daily | weekly
+tars-created: YYYY-MM-DD
 ---
+```
+
+Weekly mode adds:
+```yaml
+tars-week-start: YYYY-MM-DD
+tars-week-end: YYYY-MM-DD
 ```
 
 ---
 
-## Context budget
-- Memory: Read `_index.md` for people and initiatives + up to 5 targeted files
-- Tasks: Execute task integration `list` operation for Active (+ all lists for weekly mode)
-- Calendar: Execute calendar integration `list_events` operation for today (daily) or full week (weekly)
-- Journal: Current month `_index.md` for last week summary (weekly only)
-- Inbox: Read `inbox/pending/` file list
-- System: Read `reference/.housekeeping-state.yaml` and `reference/maturity.yaml`
+# Context budgets
+
+| Source | Daily | Weekly |
+|--------|-------|--------|
+| Calendar | list_events for 1 day | list_events for 7 days |
+| Tasks | Active list only | Active + Delegated + Backlog lists |
+| People | Search + up to 5 targeted reads | Search + up to 10 targeted reads |
+| Initiatives | Active initiatives only | Active initiatives + health details |
+| Journal | — | Last week's entries via search |
+| Schedule | `_system/schedule.md` | `_system/schedule.md` |
+| Inbox | Count only | Count only |
+| System | housekeeping-state.yaml, maturity.yaml | housekeeping-state.yaml, maturity.yaml |
 
 ---
 
-## Absolute constraints
+# Self-evaluation — Issue 9
 
-- NEVER skip calendar lookup (fall back to tasks-only if calendar integration is unreachable)
-- NEVER output briefing without saving to journal
+If any errors occur during briefing generation:
+
+1. Check `_system/backlog/issues/` for existing issue with same error signature
+2. If exists: increment `tars-occurrence-count`, update `tars-last-seen`
+3. If new: create issue note with context via the issue template
+4. Continue generating briefing with available data — never fail silently
+
+---
+
+# Absolute constraints
+
+- NEVER skip calendar lookup — fall back to tasks-only if calendar is unreachable, but always attempt
+- NEVER output a briefing without saving to journal
 - ALWAYS resolve dates to `YYYY-MM-DD` format before any calendar query
 - ALWAYS look up memory profiles for meeting attendees
-- ALWAYS flag overdue tasks (via task integration `overdue` operation)
-- ALWAYS check calendar integration constraints in reference/integrations.md before querying
+- ALWAYS flag overdue tasks prominently
+- ALWAYS check calendar integration constraints before querying
+- ALWAYS include the data freshness footer with sources used and stale memory flagged
+- ALWAYS verify cron jobs during the self-check step (Issue 10)
+- NEVER fabricate meetings, tasks, or people context — only report what is found
+- NEVER skip the cross-reference step — attendees must be matched to memory
+- ALWAYS include system status section with maturity, inbox count, and last housekeeping date

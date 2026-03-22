@@ -1,0 +1,52 @@
+filters:
+  and:
+    - file.hasTag("tars/task")
+    - 'tars-status != "done"'
+    - 'tars-status != "cancelled"'
+    - not:
+        - file.hasTag("tars/archived")
+
+formulas:
+  is_overdue: 'if(tars-due, date(tars-due) < today(), false)'
+  days_until_due: 'if(tars-due, (date(tars-due) - today()).days, "")'
+
+properties:
+  formula.is_overdue:
+    displayName: "Overdue"
+  formula.days_until_due:
+    displayName: "Days Left"
+
+views:
+  - type: table
+    name: "By Priority"
+    order:
+      - file.name
+      - tars-status
+      - tars-owner
+      - tars-due
+      - tars-priority
+      - tars-project
+      - formula.days_until_due
+    groupBy:
+      property: tars-priority
+  - type: table
+    name: "By Owner"
+    order:
+      - file.name
+      - tars-status
+      - tars-due
+      - tars-priority
+      - tars-project
+    groupBy:
+      property: tars-owner
+  - type: table
+    name: "Overdue"
+    filters:
+      and:
+        - 'formula.is_overdue == true'
+    order:
+      - file.name
+      - tars-owner
+      - tars-due
+      - tars-priority
+      - tars-project

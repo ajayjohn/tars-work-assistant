@@ -1,302 +1,545 @@
 ---
 name: learn
-description: Extract durable memory from conversations or wisdom from learning content with strict durability test
+description: Extract durable memory from conversations or wisdom from learning content
+triggers: ["remember that", "save to memory", "learn from this", "extract wisdom"]
 user-invocable: true
 help:
   purpose: |-
-    Extract durable memory from conversations or wisdom from learning content with strict durability test.
+    Extract durable memory from conversations or wisdom from learning content.
+    Two modes: Memory (persist facts) and Wisdom (extract insights from articles, podcasts, books).
   use_cases:
-    - "Remember this [insight]"
-    - "Extract wisdom from this article"
-    - "Save what we discussed about [topic]"
+    - "Remember that Jane prefers email over Slack"
+    - "Save to memory: we decided to use REST for the public API"
+    - "Learn from this article about API design patterns"
+    - "Extract wisdom from this podcast transcript"
   scope: memory,wisdom,learning,extraction
 ---
 
-# Learn: Memory and Wisdom extraction protocol
+# Learn: Memory and Wisdom Extraction
 
-Extract durable insights and knowledge from conversations and learning content. This merged skill combines two complementary modes: Memory extraction for conversation insights and Wisdom extraction for learning content.
-
----
-
-## MODE A: Memory extraction protocol
-
-You are a Memory Manager. Extract durable, high-value insights from input and persist them to memory. Be highly judicious. Memory additions should be rare and reserved for high-signal, broadly applicable information.
-
-Most inputs will NOT result in memory additions. Memory is for durable insights, NOT a task tracker or event log.
-
-### Step 1: Load replacements and resolve names (MANDATORY)
-
-Read `reference/replacements.md`. Apply canonical names to ALL names in memory entries.
-
-After loading replacements, scan the input for person names. Apply the **name resolution protocol** (core skill, Memory protocol section). If any names are ambiguous (multiple canonical matches) or unknown (no match), resolve using memory indexes and document context first. If still unresolved, ask the user before proceeding. Do not persist memory entries with unresolved or ambiguous names.
+Two complementary modes for building TARS's knowledge base. Memory mode persists durable facts from conversations. Wisdom mode extracts insights from learning content.
 
 ---
 
-### Step 2: Analyze for delta (MANDATORY)
+## Mode detection
 
-Read the input completely. Look for delta, new information that:
+| Signal | Mode |
+|--------|------|
+| "remember that...", "save to memory", "learn that..." | Memory |
+| "extract wisdom from...", "learn from this article/podcast/book" | Wisdom |
+| Ambiguous | Ask: "Should I save this as a memory fact, or extract wisdom from it as learning content?" |
+
+---
+
+# MODE A: Memory Extraction
+
+Persist durable, high-value facts from conversation. Be highly selective. Most inputs will NOT result in memory additions. Memory is for durable insights, not a task tracker or event log.
+
+---
+
+## Step 1: Load alias registry (MANDATORY)
+
+```
+obsidian read file="alias-registry"
+```
+
+Apply canonical names to ALL names in the input. Scan for person names and resolve using the three-layer resolution protocol:
+
+1. **Obsidian aliases**: Check note aliases via obsidian search
+2. **Context-aware registry**: Check `_system/alias-registry.md` for disambiguation
+3. **Search fallback**: `obsidian search query="[name]" limit=5`
+
+If any name is ambiguous (multiple canonical matches) or unknown (no match), ask before proceeding:
+
+```
+"Who is 'Dan' in this context?
+  1. Dan Rivera (Engineering)
+  2. Dan Chen (Infrastructure)
+  3. Someone new — I'll provide the full name"
+```
+
+Do NOT persist memory entries with unresolved or ambiguous names.
+
+---
+
+## Step 2: Analyze input for delta (MANDATORY)
+
+Read the input completely. Identify potential delta — new information that:
+
 1. Was not previously known (check existing memory first)
 2. Contradicts existing memory (requires update)
 3. Reveals deeper insight when combined with context
 
-STOP. If no delta identified, output "No Action" and end.
+**STOP.** If no delta identified, output "No Action — input contains no new information." and end.
 
 ---
 
-### Step 3: Compare against existing memory (MANDATORY)
+## Step 3: Check existing memory (MANDATORY)
 
-1. Read the relevant `_index.md` to find existing entries
-2. Read specific files if a match is likely
-3. Discard duplicates
+For each entity or topic identified:
 
-STOP. If insight is already captured, do NOT proceed.
+```
+obsidian search query="tag:tars/[type] [entity]" limit=5
+```
+
+Then read the specific files that match:
+
+```
+obsidian read file="[entity name]"
+```
+
+Compare the input against what is already captured.
+
+- If the insight is already captured identically: **STOP.** Output "Already in memory." and end.
+- If partial overlap: proceed to determine if it qualifies as an UPDATE.
+- If no existing knowledge: proceed as potentially NEW.
 
 ---
 
-### Step 4: Apply durability test (MANDATORY)
+## Step 4: Apply durability test (MANDATORY)
 
-For EACH potential insight, apply ALL four criteria from the memory management skill. All four must pass:
+For EACH potential insight, ALL four criteria must pass:
 
-| Question | Requirement |
-|----------|-------------|
-| **Lookup value** | Will this be useful for lookup next week or next month? |
-| **Signal** | Is this high-signal and broadly applicable? |
-| **Durability** | Is this durable (not transient or tactical)? |
-| **Behavior change** | Does this change how I should interact in the future? |
+| # | Criterion | Question |
+|---|-----------|----------|
+| 1 | **Lookup value** | Will this be useful for lookup next week or next month? |
+| 2 | **Signal** | Is this high-signal and broadly applicable? |
+| 3 | **Durability** | Is this durable (not transient or tactical)? |
+| 4 | **Behavior change** | Does this change how I should interact in the future? |
 
-**Durability test pass/fail examples:**
+### Pass examples
 
-| Pass | Why |
-|------|-----|
-| "Daniel prefers data in tables, not paragraphs" | Changes all future communications |
-| "Vendor contract renews June 2026" | Contract intelligence |
-| "We decided to delay Phase 2 for the migration" | Lasting strategic impact |
+| Insight | Why it passes |
+|---------|--------------|
+| "Daniel prefers data in tables, not paragraphs" | Changes all future communications with Daniel |
+| "Vendor contract renews June 2026" | Contract intelligence, lookup value for months |
+| "We decided to delay Phase 2 for the migration" | Lasting strategic impact on initiative planning |
+| "Sarah is the new VP of Engineering" | Durable org fact, changes communication routing |
 
-| Fail | Why |
-|------|-----|
-| "I have a meeting with John tomorrow" | Tactical, schedule item |
+### Fail examples
+
+| Insight | Why it fails |
+|---------|-------------|
+| "I have a meeting with John tomorrow" | Tactical, schedule item — not durable |
 | "We discussed MCP timeline" | Vague, no specific insight |
 | "Emailed Daniel about the update" | Event log, not insight |
+| "The server was down for 2 hours today" | Transient incident, not a durable fact |
 
-If ANY answer is "No", the insight FAILS. Do not persist it. When in doubt, it does NOT pass.
+If ANY criterion fails, the insight FAILS. Do not persist. When in doubt, it does NOT pass.
 
 ---
 
-### Step 5: Categorize and determine folder (MANDATORY)
+## Step 5: Classify and determine folder (MANDATORY)
 
-Map each passing insight to the correct folder using the memory management skill folder mapping:
+Map each passing insight to the correct memory folder:
 
-| Type | Folder |
-|------|--------|
-| person | `memory/people/` |
-| vendor | `memory/vendors/` |
-| competitor | `memory/competitors/` |
-| product | `memory/products/` |
-| initiative | `memory/initiatives/` |
-| decision | `memory/decisions/` |
-| context | `memory/organizational-context/` |
+| Type | Folder | Tag |
+|------|--------|-----|
+| Person fact | `memory/people/` | `tars/person` |
+| Vendor info | `memory/vendors/` | `tars/vendor` |
+| Competitor intel | `memory/competitors/` | `tars/competitor` |
+| Product knowledge | `memory/products/` | `tars/product` |
+| Initiative context | `memory/initiatives/` | `tars/initiative` |
+| Decision record | `memory/decisions/` | `tars/decision` |
+| Organizational context | `memory/org-context/` | `tars/org-context` |
 
-#### Vendor vs competitor classification
+### Vendor vs competitor classification
+
 | Type | Definition | Examples |
 |------|------------|----------|
-| **Vendor** | Contractual relationship with us | Cloud providers, SaaS tools |
-| **Competitor** | Competing for same customers | Direct and adjacent competitors |
+| **Vendor** | Contractual/service relationship with us | Cloud providers, SaaS tools, consulting firms |
+| **Competitor** | Competing for the same customers or market share | Direct and adjacent competitors |
 
 ---
 
-### Step 6: Check existence (MANDATORY)
+## Step 6: Knowledge check — Issue 7 (MANDATORY)
 
-1. Check if a file already exists for this entity
-2. If exists -> UPDATE with new insights (append to relevant section)
-3. If not -> CREATE following frontmatter template from `reference/taxonomy.md`
+For each insight that passes the durability test, classify against existing vault knowledge:
 
-New files must include the `summary` field in frontmatter for index scanning.
+| Classification | Action |
+|---------------|--------|
+| **NEW** | Present for review. Will create new content. |
+| **UPDATE** | Show diff to user: "Current: 'Jane leads platform.' Update to: 'Jane leads platform and mobile.' Update?" |
+| **REDUNDANT** | Skip silently. Mention in summary: "Already in memory. Skipping." |
+| **CONTRADICTS** | Ask user: "Memory says REST. Input says GraphQL. Which is current?" |
+
+Never persist REDUNDANT items. Never persist CONTRADICTS items without resolution.
 
 ---
 
-### Step 7: Write to memory
+## Step 7: Negative sentiment detection — Issue 8 (MANDATORY)
 
-Use proper frontmatter with ALL required fields:
+Scan each insight for negative sentiment patterns:
+
+**Patterns to detect**: slow, political, difficult, unreliable, incompetent, lazy, disorganized, hostile, passive-aggressive, underperforming, resistant, obstructionist, untrustworthy
+
+If a statement contains negative sentiment about a person:
+
+```
+"This about Steve has negative sentiment: 'Steve has been slow to deliver.'
+ Save with flag for periodic review? [Y / Rephrase / Skip]"
+```
+
+| Response | Action |
+|----------|--------|
+| **Y** | Save with inline flag: `<!-- tars-flag:negative YYYY-MM-DD -->`. Set `tars-has-flagged-content: true` on the person's note. |
+| **Rephrase** | Ask for a neutral restatement. Re-apply durability test to rephrased version. |
+| **Skip** | Do not persist this insight. |
+
+---
+
+## Step 8: Present for review (MANDATORY)
+
+Present ALL proposed memory updates in a numbered list:
+
+```
+Proposed memory updates:
+  1. [[Jane Smith]]: Approved 2 backend hires for [[Platform Rewrite]]     [NEW]
+  2. [[Bob Chen]]: Now reports to Sarah instead of Mike                     [UPDATE]
+  3. New decision: REST over GraphQL for public API                         [NEW]
+
+Save? [all / 1, 3 / none / edit #2]
+```
+
+Selection syntax:
+- `all` — save all proposed updates
+- `1, 3` — save only specific items
+- `all except 2` — save all but specific items
+- `none` — discard all
+- `edit #2` — modify a specific item before saving
+
+**Do NOT persist anything until the user confirms.**
+
+---
+
+## Step 9: Write after confirmation (MANDATORY)
+
+For each confirmed update:
+
+### New entity
+
+```
+obsidian create name="Entity Name" path="memory/[category]/entity-slug.md" template="[type]" silent
+obsidian property:set name="tars-summary" value="One-line description" file="Entity Name"
+obsidian append file="Entity Name" content="## Key Facts\n- [insight content]"
+```
+
+Frontmatter must include all required fields per `_system/schemas.yaml`:
 
 ```yaml
 ---
-title: Entity Name
-type: person | vendor | competitor | product | initiative | decision | context
-tags: [relevant, tags]
-aliases: [alternate, names]
-summary: One-line description for quick scanning
-related: [linked entities]
-updated: YYYY-MM-DD
+tags: [tars/[type]]
+aliases: [alternate names]
+tars-summary: "One-line description for scanning"
+tars-related: ["[[linked entities]]"]
+tars-created: YYYY-MM-DD
+tars-updated: YYYY-MM-DD
 ---
 ```
 
-ALL entity references in content must use `[[Entity Name]]` wikilink syntax.
+### Existing entity (update)
+
+```
+obsidian append file="Entity Name" content="\n- [new insight] (YYYY-MM-DD)"
+obsidian property:set name="tars-updated" value="YYYY-MM-DD" file="Entity Name"
+```
+
+ALL entity references in content MUST use `[[Entity Name]]` wikilink syntax.
 
 ---
 
-### Step 8: Update index (MANDATORY)
+## Step 10: Update alias registry (MANDATORY for new entities)
 
-After creating or updating a memory file, update the relevant `_index.md`:
-- Add or update the entity's row with canonical name, aliases, filename, and one-line summary
+If a new entity was created, add it to the alias registry:
+
+```
+obsidian append file="alias-registry" content="| [canonical name] | [aliases] | [type] | [file path] |"
+```
 
 ---
 
-### Output format (Memory mode)
+## Step 11: Log to daily note (MANDATORY)
+
+```
+obsidian daily:append content="- Memory: [action] [[Entity Name]] — [summary]"
+```
+
+Write changelog entry to `_system/changelog/YYYY-MM-DD.md` with batch ID.
+
+---
+
+## Output format (Memory mode)
 
 **If insights persisted:**
+
 ```markdown
----
 ## Memory updates
 | Action | File | Summary |
 |--------|------|---------|
-| Created | `memory/vendors/acme.md` | Contract renewal date |
-| Updated | `memory/people/jane-smith.md` | Added communication preference |
+| Created | `memory/vendors/acme.md` | Contract renewal June 2026 |
+| Updated | `memory/people/jane-smith.md` | Added: leads mobile team |
+| Skipped | — | "Discussed timeline" — already captured |
 ```
 
 **If no insights qualified:**
+
 ```markdown
----
 ## Memory updates
 No Action: Input contained no durable, high-signal insights.
+Reason: [specific reason — e.g., "all items were transient scheduling logistics"]
 ```
 
 ---
 
-## MODE B: Wisdom extraction protocol
+# MODE B: Wisdom Extraction
 
-Process learning-focused content (articles, videos, transcripts, presentations) to extract insights, wisdom, and core concepts.
-
-Use this when the user is **learning** rather than **collaborating**. Not for collaborative meetings (use `skills/meeting/` instead).
-
-### Step 0: Load reference files and resolve names (MANDATORY)
-
-Read before proceeding (retry once if failed):
-1. `reference/replacements.md` (name normalization)
-2. `reference/taxonomy.md` (tags and categories)
-
-Scan the source content for person names and apply the **name resolution protocol** (core skill). Resolve ambiguous or unknown names before extraction begins.
+Process learning content (articles, podcasts, books, transcripts, videos, conversations) to extract insights, frameworks, and actionable knowledge. Use this when the user is **learning** rather than **collaborating**. Not for collaborative meetings — use `skills/meeting/` instead.
 
 ---
 
-### Stage 1: Source type analysis
+## Step 1: Identify source type (MANDATORY)
 
 Classify the source:
 
-**Conversational and narrative sources:**
-- Podcasts, YouTube transcripts, blogs, social media threads
-- Interviews, panel discussions, monologues, informal talks
+### Conversational and narrative sources (Directive A)
 
-**Authoritative and educational sources:**
+- Podcasts, YouTube transcripts, interviews
+- Panel discussions, monologues, informal talks
+- Blog posts, social media threads, newsletters
+- Conversation recordings, fireside chats
+
+### Authoritative and educational sources (Directive B)
+
 - Research papers, technical guides, textbooks
 - Formal documentation with citations, whitepapers
+- Standards documents, RFCs, specifications
+- Course materials, structured tutorials
 
-State your classification in the output.
+State the classification in output. If mixed (e.g., a podcast with a professor), default to Directive A but apply Directive B rigor to technical segments.
 
 ---
 
-### Stage 2: Conditional extraction
+## Step 2: Load references (MANDATORY)
 
-#### Directive A: Conversational sources (DEFAULT)
+```
+obsidian read file="alias-registry"
+```
+
+Scan source content for person names. Resolve using the three-layer name resolution protocol (same as Memory mode Step 1). Resolve ambiguous or unknown names before extraction begins.
+
+---
+
+## Step 3: Extract key insights
+
+### Directive A: Conversational sources (DEFAULT)
 
 Extract wisdom, inspiration, and profound nuggets:
-- **Profound statements**: Ideas that challenge norms
-- **Novel perspectives**: Unique framing of common problems
-- **Key mental models**: Frameworks, analogies, models used
-- **Actionable insights**: Specific, non-obvious advice
 
-#### Directive B: Authoritative sources (EXCEPTION)
+- **Profound statements**: Ideas that challenge norms or reframe common assumptions
+- **Novel perspectives**: Unique framing of common problems
+- **Key mental models**: Frameworks, analogies, and models used by speakers
+- **Actionable insights**: Specific, non-obvious advice with clear application
+- **Memorable quotes**: Verbatim quotes that capture the essence of an idea
+
+### Directive B: Authoritative sources (EXCEPTION)
 
 Extract education and simplification:
+
 - **Core concepts**: Fundamental principles or building blocks
-- **Complex methodologies**: Step-by-step breakdowns
-- **Key findings**: The "so what" of the content
-- **Definitions**: Critical domain-specific jargon
+- **Complex methodologies**: Step-by-step breakdowns in plain language
+- **Key findings**: The "so what" — implications and applications
+- **Definitions**: Critical domain-specific terms explained clearly
+- **Reference frameworks**: Models, taxonomies, or decision trees
 
----
+### Comprehensive context requirement (BOTH directives)
 
-### Stage 3: Comprehensive context requirement
+Each extracted insight MUST be comprehensive and self-contained. Never output isolated statements without context.
 
-Each extracted insight MUST be comprehensive and self-contained. Never output isolated statements.
-
-**Avoid (weak):**
+**Weak (avoid):**
 > "Bicycle for the Mind": The speaker said AI is a bicycle for the mind. (Ref: 22:15)
 
-**Provide (strong):**
-> **Reframing AI as a "Bicycle for the Mind"**: The speaker challenged the "AI as replacement" narrative. Their core argument was that AI should be viewed as cognitive amplification, much like the bicycle amplified human locomotion. The insight is that AI enables an average individual to achieve world-class cognitive output in specific narrow domains. This shifts focus from "human vs. machine" to "human with machine." (Ref: 22:15-23:45)
+**Strong (required):**
+> **Reframing AI as a "Bicycle for the Mind"**: The speaker challenged the "AI as replacement" narrative. Their core argument was that AI should be viewed as cognitive amplification, much like the bicycle amplified human locomotion. The insight is that AI enables an average individual to achieve world-class cognitive output in specific narrow domains. This shifts the frame from "human vs. machine" to "human with machine." (Ref: 22:15-23:45)
 
 ---
 
-### Stage 4: Deep extraction process
+## Step 4: Apply durability test to each insight (MANDATORY)
 
-1. **First pass (themes)**: Identify high-level topics
-2. **Second pass (deep extraction)**: Line-by-line with chosen directive
-3. **Contextualize**: For each point, gather surrounding context
-4. **Select for review**: Identify sections worth direct source review
-5. **Extract memory and tasks**: Identify durable insights and actionable items
+Apply the same four-criterion durability test from Memory mode (Step 4) to each extracted insight:
+
+1. **Lookup value** — Will I reference this insight again?
+2. **Signal** — Is this broadly applicable, not niche trivia?
+3. **Durability** — Will this be true/relevant in 6 months?
+4. **Behavior change** — Does this change how I think, work, or decide?
+
+Insights that pass all four become candidates for memory persistence (Step 7). Insights that fail can still appear in the wisdom journal entry but are NOT persisted to memory files.
 
 ---
 
-### Stage 5: Save to journal
+## Step 5: Check existing memory for overlap (MANDATORY)
 
-**Filename:** `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
+For each durable insight:
+
+```
+obsidian search query="tag:tars/[type] [topic keywords]" limit=5
+```
+
+Compare against existing vault knowledge. Apply the knowledge check (Issue 7):
+
+| Classification | Action |
+|---------------|--------|
+| **NEW** | Include in wisdom report and propose for memory |
+| **UPDATE** | Note the enhancement. Show diff if proposing memory update. |
+| **REDUNDANT** | Include in report for completeness. Do NOT propose memory update. |
+| **CONTRADICTS** | Flag in report. Ask user which version to keep. |
+
+---
+
+## Step 6: Create wisdom journal entry (MANDATORY)
+
+**Filename**: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 
 Note the `wisdom-` prefix to distinguish from meeting reports.
 
+```
+obsidian create name="YYYY-MM-DD Wisdom: Source Title" \
+  path="journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md" \
+  template="wisdom-journal" silent
+```
+
+Set frontmatter properties:
+
 ```yaml
 ---
-date: YYYY-MM-DD
-title: Source Title or Topic
-type: wisdom
-source_type: Podcast | Article | Video | Paper
-topics: [key topics]
-author: Author Name
+tags: [tars/journal, tars/wisdom]
+tars-date: YYYY-MM-DD
+tars-source-type: podcast | article | video | paper | book | transcript | conversation
+tars-source-title: "Full Source Title"
+tars-author: "Author or Speaker Name"
+tars-topics: [key, topics, extracted]
+tars-created: YYYY-MM-DD
 ---
+```
+
+### Journal entry structure
+
+```markdown
+# Wisdom: [Source Title]
+
+## Source analysis
+- **Type**: [Podcast / Article / Video / Paper / Book]
+- **Author/Speaker**: [Name]
+- **Core topics**: [1-2 sentence overview]
+- **Directive applied**: A (conversational) / B (authoritative)
+
+## Executive insights
+
+### 1. [Insight title]
+[Comprehensive, self-contained explanation with context, implications, and reference]
+
+### 2. [Insight title]
+[...]
+
+## Key quotes
+> "[Verbatim quote]" — [Speaker], [Reference/Timestamp]
+
+## Implications for current work
+- [[Initiative Name]]: [How this applies]
+- [General application]: [How this changes thinking]
+
+## Recommended direct review
+- [Section/timestamp]: [Why worth reviewing directly]
+
+## Follow-up actions
+- [ ] [Specific action identified]
+- [ ] [Research item to explore]
 ```
 
 ---
 
-### Stage 6: Memory and task extraction (MANDATORY)
+## Step 7: Persist durable insights to memory (CONDITIONAL)
 
-After generating wisdom report, automatically:
+For insights that passed the durability test AND the knowledge check (NEW or UPDATE):
 
-1. **Extract memory** (apply durability test):
-   - Novel frameworks or mental models -> `memory/decisions/`
-   - Vendor/competitor intelligence -> `memory/vendors/` or `memory/competitors/`
-   - Product insights -> `memory/products/`
-   - Update relevant `_index.md` files
+Present proposed memory updates using the same numbered review format as Memory mode Step 8:
 
-2. **Extract tasks** (apply accountability test):
-   - "I should try X" -> Task for user
-   - "Need to follow up on Y" -> Task for user
-   - Research items -> Backlog tasks
+```
+Durable insights extracted. Proposed memory updates:
+  1. New decision: "API-first design" framework from [Source]          [NEW]
+  2. [[Acme Corp]]: Identified as competitor in adjacent space         [NEW]
+  3. [[Platform Rewrite]]: Validates microservices approach            [UPDATE]
 
-   For EACH task:
-   - Execute the `create_reminder` operation via the task integration
-   - Check the tool response. Only count a task as "created" if the response confirms success.
-   - If the response indicates an error, skip and note in output.
+Save to memory? [all / 1, 2 / none]
+```
 
-   **After all creation attempts**, execute `list_reminders` for each list that received new tasks. Verify each task appears by matching title. Tasks reported as created but missing from the list are "creation_unverified" — report them to the user. NEVER report a task as created without this verification.
+Only persist after user confirms. Follow the same write protocol as Memory mode Step 9.
 
 ---
 
-### Output format (Wisdom mode)
+## Step 8: Extract tasks from follow-up actions (CONDITIONAL)
+
+If the source content suggests follow-up actions:
+
+Apply the accountability test to each:
+
+| # | Criterion | Question |
+|---|-----------|----------|
+| 1 | **Concrete** | Is it a specific deliverable? |
+| 2 | **Owned** | Is there a clear single owner? (Usually the user for wisdom content) |
+| 3 | **Verifiable** | Will we know when it's done? |
+
+Present candidates:
+
+```
+Follow-up actions identified:
+  1. [KEEP] Research API-first design patterns (you, backlog, low)
+  2. [KEEP] Share article with Sarah re: platform strategy (you, due this week, medium)
+
+  -- Filtered out --
+  3. "Should think more about this" — not concrete
+
+Create tasks? [all / 1 / none]
+```
+
+For each confirmed task, create via the task integration. Verify creation by reading back from the task list. Report any creation failures.
+
+---
+
+## Step 9: Log to daily note (MANDATORY)
+
+```
+obsidian daily:append content="- Wisdom: extracted from [Source Title] → [[YYYY-MM-DD Wisdom: Source Title]]
+  - Insights: N extracted, M durable
+  - Memory: N updates proposed, M saved
+  - Tasks: N created"
+```
+
+Write changelog entry with batch ID.
+
+---
+
+## Output format (Wisdom mode)
 
 ```markdown
 # Knowledge extraction report
 
 ## 1. Source analysis
-- **Source type:** [Type]
-- **Core topics:** [1-2 sentence overview]
-- **Date processed:** YYYY-MM-DD
+- **Source type**: [Type] (Directive [A/B])
+- **Core topics**: [1-2 sentence overview]
+- **Date processed**: YYYY-MM-DD
 
 ## 2. Executive insights and key ideas
-[For Directive A: comprehensive wisdom nuggets with context]
+[For Directive A: comprehensive wisdom nuggets with full context]
+[For Directive B: simplified educational content with clear explanations]
 
-## 3. Core concepts explained
-[For Directive B: simplified educational content]
+## 3. Key quotes
+[Verbatim quotes with attribution and reference]
 
-## 4. Recommended direct review
-[Selective list of sections worth reviewing directly with reasons]
+## 4. Implications for current work
+[How insights connect to active initiatives and priorities]
+
+## 5. Recommended direct review
+[Selective list of sections worth reviewing in the source, with reasons]
 
 ---
 ## Wisdom context
@@ -304,49 +547,90 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 
 ## Memory updates
 | Action | File | Summary |
+|--------|------|---------|
+| Created | `memory/decisions/api-first.md` | API-first design framework |
+| Skipped | — | Microservices pattern — already captured |
 
 ## Task updates
 | Operation | Task | Details |
+|-----------|------|---------|
+| Created | Research API patterns | Backlog, low priority |
+| Skipped | "Think about this more" | Failed accountability test |
 
 ## Creation unverified
 | Task | List | Issue |
-(Tasks reported created but not found in list_reminders verification)
+|------|------|-------|
+(Tasks reported created but not confirmed via list verification)
 ```
 
 ---
 
+# Shared protocols
+
 ## Context budgets
 
 **Memory mode:**
-- Memory: Read relevant `_index.md` + up to 3 targeted files for comparison
-- Reference: `reference/replacements.md` (mandatory)
+- Alias registry: `_system/alias-registry.md` (mandatory)
+- Memory: Search results + up to 3 targeted file reads for comparison
+- Daily note: append only
 
 **Wisdom mode:**
-- Memory: Read `_index.md` + up to 3 targeted files
-- Reference: `reference/replacements.md` + `reference/taxonomy.md`
+- Alias registry: `_system/alias-registry.md` (mandatory)
+- Memory: Search results + up to 3 targeted file reads for overlap check
+- Journal: create one entry
+- Tasks: create via integration (verify after)
+- Daily note: append only
+
+## Circuit breakers
+
+| Condition | Action |
+|-----------|--------|
+| >10 memory updates in a single invocation | Pause. Ask user to confirm batch. |
+| Name resolution confidence <70% | Do not persist. Ask user. |
+| >3 consecutive obsidian-cli errors | Stop all operations. Report status. Log to `_system/backlog/issues/`. |
+| Contradicting existing memory | Do not auto-resolve. Ask user explicitly. |
+
+## Self-evaluation — Issue 9
+
+If any errors occur during processing:
+
+1. Check `_system/backlog/issues/` for existing issue with same error signature
+2. If exists: increment `tars-occurrence-count`, update `tars-last-seen`
+3. If new: create issue note with context via `obsidian create` using the issue template
 
 ---
 
-## Absolute constraints
+# Absolute constraints
 
-### Memory mode constraints
-- NEVER persist scheduling logistics
-- NEVER persist event logs ("met with", "emailed")
-- NEVER persist vague references ("discussed timeline")
-- NEVER skip the durability test
+## Memory mode constraints
+
+- NEVER persist scheduling logistics ("meeting tomorrow at 3pm")
+- NEVER persist event logs ("met with", "emailed", "called")
+- NEVER persist vague references ("discussed timeline", "talked about the project")
+- NEVER skip the durability test — all four criteria must pass
 - NEVER skip comparison against existing memory
-- NEVER omit the memory updates output
-- NEVER skip index update after writes
+- NEVER skip the knowledge check (Issue 7) — classify as NEW/UPDATE/REDUNDANT/CONTRADICTS
+- NEVER persist without user confirmation via the numbered review list
+- NEVER skip alias registry load and name resolution
+- NEVER write entries with unresolved or ambiguous names
+- NEVER omit the memory updates output section
 
-### Wisdom mode constraints
-- NEVER use isolated bullet points without context
-- NEVER skip source type analysis
-- NEVER output without comprehensive explanations
-- NEVER forget to extract memory and tasks
-- NEVER omit the `wisdom-` prefix in filename
-- NEVER report tasks as created without verifying via `list_reminders` after creation
+## Wisdom mode constraints
 
-### Shared constraints
-- NEVER skip frontmatter template requirements
-- ALL entity references must use `[[Entity Name]]` wikilink syntax
-- NEVER skip canonical name normalization
+- NEVER use isolated bullet points without comprehensive context
+- NEVER skip source type analysis and directive selection
+- NEVER output insights without self-contained explanations
+- NEVER forget to apply durability test to extracted insights
+- NEVER forget to check existing memory for overlap (Issue 7)
+- NEVER omit the `wisdom-` prefix in journal filenames
+- NEVER report tasks as created without verifying via the task integration list operation
+- NEVER skip the follow-up action extraction step
+
+## Shared constraints
+
+- ALL entity references MUST use `[[Entity Name]]` wikilink syntax
+- ALL names MUST be resolved to canonical form via the alias registry
+- ALL writes MUST be logged to the daily note and changelog
+- ALL frontmatter MUST conform to `_system/schemas.yaml`
+- NEVER skip negative sentiment detection (Issue 8) for person-related content
+- NEVER auto-resolve contradictions — always ask the user
