@@ -1,10 +1,10 @@
-# TARS 3.0 Build and Release
+# TARS Build and Release
 
-This document describes the supported packaging path for the rebuilt framework.
+This document describes the supported packaging path for the current framework.
 
 ## Build model
 
-TARS 3.0 is maintained from the repository root and packaged into a distributable plugin directory. The active packaging entrypoint is [build-plugin.sh](/Users/ajayjohn/Sync/Applications/Library/tars/build-plugin.sh).
+TARS is maintained from the repository root and packaged into a distributable plugin directory. The active packaging entrypoint is [build-plugin.sh](/Users/ajayjohn/Sync/Applications/Library/tars/build-plugin.sh).
 
 The build model is:
 - repository source is the maintainer-facing truth
@@ -71,7 +71,7 @@ The version source of truth is `.claude-plugin/plugin.json`.
 Helpful utilities:
 
 ```bash
-python3 scripts/bump-version.py 3.0.0
+python3 scripts/bump-version.py X.Y.Z
 ./build-plugin.sh
 python3 tests/validate-plugin.py
 ```
@@ -82,4 +82,4 @@ Marketplace metadata lives in `.claude-plugin/marketplace.json`. The build scrip
 
 ## Legacy packaging note
 
-Only the repository-root `build-plugin.sh` is part of the supported v3 release flow.
+Only the repository-root `build-plugin.sh` is part of the supported release flow.

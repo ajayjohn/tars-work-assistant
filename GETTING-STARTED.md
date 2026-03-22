@@ -1,8 +1,8 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# Getting Started with TARS 3.0
+# Getting Started with TARS
 
-TARS 3.0 is an Obsidian-native executive assistant framework. The setup goal is straightforward: connect TARS to a real Obsidian vault, give it a dependable write path through `obsidian-cli`, and let `/welcome` scaffold the runtime so daily work can begin immediately.
+TARS is an Obsidian-native executive assistant framework. The setup goal is straightforward: connect TARS to a real Obsidian vault, give it a dependable write path through `obsidian-cli`, and let `/welcome` scaffold the runtime so daily work can begin immediately.
 
 ## Before you install
 
@@ -12,7 +12,7 @@ You need:
 - Claude Code or Claude Cowork with the TARS framework installed
 - a vault location dedicated to your TARS workspace
 
-If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS generation, migrate the old workspace into a TARS 3.0 vault first and then use this guide.
+If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide.
 
 ## Installation
 
@@ -114,7 +114,7 @@ Use this for deeper analysis, challenge rounds, and structured decision support.
 
 ## How persistence works
 
-TARS 3.0 is designed to avoid dirty data.
+TARS is designed to avoid dirty data.
 
 Before it writes:
 - it checks what the vault already knows

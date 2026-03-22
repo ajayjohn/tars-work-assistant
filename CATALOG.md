@@ -1,8 +1,8 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.0 Catalog
+# TARS Catalog
 
-TARS 3.0 is a persistent executive assistant framework built around an Obsidian vault. It is designed for senior knowledge workers who need continuity across meetings, decisions, tasks, stakeholder context, and long-running initiatives.
+TARS is a persistent executive assistant framework built around an Obsidian vault. It is designed for senior knowledge workers who need continuity across meetings, decisions, tasks, stakeholder context, and long-running initiatives.
 
 ## Executive summary
 
@@ -11,19 +11,19 @@ TARS addresses three chronic problems in modern knowledge work:
 - meeting follow-through is inconsistent and hard to audit
 - strategic work is often detached from the evidence trail that produced it
 
-TARS 3.0 solves those problems by treating the vault as a structured operating system rather than a pile of notes. It combines durable memory, transcript-backed retrieval, task review gates, live views, and maintenance workflows so the assistant stays useful over time instead of becoming another capture layer that drifts out of date.
+TARS solves those problems by treating the vault as a structured operating system rather than a pile of notes. It combines durable memory, transcript-backed retrieval, task review gates, live views, and maintenance workflows so the assistant stays useful over time instead of becoming another capture layer that drifts out of date.
 
-## What makes v3 different
+## What makes TARS different
 
-The v3 rebuild materially changed the framework:
-- Obsidian is now the native runtime, not a secondary destination
+TARS is intentionally opinionated about how a long-lived assistant should work:
+- Obsidian is the native runtime, not a secondary destination
 - `obsidian-cli` is the write path for managed vault changes
 - `.base` files replace manual `_index.md` maintenance
 - transcript archives are first-class retrieval assets
 - tasks and memory go through explicit review before persistence
 - schemas, guardrails, aliasing, and maintenance state live in `_system/`
 
-The result is a framework that is much more stable for months-long use, especially when the vault accumulates hundreds of journal entries, transcripts, and memory notes.
+The result is a framework that is stable for months-long use, especially when the vault accumulates hundreds of journal entries, transcripts, and memory notes.
 
 ## Core capabilities
 

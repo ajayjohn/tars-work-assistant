@@ -1,10 +1,10 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.0
+# TARS
 
 TARS is an Obsidian-native persistent executive assistant for senior knowledge workers. It turns an Obsidian vault into a long-lived operating system for meetings, memory, tasks, briefings, strategic thinking, and stakeholder communication.
 
-TARS 3.0 is built around a few core ideas:
+TARS is built around a few core ideas:
 - Obsidian is the runtime workspace, not an export target.
 - `obsidian-cli` is the write interface for vault content.
 - TARS-managed notes use schema-validated `tars-` frontmatter properties.
@@ -26,7 +26,7 @@ Core user-facing capabilities:
 
 ## Architecture at a glance
 
-TARS 3.0 uses this high-level structure:
+The framework uses this high-level structure:
 
 ```text
 skills/           Behavioral and workflow protocols
@@ -49,7 +49,7 @@ inbox/processed/        Processed intake awaiting later maintenance
 archive/transcripts/    Preserved transcript notes with journal backlinks
 ```
 
-Legacy directories such as `reference/` may still exist in the repository for compatibility and migration context, but they are not the active runtime source of truth in TARS 3.0.
+Legacy directories or compatibility files may still exist in some checkouts for migration context, but the active runtime source of truth lives in the current system files and workflow definitions.
 
 ## Quick start
 
@@ -84,7 +84,7 @@ TARS is designed to preserve signal and avoid silent drift:
 
 Start here depending on what you need:
 - [GETTING-STARTED.md](/Users/ajayjohn/Sync/Applications/Library/tars/GETTING-STARTED.md) for setup and first workflows
-- [ARCHITECTURE.md](/Users/ajayjohn/Sync/Applications/Library/tars/ARCHITECTURE.md) for the full TARS 3.0 system model
+- [ARCHITECTURE.md](/Users/ajayjohn/Sync/Applications/Library/tars/ARCHITECTURE.md) for the current system model
 - [BUILD.md](/Users/ajayjohn/Sync/Applications/Library/tars/BUILD.md) for packaging and release mechanics
 - [CONTRIBUTING.md](/Users/ajayjohn/Sync/Applications/Library/tars/CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](/Users/ajayjohn/Sync/Applications/Library/tars/CHANGELOG.md) for release history

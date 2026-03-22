@@ -1,6 +1,6 @@
 # Contributing to TARS
 
-Use this checklist whenever you change the framework. TARS 3.0 is opinionated and the docs, schemas, skills, templates, and packaging metadata need to stay aligned.
+Use this checklist whenever you change the framework. TARS is opinionated and the docs, schemas, skills, templates, and packaging metadata need to stay aligned.
 
 ## If you change a skill
 
