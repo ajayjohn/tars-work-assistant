@@ -1,105 +1,81 @@
 # Common workflows
 
-Multi-skill patterns for recurring scenarios. Each workflow describes the skills involved, typical trigger, and expected flow.
+This file remains as a lightweight workflow map. In TARS 3.0, the active runtime instructions live in `skills/` and `CLAUDE.md`.
 
----
+## Daily operating loop
 
-## Meeting processing
+Trigger:
+- `/briefing`
+- “What does my day look like?”
 
-**Trigger**: "Process this meeting" or paste a transcript.
-**Skills**: `meeting` (single unified skill with parallel sub-agents)
-**Flow**:
-1. Transcript analysis produces structured journal entry with attendees, topics, decisions, and action items.
-2. Two sub-agents run in parallel: task extraction (creates tasks via task integration) and memory extraction (offers durable facts for persistence).
-3. If attendees are unknown, TARS offers to create memory entries.
-4. Task creation is verified via list operation after each creation.
-**Output**: Journal entry saved to `journal/YYYY-MM/`, tasks created and verified, memory updated.
+Flow:
+1. TARS checks maintenance state and runs scheduled upkeep when needed.
+2. Calendar, tasks, and memory context are gathered in parallel when available.
+3. The briefing surfaces meetings, deadlines, people context, and important initiative signals.
 
----
+Output:
+- Daily or weekly journal briefing with operational context
 
-## Weekly review
+## Meeting to execution
 
-**Trigger**: "Weekly briefing" or "What happened this week?"
-**Skills**: `briefing` (weekly mode, with parallel sub-agents for calendar, tasks, and memory)
-**Flow**:
-1. Three sub-agents run in parallel: calendar events from the past 7 days, task list review, and memory context query.
-2. Results are cross-referenced: overdue items flagged, completed items noted, stale items triaged.
-3. Memory gaps are detected (people or initiatives referenced but not in memory).
-4. Upcoming week preview highlights key meetings and deadlines.
-**Output**: Comprehensive weekly summary with action items for the week ahead.
+Trigger:
+- `/meeting`
+- “Process this transcript”
 
----
+Flow:
+1. TARS matches the meeting against date and calendar context.
+2. A meeting journal entry is drafted.
+3. Tasks are proposed only if they pass the accountability test.
+4. Durable memory is proposed only if it passes the durability test.
+5. Transcript text is archived in a searchable transcript note linked to the journal entry.
 
-## Strategic decision
+Output:
+- Meeting journal entry
+- Reviewed tasks
+- Reviewed memory updates
+- Archived transcript note
 
-**Trigger**: "Help me think through X" or "Analyze this decision."
-**Skills**: `think` (deep mode orchestrates strategic analysis, validation council, and executive council)
-**Flow**:
-1. Strategic analysis uses Tree of Thoughts methodology with framework selection.
-2. Two sub-agents run in parallel: validation council (adversarial stress-test) and executive council (CPO/CTO brain trust debate).
-3. Final synthesis combines all perspectives into actionable recommendations.
-**Output**: Multi-perspective analysis with clear recommendation and dissenting views.
+## Ask and retrieve
 
----
+Trigger:
+- `/answer`
+- “What do I know about X?”
+- “When did we decide Y?”
 
-## Initiative onboarding
+Flow:
+1. Search memory.
+2. Search tasks and recent journal entries.
+3. Search transcript archives for missing detail.
+4. Check integrations when the question depends on external state.
 
-**Trigger**: "Set up tracking for Project X" or "New initiative: ..."
-**Skills**: `initiative` (planning mode) — cascades to `learn` (memory persistence) and `tasks` (task extraction) as side effects
-**Flow**:
-1. Initiative scoping captures goals, stakeholders, timeline, and success metrics.
-2. Memory entry created in `memory/initiatives/` with full frontmatter.
-3. Initial tasks are extracted and created with initiative linkage.
-4. Stakeholder entries are checked and created if missing.
-**Output**: Initiative memory file, linked tasks, stakeholder profiles updated.
+Output:
+- Source-backed answer with confidence anchored in the vault
 
----
+## Initiative tracking
 
-## Stakeholder communication
+Trigger:
+- `/initiative`
+- “Set up a new initiative”
+- “How is this initiative going?”
 
-**Trigger**: "Draft an email to X about Y" or "Help me communicate this change."
-**Skills**: `communicate` (uses `answer` internally for context lookup)
-**Flow**:
-1. TARS looks up the recipient in memory for communication preferences and context.
-2. Draft is composed with BLUF structure, appropriate tone, and relevant background.
-3. Empathy audit checks for unintended tone issues.
-4. RASCI enforcement ensures the right stakeholders are included.
-**Output**: Draft communication ready for review and sending.
+Flow:
+1. TARS checks whether the initiative already exists.
+2. It creates or updates the initiative note.
+3. It links decisions, tasks, KPIs, and related stakeholders.
 
----
+Output:
+- Initiative note updates and supporting context
 
-## Knowledge extraction
+## Strategic analysis
 
-**Trigger**: "Extract insights from this article" or share a podcast transcript.
-**Skills**: `learn` (wisdom mode — extracts insights and cascades to memory persistence)
-**Flow**:
-1. Content is analyzed for key insights, frameworks, and actionable takeaways.
-2. Insights are structured into a journal entry with proper attribution.
-3. Durable facts that pass the memory durability test are offered for persistence.
-**Output**: Structured wisdom entry in journal, relevant memory updates.
+Trigger:
+- `/think`
+- “Stress-test this decision”
 
----
+Flow:
+1. TARS reviews what the vault already knows.
+2. It runs the appropriate analysis mode.
+3. It produces a recommendation, risks, assumptions, and failure conditions.
 
-## Daily startup
-
-**Trigger**: Start of day or "Good morning."
-**Skills**: `briefing` (daily mode, with parallel sub-agents) — automatic housekeeping via `maintain` if not already run today
-**Flow**:
-1. Automatic housekeeping runs if not already done today (health check, archival sweep, sync).
-2. Three sub-agents run in parallel: today's calendar with attendee context, task priorities, and relevant memory context.
-3. Task priorities are presented: overdue first, then today's due items, then upcoming.
-4. Inbox is checked for pending items requiring processing.
-**Output**: Morning briefing with calendar, tasks, people context, and pending inbox items.
-
----
-
-## Performance review prep
-
-**Trigger**: "Performance report for [team/initiative]" or "How is X doing?"
-**Skills**: `initiative` (performance mode) — uses `answer` internally for KPI lookup
-**Flow**:
-1. KPI data is gathered from memory, task completion rates, and meeting participation.
-2. Trend analysis identifies improvements and regressions over the reporting period.
-3. Issues and blockers are surfaced from task and initiative data.
-4. Report is formatted with metrics tables and narrative assessment.
-**Output**: KPI-based performance report with trends and recommendations.
+Output:
+- Structured strategic analysis grounded in current context

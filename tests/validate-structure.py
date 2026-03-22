@@ -10,7 +10,6 @@ PLUGIN_JSON = os.path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json")
 
 REQUIRED_ROOT_FILES = [
     "LICENSE",
-    "NOTICE",
     "ARCHITECTURE.md",
     "CHANGELOG.md",
     "README.md",

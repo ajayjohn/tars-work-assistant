@@ -211,6 +211,8 @@ def check_stale_references(errors, warnings):
 
         # Check for skills/{name}/ references
         for match in skill_ref_pattern.finditer(content):
+            if content[max(0, match.start() - 8):match.start()] == ".claude/":
+                continue
             skill_name = match.group(1)
             # Skip placeholder/example names
             if skill_name in PLACEHOLDER_SKILL_NAMES:
@@ -238,6 +240,13 @@ def check_stale_references(errors, warnings):
                 if is_changelog and _is_in_historical_section(content, match.start(), current_version):
                     continue
                 lineno = content[:match.start()].count("\n") + 1
+                line_start = content.rfind("\n", 0, match.start()) + 1
+                line_end = content.find("\n", match.end())
+                if line_end == -1:
+                    line_end = len(content)
+                line = content[line_start:line_end]
+                if "<!--" in line:
+                    continue
                 # Only warn for non-blocklist items (could be mode references)
                 if cmd_name in V1_BLOCKLIST:
                     errors.append(

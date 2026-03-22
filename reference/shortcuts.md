@@ -1,48 +1,51 @@
 # TARS shortcuts
 
-Shortcut definitions for Cowork scheduled execution. These are created during the welcome flow or manually by the user via Cowork's shortcut settings.
+This file documents the scheduling intent for TARS 3.0. The active runtime state for schedules and last-run bookkeeping lives in `_system/`.
 
-## daily-housekeeping
+## Daily maintenance
 
-**Schedule:** `30 17 * * *` (5:30 PM daily, configurable during setup)
+Recommended schedule:
+- once per day
+- usually late afternoon or end of workday
 
-**Task description:**
+Suggested task description:
 
-```
-Run the TARS daily housekeeping pipeline. This is a silent maintenance pass that keeps the workspace healthy.
+```text
+Run the TARS daily maintenance pass.
 
-Steps:
-1. Read reference/.housekeeping-state.yaml to check if housekeeping has already run today. If last_run equals today's date, exit early with no action.
-2. Run the archival sweep: execute `python3 scripts/archive.py {workspace_path} --auto` to expire ephemeral lines and archive stale content.
-3. Run the health check: execute `python3 scripts/health-check.py {workspace_path}` to validate indexes, detect broken wikilinks, and flag naming issues.
-4. Run the task sync: execute `python3 scripts/sync.py {workspace_path}` to check scheduled items and detect memory gaps.
-5. Count files in inbox/pending/ to track unprocessed inbox items.
-6. Update reference/.housekeeping-state.yaml with today's date, success status, incremented run count, and current inbox count.
-7. If critical issues are found (broken indexes, overdue scheduled items), save a brief summary to journal/YYYY-MM/YYYY-MM-DD-housekeeping.md for later review.
-
-Success criteria: All three scripts complete without errors. State file updated. No user interaction required.
+1. Read _system/housekeeping-state.yaml.
+2. If maintenance already ran today, exit cleanly.
+3. Run scripts/archive.py against the active vault.
+4. Run scripts/health-check.py against the active vault.
+5. Run scripts/sync.py against the active vault.
+6. Count items in inbox/pending/.
+7. Update _system/housekeeping-state.yaml with last-run metadata.
+8. If issues are detected, write a dated note or changelog entry in _system/changelog/ or journal/YYYY-MM/.
 
 Constraints:
-- Do not prompt the user for input. This runs autonomously.
-- Do not process inbox items (that requires user confirmation via /maintain inbox).
-- Do not run full index rebuild (expensive, only on demand via /maintain rebuild).
-- If any script fails, log the failure and continue with the remaining scripts.
-- All scripts use Python standard library only. No pip installs needed.
-
-File paths:
-- State file: reference/.housekeeping-state.yaml
-- Scripts: scripts/health-check.py, scripts/archive.py, scripts/sync.py
-- Inbox: inbox/pending/
-- Journal output (if issues found): journal/YYYY-MM/YYYY-MM-DD-housekeeping.md
+- Do not silently persist tasks or memory.
+- Do not delete transcript archives.
+- Do not require user interaction unless a blocking error occurs.
 ```
 
-### Creating this shortcut
+## Daily briefing
 
-During the welcome flow or at any time, create this shortcut via Cowork settings:
+Recommended schedule:
+- once each morning at the user’s preferred start time
 
-1. Open Cowork → Settings → Shortcuts
-2. Create a new shortcut with task name: `daily-housekeeping`
-3. Paste the task description above
-4. Set cron schedule: `30 17 * * *` (or user's preferred time)
+Intent:
+- create or present a daily briefing using calendar, tasks, and memory context
 
-The session-start check in the core skill serves as a fallback if this shortcut is not configured or the environment does not support scheduled shortcuts.
+## Weekly briefing
+
+Recommended schedule:
+- once per week, usually Monday morning
+
+Intent:
+- summarize the previous week and orient the upcoming week
+
+## Notes
+
+- `/welcome` is the preferred place to register schedules when the environment supports it.
+- Session-start checks should act as a fallback when scheduled execution is unavailable or stale.
+- `_system/schedule.md` stores user-facing schedule preferences.

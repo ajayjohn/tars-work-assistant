@@ -545,7 +545,7 @@ Save with flag for periodic review? [Y / Rephrase / Skip]
 ```
 
 **If saved with flag:**
-- Wrap the content in markers: `<!-- tars-flag:negative YYYY-MM-DD -->content<!-- /tars-flag -->`
+- Wrap the content in markers: `<!-- tars-flag:negative YYYY-MM-DD -->content<!-- end-tars-flag -->`
 - Set `tars-has-flagged-content: true` on the person's note via `obsidian property:set`
 - Flagged content appears in the `_views/flagged-content.base` for periodic cleanup
 

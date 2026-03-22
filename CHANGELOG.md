@@ -8,7 +8,7 @@
 - **Obsidian-native**: All vault mutations via `obsidian-cli` (create, append, property:set, search). No direct filesystem writes for content.
 - **Bases replace indexes**: 15 live `.base` query files replace all hand-maintained `_index.md` files. Zero drift, always accurate.
 - **Schema-validated frontmatter**: All TARS notes use `tars-` prefixed properties validated against `_system/schemas.yaml` (14 entity types).
-- **Single source tree**: No duplicate distribution folders. The vault IS the source of truth.
+- **Vault-first runtime**: The deployed Obsidian vault is the runtime source of truth. The repository is the framework source and packaging surface.
 - **Tag-driven filterability**: Hierarchical `tars/` tags on all managed notes for reliable search and base filtering.
 
 ### New capabilities (10 real-world issues addressed)
@@ -27,6 +27,7 @@
 - `_system/` directory: config, integrations, alias-registry, taxonomy, kpis, schedule, guardrails.yaml, maturity.yaml, housekeeping-state.yaml, schemas.yaml, changelog/, backlog/
 - `_views/` directory: 15 `.base` files (all-people, all-initiatives, all-decisions, all-products, all-vendors, all-competitors, recent-journal, active-tasks, overdue-tasks, stale-memory, inbox-pending, all-documents, all-transcripts, flagged-content, backlog)
 - `templates/` directory: 15 Obsidian templates (person, vendor, competitor, product, initiative, decision, org-context, meeting-journal, daily-briefing, weekly-briefing, wisdom-journal, companion, transcript, issue, idea)
+- `commands/` thin wrappers retained for explicit slash-command invocation in the v3 framework
 - `scripts/validate-schema.py`: Schema validation against schemas.yaml with PyYAML fallback
 - `scripts/scan-flagged.py`: Negative sentiment scanner for people notes
 - `scripts/health-check.py`: Rewritten for v3 schema, broken links, alias consistency, staleness
@@ -36,7 +37,7 @@
 - `tests/smoke-tests.py`: 13-point verification suite
 - `tests/fixtures/`: 6 schema validation fixtures (valid + invalid examples)
 - `CLAUDE.md`: Vault-level agent configuration for v3
-- `DECISIONS.md`: Architectural decisions and deviation log
+- Architectural decisions and deviation notes recorded during the rebuild
 - `.claude/skills/`: obsidian-cli, obsidian-bases, obsidian-markdown, json-canvas, defuddle skill references
 
 ### Changed
@@ -45,12 +46,13 @@
 - **Inbox processing**: Simplified to pending/processed (no processing/failed intermediate states)
 - **Think modes**: All 5 modes (A-E) check existing vault knowledge before analyzing
 - **Communication drafting**: Loads stakeholder memory, checks for flagged negative content
+- **Documentation set refreshed**: README, GETTING-STARTED, ARCHITECTURE, BUILD, CATALOG, and contribution docs now describe the actual v3 runtime model and release flow
+- **Repository cleanup**: Removed duplicate legacy `.claude-plugin` payload trees, obsolete helper scripts, and stale release artifacts that were not part of the active v3 plugin
 
-### Removed (by design)
+### Retired from the active runtime architecture
 - `_index.md` files: Replaced by `.base` live queries
-- `reference/` directory: Replaced by `_system/`
-- `commands/` directory: Skills handle routing directly
-- Duplicate distribution trees: Single source tree
+- `reference/` as runtime control plane: Replaced by `_system/`
+- Manual index rebuilding as the primary query model: Replaced by live views and schema-driven note structure
 
 ## v2.2.0 (2026-02-19)
 

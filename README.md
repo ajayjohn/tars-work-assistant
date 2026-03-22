@@ -1,205 +1,95 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS
+# TARS 3.0
 
-Knowledge work assistant plugin for Claude Code and Claude Cowork. TARS turns Claude into a persistent, context-aware executive assistant that remembers your organization, manages your work, processes meetings, captures knowledge, and helps you think strategically.
+TARS is an Obsidian-native persistent executive assistant for senior knowledge workers. It turns an Obsidian vault into a long-lived operating system for meetings, memory, tasks, briefings, strategic thinking, and stakeholder communication.
 
-Built for leaders, operators, and teams who want AI that adapts to their business, not the other way around. TARS learns your people, your initiatives, your decisions—and stays grounded in your workspace.
+TARS 3.0 is built around a few core ideas:
+- Obsidian is the runtime workspace, not an export target.
+- `obsidian-cli` is the write interface for vault content.
+- TARS-managed notes use schema-validated `tars-` frontmatter properties.
+- Live Obsidian Bases replace hand-maintained `_index.md` files.
+- Meeting answers can fall back to archived raw transcripts when summaries are not enough.
+- Tasks and durable memory always go through review before persistence.
 
-## Installation
+## What ships in the framework
 
-### Option 1: Install from Marketplace (Recommended)
+The framework ships with 12 skills, 11 commands, 15 templates, 15 live views, and 8 deterministic scripts.
 
-Subscribe to automatic updates:
+Core user-facing capabilities:
+- Daily and weekly briefings with calendar, task, people, and initiative context
+- Meeting processing that links transcripts, journal notes, decisions, and follow-through
+- Task extraction with accountability testing and duplicate checks
+- Durable memory capture for people, initiatives, decisions, products, vendors, competitors, and organizational context
+- Fast lookup across memory, journal, transcripts, and configured integrations
+- Strategic analysis, communications drafting, initiative planning, and maintenance workflows
 
-1. Open **Cowork → Settings → Marketplaces**
-2. Click **"Add Marketplace"**
-3. Enter URL: `https://github.com/ajayjohn/tars-work-assistant`
-4. The TARS plugin will appear in your plugin list
-5. Click **Install** and run `/welcome` to set up
+## Architecture at a glance
 
-**Benefits**: Automatic updates when new versions are released.
+TARS 3.0 uses this high-level structure:
 
-### Option 2: Manual Installation
-
-For Claude Code or one-time installation:
-
-```bash
-claude plugin install ./tars
+```text
+skills/           Behavioral and workflow protocols
+commands/         Thin slash-command wrappers into the skills
+_system/          Runtime configuration, schemas, guardrails, alias registry, state
+_views/           Obsidian `.base` files for live queries
+templates/        Canonical TARS note templates
+scripts/          Deterministic validators and maintenance utilities
+.claude/skills/   Obsidian-specific helper skills used by the agent
 ```
 
-Then run `/welcome` in your workspace for the progressive onboarding wizard.
+A deployed TARS vault uses this runtime layout:
 
-## Getting Started
-
-New to TARS? Read the [**Getting Started Guide**](GETTING-STARTED.md) for:
-- Quick Start (5 minutes) — workspace setup and installation
-- Your First Workflows — the TARS Inbox and batch processing
-- Building Habits — daily briefing, meeting processing, and memory updates
-- Essential Skills — strategic analysis, communication drafting, decision support
-- Common Questions — commands, calendar setup, backups, and team usage
-
-**TLDR**: Run `/welcome`, then try "Daily briefing" to see TARS in action.
-
-## What TARS does
-
-**Memory system**: Persistent knowledge graph of people, initiatives, decisions, products, vendors, and competitors. Wikilink-connected with durability-tested entries. Provider-agnostic integrations sync with your tools.
-
-**Task management**: Accountable task extraction and lifecycle. Active/backlog/completed with date resolution and duplicate detection.
-
-**Meeting processing**: Full pipeline from transcript to structured report, journal entry, tasks, and memory updates.
-
-**Briefings**: Daily and weekly briefings pulling from calendar, tasks, and people context.
-
-**Strategic analysis**: Multi-method thinking (Tree of Thoughts, debate, stress-testing, deep understanding).
-
-**Communications**: Stakeholder-aware drafting with upstream/downstream modes and RASCI enforcement.
-
-**Knowledge capture**: Extract durable insights and wisdom from meetings, documents, and conversations. Durability-tested entries that actually stay useful.
-
-**Initiative management**: Plan, track, and report on initiatives with KPIs and health checks.
-
-**Workspace maintenance**: Health checks, syncs, index rebuilds, and automated housekeeping.
-
----
-
-## Natural language interface
-
-You don't need to memorize commands. Tell TARS what you need in plain language:
-
-- "Here's a meeting transcript, process it" → Meeting skill (full pipeline)
-- "What's on my plate today?" → Daily briefing
-- "Poke holes in this plan" → Stress-test mode (Think skill)
-- "Remember that Murph reports to Brand" → Learn skill (memory mode)
-- "Draft an email to the VP about the Q3 delay" → Communicate skill
-- "What do I know about Project Lazarus?" → Answer skill (fast lookup)
-
-TARS routes your request to the right skill and runs it end-to-end.
-
----
-
-## Commands (11)
-
-| Command | Purpose |
-|---------|---------|
-| `/welcome` | Progressive onboarding wizard (3-phase setup) |
-| `/meeting` | Process meeting transcript (full pipeline: report → tasks → memory) |
-| `/briefing` | Daily or weekly briefing (calendar + tasks + people context) |
-| `/tasks` | Extract or manage tasks (extract mode or triage mode) |
-| `/learn` | Persist memory or extract wisdom (memory mode or wisdom mode) |
-| `/think` | Strategic analysis, debate, stress-test, deep dive (5 analysis modes) |
-| `/initiative` | Plan, status, or performance report (3 initiative modes) |
-| `/maintain` | Health check, sync, rebuild, inbox (workspace maintenance) |
-| `/communicate` | Draft stakeholder communications (upstream or downstream) |
-| `/create` | Generate decks, narratives, speeches (presentation-grade content) |
-| `/answer` | Fast factual lookup (search hierarchy with sources) |
-
----
-
-## Skills (12)
-
-Skills contain workflow logic and fire based on command routing. Metadata loads at session start (~48 tokens). Full skill logic loads on-demand.
-
-### Background (1)
-
-| Skill | Purpose |
-|-------|---------|
-| Core | Identity, routing, communication rules, memory/task protocols, decision frameworks, clarification |
-
-### Workflow (11)
-
-| Skill | Modes | Purpose |
-|-------|-------|---------|
-| Meeting | auto | Full pipeline: transcript → report → tasks → memory |
-| Tasks | extract, manage | Extract accountable tasks or review/triage existing |
-| Learn | memory, wisdom | Persist durable insights or extract from content |
-| Think | analyze, debate, stress-test, deep, discover | Strategic analysis engine (5 modes) |
-| Briefing | daily, weekly | Calendar + tasks + people context |
-| Initiative | plan, status, performance | Initiative lifecycle management |
-| Maintain | health, sync, rebuild, inbox | Workspace maintenance |
-| Welcome | - | Progressive 3-phase onboarding |
-| Communicate | upstream, downstream | Stakeholder communications |
-| Create | - | Presentation-grade content |
-| Answer | - | Fast factual lookups |
-
----
-
-## Workspace structure (created by `/welcome`)
-
-```
-your-project/
-├── CLAUDE.md                    # Root config with your identity
-├── memory/
-│   ├── _index.md
-│   ├── people/                  # Stakeholder profiles
-│   ├── initiatives/             # Project/initiative knowledge
-│   ├── decisions/               # Key decisions and rationale
-│   ├── products/                # Product knowledge
-│   ├── vendors/                 # Vendor relationships
-│   ├── competitors/             # Competitive intelligence
-│   └── organizational-context/
-├── journal/
-│   └── YYYY-MM/                 # Meeting reports, briefings, wisdom
-├── contexts/
-│   ├── products/                # Deep product documentation
-│   └── artifacts/               # Generated decks, narratives, speeches
-└── reference/
-    ├── replacements.md          # Name normalization mappings
-    ├── taxonomy.md              # Tags, types, frontmatter templates
-    ├── kpis.md                  # Team/initiative metrics
-    ├── schedule.md              # Recurring/one-time scheduled items
-    └── integrations.md          # Integration config and query patterns
+```text
+memory/                 Durable knowledge graph
+journal/YYYY-MM/        Skill outputs and dated notes
+contexts/               Deep reference material and generated artifacts
+inbox/pending/          Raw intake waiting for processing
+inbox/processed/        Processed intake awaiting later maintenance
+archive/transcripts/    Preserved transcript notes with journal backlinks
 ```
 
----
+Legacy directories such as `reference/` may still exist in the repository for compatibility and migration context, but they are not the active runtime source of truth in TARS 3.0.
 
-## Key concepts
+## Quick start
 
-**Index-first**: Every search reads `_index.md` before opening individual files. Scales to hundreds of memory entries.
+1. Install the framework from the marketplace or from a local checkout.
+2. Make sure Obsidian Desktop is running and `obsidian-cli` is installed.
+3. Point TARS at an Obsidian vault dedicated to your TARS workspace.
+4. Run `/welcome` to scaffold the vault, configure integrations, and initialize system files.
+5. Start with `/briefing`, `/meeting`, `/tasks`, `/answer`, or natural-language requests.
 
-**Durability test**: Memory additions must pass 4 criteria (lookup value, signal, durability, behavior change). Most inputs produce zero memory additions.
+Examples:
 
-**Accountability test**: Tasks must be concrete, have a clear owner, and be verifiable. "Synergize on the roadmap" fails.
+```text
+/welcome
+/briefing
+/meeting
+/tasks
+/answer What do I know about the platform rewrite?
+/think Stress-test this roadmap decision.
+```
 
-**Wikilinks**: All entity references use `[[Entity Name]]` syntax for graph connectivity.
+## How TARS behaves
 
-**Name normalization**: `reference/replacements.md` maps variations to canonical names. "Mick" becomes "Michael Rodriguez."
+TARS is designed to preserve signal and avoid silent drift:
+- It checks the vault before writing and classifies findings as NEW, UPDATE, REDUNDANT, or CONTRADICTS.
+- It uses the durability test before proposing memory persistence.
+- It uses the accountability test before proposing tasks.
+- It preserves transcript text so later queries can inspect what was actually said.
+- It records framework issues and user improvement ideas in `_system/backlog/`.
+- It performs scheduled or session-start maintenance to keep schemas, links, and archival state healthy.
 
-**Provider-agnostic integrations**: TARS integrates with your tools (calendar, task systems, Slack, email) through abstracted query patterns in `reference/integrations.md`. Not locked into one platform.
+## Documentation map
 
-**4-tier archival**: Entries move through 4 tiers (durable, seasonal, transient, ephemeral) with automated housekeeping. Keeps memory fresh without manual cleanup.
-
-**Sensitive data guardrails**: Flags PII, financial, and security-sensitive entries. Blocks accidental exposure in briefings and comms.
-
-**Automated housekeeping**: `/maintain` detects stale tasks, orphaned memory entries, duplicate wikilinks, and index drift.
-
-**Help system**: Ask TARS "what can you do?" or "how do I process a meeting?" Inline help metadata provides accurate answers without opening docs.
-
-**Token efficiency**: v2.0 loads only metadata at session start (~48 tokens baseline). Full skill logic loads on-demand when commands execute.
-
----
-
-## Getting help
-
-Ask TARS directly:
-- "What can you do?"
-- "How do I process a meeting?"
-- "What's the difference between `/think` and `/think stress-test`?"
-
-TARS answers from inline help metadata. For deeper reference material, see `GETTING-STARTED.md` and `reference/workflows.md`.
-
----
-
-## Origin: Why the Name TARS?
-
-The inspiration comes directly from one of my favorite movies, *Interstellar* by Christopher Nolan. TARS is a robot from the movie that plays a crucial role in the storyline. I named this assistant TARS because ultimately, I want it to be a partner that is robust, reliable and brings a distinct perspective to your work, just like TARS did in the movie.
-
----
+Start here depending on what you need:
+- [GETTING-STARTED.md](/Users/ajayjohn/Sync/Applications/Library/tars/GETTING-STARTED.md) for setup and first workflows
+- [ARCHITECTURE.md](/Users/ajayjohn/Sync/Applications/Library/tars/ARCHITECTURE.md) for the full TARS 3.0 system model
+- [BUILD.md](/Users/ajayjohn/Sync/Applications/Library/tars/BUILD.md) for packaging and release mechanics
+- [CONTRIBUTING.md](/Users/ajayjohn/Sync/Applications/Library/tars/CONTRIBUTING.md) for maintenance and change hygiene
+- [CHANGELOG.md](/Users/ajayjohn/Sync/Applications/Library/tars/CHANGELOG.md) for release history
+- [CATALOG.md](/Users/ajayjohn/Sync/Applications/Library/tars/CATALOG.md) for the product and adoption overview
 
 ## License
 
-PolyForm Noncommercial 1.0.0. See `LICENSE`.
-
-> **Note**: Commercial use requires prior permission. Please contact the author for commercial licensing.
-
-Users must preserve the attribution notices in the `NOTICE` file when distributing this work.
+This repository is licensed under PolyForm Noncommercial 1.0.0. See [LICENSE](/Users/ajayjohn/Sync/Applications/Library/tars/LICENSE).

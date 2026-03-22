@@ -101,7 +101,7 @@ def validate_marketplace(repo_root: Path):
         plugin = marketplace["plugins"][0]
         if "source" in plugin:
             source = plugin["source"]
-            if source.get("path") != ".claude-plugin":
+            if "path" in source and source.get("path") != ".claude-plugin":
                 warnings.append(f"Source path is '{source.get('path')}' - should be '.claude-plugin'")
 
     return errors, warnings

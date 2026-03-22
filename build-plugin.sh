@@ -69,7 +69,7 @@ PYTHON_SCRIPT
 cat > tars-cowork-plugin/README.md << 'EOF'
 # TARS 3.0 — Persistent Executive Assistant for Obsidian
 
-**Obsidian-native knowledge work operating system with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications.**
+**Obsidian-native executive assistant framework with memory continuity, meeting processing, task accountability, transcript-backed retrieval, strategic analysis, and stakeholder communications.**
 
 ## Installation
 1. Claude Code → Install from marketplace or folder
@@ -91,6 +91,8 @@ cat > tars-cowork-plugin/README.md << 'EOF'
 - An Obsidian vault for TARS to use
 
 Full docs: https://github.com/ajayjohn/tars-work-assistant
+
+License: PolyForm Noncommercial 1.0.0
 EOF
 
 cd tars-cowork-plugin

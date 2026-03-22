@@ -1,238 +1,85 @@
-# TARS Build System Documentation
+# TARS 3.0 Build and Release
 
-## Overview
+This document describes the supported packaging path for the rebuilt framework.
 
-TARS uses a **source-based build system** where the GitHub repository contains the complete plugin specification, but the Cowork distribution uses a minimal configuration that relies on auto-discovery.
+## Build model
 
-The repository is also configured as a **marketplace**, allowing users to subscribe and receive automatic updates when new versions are pushed to GitHub.
+TARS 3.0 is maintained from the repository root and packaged into a distributable plugin directory. The active packaging entrypoint is [build-plugin.sh](/Users/ajayjohn/Sync/Applications/Library/tars/build-plugin.sh).
 
-## Key Principle
+The build model is:
+- repository source is the maintainer-facing truth
+- `.claude-plugin/plugin.json` is the metadata source of truth
+- `build-plugin.sh` assembles the distributable plugin tree
+- the packaged plugin is meant for installation, not for authoring
 
-**Single Source of Truth**: `.claude-plugin/plugin.json` in the repository root contains the complete plugin specification. All build processes derive values from this file.
+## What the root build script packages
 
-## Why Minimal Distribution?
+The root build script currently creates `tars-cowork-plugin/` and copies:
+- `skills/`
+- Python scripts from `scripts/`
+- `templates/`
+- `_system/`
+- `_views/`
+- `.claude/skills/`
+- `LICENSE`
+- `CLAUDE.md`
+- `.mcp.json` when present
 
-Cowork **auto-discovers** skills and commands from the directory structure. Including explicit `skills` and `commands` arrays in the distribution `plugin.json` **breaks** plugin loading.
+It also:
+- generates a minimal distribution `plugin.json`
+- syncs version and description into `.claude-plugin/marketplace.json`
+- writes a packaged README
+- produces `tars-cowork-plugin/Archive.zip`
 
-**Repository version** (with arrays):
-```json
-{
-  "name": "tars",
-  "version": "2.0.0",
-  "skills": ["skills/core/SKILL.md", ...],
-  "commands": ["commands/welcome.md", ...]
-}
-```
+## Why the packaged manifest is minimal
 
-**Distribution version** (minimal, auto-discovery):
-```json
-{
-  "name": "tars",
-  "version": "2.0.0",
-  "description": "...",
-  "author": {...},
-  "license": "Apache-2.0"
-}
-```
+The installable distribution relies on directory-based discovery at runtime. The packaged `plugin.json` therefore keeps only the metadata needed by the installer:
+- name
+- version
+- description
+- author
+- license
 
-## Build Processes
+The repository remains the place where framework source, tests, and documentation live.
 
-### 1. Local Build (`build-plugin.sh`)
+## Supported maintainer workflow
 
-**Purpose**: Create a Cowork-installable plugin in `tars-cowork-plugin/`
+Use this sequence for release preparation:
 
-**Usage**:
+1. Update framework source files.
+2. Update public docs and changelog.
+3. Update `.claude-plugin/plugin.json` if version or release metadata changed.
+4. Run validators from `tests/`.
+5. Run `./build-plugin.sh`.
+6. Verify the packaged plugin contents and packaged README.
+7. Tag and publish the GitHub release artifact.
+
+## Repository versus distribution
+
+Repository source includes:
+- documentation
+- tests
+- migration and rebuild handoff documents
+- helper and compatibility files not required in the install artifact
+
+Distribution output includes only what the installed framework needs to run.
+
+## Versioning
+
+The version source of truth is `.claude-plugin/plugin.json`.
+
+Helpful utilities:
+
 ```bash
+python3 scripts/bump-version.py 3.0.0
 ./build-plugin.sh
+python3 tests/validate-plugin.py
 ```
 
-**What it does**:
-1. Reads `.claude-plugin/plugin.json` (source)
-2. Extracts: name, version, description, author, license
-3. Copies: skills/, commands/, scripts/, reference/, LICENSE, .mcp.json
-4. Generates minimal `plugin.json` in distribution
-5. Creates `Archive.zip`
+## Marketplace metadata
 
-**Output**: `tars-cowork-plugin/` folder ready for Cowork installation
+Marketplace metadata lives in `.claude-plugin/marketplace.json`. The build script keeps the packaged version aligned with the source manifest so the GitHub release artifact and marketplace entry describe the same version of TARS.
 
-### 2. Git Pre-Push Hook (`.git/hooks/pre-push`)
+## Legacy packaging note
 
-**Purpose**: Automatically rebuild distribution before pushing to GitHub
-
-**Trigger**: Runs automatically on `git push`
-
-**What it does**:
-1. Runs `./build-plugin.sh`
-2. If build fails, aborts the push
-3. If build succeeds, continues with push
-
-**Note**: The `tars-cowork-plugin/` folder is gitignored, so only source files are pushed.
-
-### 3. GitHub Actions Release (`.github/workflows/release.yml`)
-
-**Purpose**: Create official plugin releases on GitHub
-
-**Trigger**:
-- Manual workflow dispatch
-- Push to `main` branch that changes `.claude-plugin/plugin.json`
-
-**What it does**:
-1. Runs test suite (`tests/run-all.sh --full`)
-2. Extracts version from source `plugin.json`
-3. Checks if tag already exists (skip if yes)
-4. Creates temporary build directory
-5. **Generates minimal plugin.json** (same logic as local build)
-6. Creates `tars-vX.Y.Z.zip` with Cowork-compatible structure
-7. Extracts changelog for release notes
-8. Creates git tag (`vX.Y.Z`)
-9. Creates GitHub release with archive
-
-**Output**: GitHub release with downloadable `tars-vX.Y.Z.zip`
-
-## File Structure
-
-### Repository (GitHub)
-```
-tars/
-├── .claude-plugin/
-│   ├── plugin.json          # SOURCE OF TRUTH
-│   └── marketplace.json     # Auto-synced from plugin.json
-├── .claude/skills/           # Obsidian skills references
-├── .github/workflows/
-│   ├── release.yml           # CI/CD for releases
-│   └── validate.yml          # PR validation
-├── _system/                  # System configuration and state
-├── _views/                   # .base live query files
-├── skills/                   # 12 skill definitions
-├── scripts/                  # Python validation/scanning scripts
-├── templates/                # 15 Obsidian templates
-├── tests/                    # Smoke tests and fixtures
-├── CLAUDE.md                 # Vault-level agent configuration
-├── build-plugin.sh           # Local build script
-└── ...
-```
-
-### Distribution (Cowork)
-```
-tars-cowork-plugin/
-├── .claude-plugin/
-│   └── plugin.json          # MINIMAL (auto-discovery)
-├── .claude/skills/           # Obsidian skills references
-├── _system/                  # System configuration
-├── _views/                   # .base live queries
-├── skills/                   # Copied from source
-├── scripts/                  # Copied from source
-├── templates/                # Copied from source
-├── CLAUDE.md                 # Agent configuration
-├── Archive.zip              # Compressed distribution
-├── LICENSE
-└── README.md
-```
-
-## Updating the Plugin
-
-### To change version, description, or metadata:
-
-1. Edit `.claude-plugin/plugin.json` (repository root)
-2. Update `CHANGELOG.md` with release notes
-3. Commit changes
-4. Push to GitHub
-
-```bash
-# Pre-push hook automatically rebuilds tars-cowork-plugin/
-git add .claude-plugin/plugin.json CHANGELOG.md
-git commit -m "Bump version to 2.1.0"
-git push origin main
-
-# GitHub Actions automatically creates release if version changed
-```
-
-### To test local build:
-
-```bash
-./build-plugin.sh
-# Installs tars-cowork-plugin/ in Cowork to test
-```
-
-## Troubleshooting
-
-### Plugin installs but shows no skills
-
-**Cause**: Distribution `plugin.json` has `skills` or `commands` arrays
-
-**Fix**: Rebuild using `./build-plugin.sh` (already fixed)
-
-### GitHub release has wrong plugin.json
-
-**Cause**: Old workflow zipped source files directly
-
-**Fix**: Workflow now creates minimal version (already fixed)
-
-### Build script breaks after editing source
-
-**Cause**: Python parsing failed or source JSON malformed
-
-**Fix**: Validate `.claude-plugin/plugin.json` is valid JSON:
-```bash
-python3 -c "import json; json.load(open('.claude-plugin/plugin.json'))"
-```
-
-## Version Bumping
-
-Use the provided script:
-```bash
-python3 scripts/bump-version.py 2.1.0
-# Updates plugin.json, creates git tag, updates changelog
-```
-
-## Marketplace Configuration
-
-### What is `marketplace.json`?
-
-The `.claude-plugin/marketplace.json` file defines this repository as a Cowork marketplace. Users can subscribe to the marketplace URL and receive automatic plugin updates.
-
-**Location**: `.claude-plugin/marketplace.json` (NOT in the repository root)
-
-**Structure**:
-```json
-{
-  "name": "TARS Marketplace",
-  "description": "...",
-  "plugins": [
-    {
-      "name": "tars",
-      "version": "2.0.0",  // Synced from plugin.json
-      "source": {
-        "type": "git",
-        "url": "https://github.com/ajayjohn/tars-work-assistant.git"
-      }
-    }
-  ]
-}
-```
-
-### Version Synchronization
-
-The version in `.claude-plugin/marketplace.json` is **automatically synced** from `.claude-plugin/plugin.json`:
-
-- **Local build**: `./build-plugin.sh` syncs marketplace version
-- **GitHub Actions**: Release workflow syncs and commits marketplace.json
-- **Single source of truth**: Only edit version in `.claude-plugin/plugin.json`
-- **Important**: marketplace.json always lives in `.claude-plugin/` alongside plugin.json
-
-### How Users Subscribe
-
-1. Open **Cowork → Settings → Marketplaces**
-2. Click **"Add Marketplace"**
-3. Enter: `https://github.com/ajayjohn/tars-work-assistant`
-4. TARS appears in plugin list with automatic updates
-
-When you push a new version to GitHub, subscribed users receive update notifications.
-
-## Summary
-
-- **Repository**: Full specification (documentation + validation) + marketplace
-- **Distribution**: Minimal config (runtime compatibility)
-- **Build**: Automated via script, pre-push hook, and CI/CD
-- **Source**: `.claude-plugin/plugin.json` is the single source of truth
-- **Marketplace**: `.claude-plugin/marketplace.json` automatically synced from plugin.json
+Only the repository-root `build-plugin.sh` is part of the supported v3 release flow.

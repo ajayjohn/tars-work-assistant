@@ -1,285 +1,75 @@
 # Integration registry
 
-Provider-agnostic integration configuration. Skills reference integration **categories** (calendar, tasks), not specific tools. The registry tells each skill how to execute operations for the configured provider.
+This file is retained as a compatibility reference for the repository. In an active TARS 3.0 vault, the runtime source of truth is `_system/integrations.md`.
 
-**v2.1+ Recommended**: MCP (Model Context Protocol) servers for all integrations.
+## Principles
 
-**Integration tiers**:
-- **Mandatory**: Calendar, Tasks/Reminders (core TARS functionality)
-- **Optional**: Project tracker, Documentation (enhanced functionality)
+- skills refer to integration categories, not vendor-specific implementations
+- calendar and tasks are the most important integrations for day-to-day value
+- MCP is the preferred integration path when available
+- integration failures should degrade gracefully rather than corrupting vault state
 
-Run `/welcome` to configure integrations. Run `scripts/verify-integrations.py` to check health.
+## Core categories
 
----
+### Calendar
 
-## Calendar
+Purpose:
+- daily and weekly briefings
+- meeting matching
+- attendee context
+- schedule queries
 
-category: calendar
-required: true
+Required for full value:
+- yes
 
-### Provider: MCP (Recommended for v2.1+)
+Expected capabilities:
+- list events by date range
+- inspect event metadata
+- optionally create user-authorized events
 
-**Configuration**: Add calendar MCP server to `.mcp.json`
+### Tasks
 
+Purpose:
+- task extraction and review
+- due-date awareness in briefings
+- completion and reprioritization workflows
 
-**Operations**: TARS uses MCP server's native tools:
-- `list_events` → Fetch events for date range
-- `create_event` → Create new calendar event
-- `get_event` → Get event details
+Required for full value:
+- yes
 
-**Skills usage**: Check `<mcp_servers>` context for calendar MCP server first. If found, use MCP tools directly.
+Expected capabilities:
+- list tasks
+- create tasks
+- update or complete tasks
 
-**Constraints**:
-- Date format MUST be YYYY-MM-DD
-- Always resolve relative dates before querying
-- Only create events with no attendees
-- Never update/delete events not created by TARS
-- "Focus time" blocks count as available
+Important rule:
+- task creation should be verified after write attempts when the provider supports readback
 
----
+### Project tracker
 
-## Tasks
+Purpose:
+- initiative status
+- story and blocker lookup
+- roadmap support
 
-category: tasks
-required: true
+Required for full value:
+- optional
 
-### Provider: MCP (Recommended for v2.1+)
+### Documentation
 
-**Configuration**: Add reminders MCP server to `.mcp.json`
+Purpose:
+- query external or organizational docs from TARS workflows
 
-**Operations**: TARS uses MCP server's native tools:
-- `list_reminders` → Fetch tasks from list
-- `create_reminder` → Create new task
-- `complete_reminder` → Mark task complete
+Required for full value:
+- optional
 
-**Skills usage**: Check `<mcp_servers>` context for reminders MCP server first. If found, use MCP tools.
-
-**Constraints**:
-- Parse notes defensively: missing fields = unknown, not error
-- Only create/edit/delete in allowed lists
-- **Verification requirement**: After creating tasks, skills MUST execute `list_reminders` to confirm tasks appear in the target list by matching title. Never report tasks as created without verification. If a task was reported as created by the tool but is not found in the verification query, flag it as "creation_unverified" and report the discrepancy to the user.
-
-#### List mapping
-
-| Condition | List |
-|-----------|------|
-| Has due date, owner is user | Active |
-| Has due date, owner is other | Delegated |
-| No due date | Backlog |
-
-#### Notes field convention
+## Runtime expectations
 
-Metadata is stored as structured text in the notes field:
+The runtime integration file should answer:
+- what categories are configured
+- whether each category is connected
+- what operations are safe
+- what constraints apply
+- where credentials or server details live
 
-```
-source: journal/YYYY-MM/YYYY-MM-DD-slug.md
-created: YYYY-MM-DD
-initiative: [[Initiative Name]]
-owner: Name
-```
-
----
-
-## MCP Configuration Examples
-
-Below are copy-paste-ready `.mcp.json` configurations for common platform combinations. Place this file in your workspace root.
-
-**After creating or updating `.mcp.json`, restart Claude Cowork/Code to load the MCP servers.**
-
-### Apple Calendar + Apple Reminders (macOS)
-
-```json
-{
-  "mcpServers": {
-    "apple-calendar": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
-    },
-    "apple-reminders": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
-    }
-  }
-}
-```
-
-### Google Calendar + Todoist (Cross-platform)
-
-```json
-{
-  "mcpServers": {
-    "google-calendar": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-google-calendar"]
-    },
-    "todoist": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-todoist"]
-    }
-  }
-}
-```
-
-### Microsoft 365 Calendar + Microsoft To-Do (Windows/Enterprise)
-
-```json
-{
-  "mcpServers": {
-    "microsoft-365": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-microsoft-365"]
-    }
-  }
-}
-```
-
-**Note**: Microsoft 365 MCP server typically provides both calendar and tasks in one server.
-
-### TickTick (Alternative cross-platform task manager)
-
-```json
-{
-  "mcpServers": {
-    "apple-calendar": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
-    },
-    "ticktick": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-ticktick"]
-    }
-  }
-}
-```
-
-### Finding Other MCP Servers
-
-Search for MCP servers on:
-- [MCP GitHub Organization](https://github.com/modelcontextprotocol)
-- [Anthropic MCP Repository](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp)
-- NPM packages matching `@modelcontextprotocol/server-*` or `mcp-server-*`
-
----
-
-## Project Tracker
-
-category: project_tracker
-required: false
-status: not_configured
-available_providers: [jira-mcp, linear-mcp, github-issues, azure-devops]
-note: "Check <mcp_servers> for configured project tracker. If found, use its tools directly."
-
-### Query intents
-
-| Need | Query intent |
-|------|-------------|
-| Initiative stories | Items labeled with initiative name |
-| Sprint velocity | Items in open/recent sprints |
-| Blocked items | Items in blocked status |
-| Bug count | Open bugs by severity |
-
----
-
-## Documentation
-
-category: documentation
-required: false
-status: not_configured
-available_providers: [confluence-mcp, notion-mcp, google-docs-mcp]
-note: "Check <mcp_servers> for configured documentation tool. If found, use its tools directly."
-
-### Query intents
-
-| Need | Query intent |
-|------|-------------|
-| Find page by title | Search for exact or partial title match |
-| Search content | Full-text search across documentation |
-| Recent changes | Pages modified in last 7 days |
-
----
-
-## Data Warehouse (placeholder)
-
-category: data_warehouse
-required: false
-status: not_configured
-available_providers: [snowflake-mcp, bigquery-mcp, databricks-mcp]
-note: "Future integration for direct data queries, schema exploration, data quality checks."
-
----
-
-## Analytics (placeholder)
-
-category: analytics
-required: false
-status: not_configured
-available_providers: [amplitude-mcp, mixpanel-mcp, posthog-mcp]
-note: "Future integration for dashboard data, KPI metrics, report generation."
-
----
-
-## Time Tracking (placeholder)
-
-category: time_tracking
-required: false
-status: not_configured
-available_providers: [harvest-mcp, toggl-mcp, clockify-mcp]
-note: "Future integration for time/utilization data, billable hours, team capacity."
-
----
-
-## Monitoring (placeholder)
-
-category: monitoring
-required: false
-status: not_configured
-available_providers: [datadog-mcp, pagerduty-mcp, cloudwatch-mcp]
-note: "Future integration for infrastructure health, pipeline reliability, alert/incident data."
-
----
-
-## How skills use integrations
-
-Skills reference integration categories, not specific tools. **v2.1+ Priority**: Check for MCP servers first, then fall back to legacy providers.
-
-### Priority flow (v2.1+)
-
-1. **Check MCP first**: Look in `<mcp_servers>` context for relevant MCP server (calendar, reminders, etc.)
-2. **Use MCP if found**: Use MCP server's native tools directly
-3. **Fall back to legacy**: If MCP not found, read `reference/integrations.md` for legacy provider config
-4. **Execute or skip**: If legacy configured, execute. If neither exists, note: "[Category] not configured. Run /welcome to set up."
-5. **Handle errors**: If configured integration fails, fall back to workspace-only data and report the gap
-
-### MCP discovery at runtime
-
-For any category:
-1. Check `<mcp_servers>` context for matching MCP server (preferred)
-2. If found, use the MCP server's native operations
-3. If not found, check `reference/integrations.md` for legacy provider
-4. Map MCP results to the category's expected output format
-
----
-
-## Error handling
-
-**When an integration is unavailable:**
-1. Skip the integration query
-2. Proceed with workspace-only data (memory, journal, contexts)
-3. Note the gap in the output
-
-**When a configured integration fails:**
-1. Acknowledge the error in your response
-2. Fall back to workspace file data
-3. Never silently skip, always report the gap
-
-**When status is `not_configured`:**
-- Skills should gracefully handle the absence
-- Continue with reduced functionality
-- Clearly state what functionality is unavailable
+The agent should prefer checking live runtime configuration before assuming an integration is unavailable.

@@ -28,6 +28,7 @@ data/
 
 # Distribution build artifacts (regenerated from source)
 tars-cowork-plugin/
+tars-v*.zip
 
 # Antigravity compatibility layer (v2 legacy)
 antigravity-wrapper/

@@ -96,42 +96,48 @@ def main():
         print_results(errors, warnings)
         return 1
 
+    minimal_manifest = "skills" not in manifest and "commands" not in manifest
+
     # --- 2. plugin.json skills -> disk ---
     manifest_skills = manifest.get("skills", [])
     manifest_skill_names = set()
-    for skill_path in manifest_skills:
-        full_path = os.path.join(PLUGIN_ROOT, skill_path)
-        # Extract skill name from path like "skills/meeting/SKILL.md"
-        parts = skill_path.split("/")
-        if len(parts) >= 2:
-            manifest_skill_names.add(parts[1])
-        if not os.path.isfile(full_path):
-            errors.append(f"plugin.json references skill not on disk: {skill_path}")
+    if not minimal_manifest:
+        for skill_path in manifest_skills:
+            full_path = os.path.join(PLUGIN_ROOT, skill_path)
+            # Extract skill name from path like "skills/meeting/SKILL.md"
+            parts = skill_path.split("/")
+            if len(parts) >= 2:
+                manifest_skill_names.add(parts[1])
+            if not os.path.isfile(full_path):
+                errors.append(f"plugin.json references skill not on disk: {skill_path}")
 
     # --- 3. Disk skills -> plugin.json ---
     disk_skills = get_skill_dirs_on_disk()
-    for skill_name in sorted(disk_skills):
-        expected_path = f"skills/{skill_name}/SKILL.md"
-        if expected_path not in manifest_skills:
-            warnings.append(f"Skill on disk not in plugin.json: {expected_path}")
+    if not minimal_manifest:
+        for skill_name in sorted(disk_skills):
+            expected_path = f"skills/{skill_name}/SKILL.md"
+            if expected_path not in manifest_skills:
+                warnings.append(f"Skill on disk not in plugin.json: {expected_path}")
 
     # --- 4. plugin.json commands -> disk ---
     manifest_commands = manifest.get("commands", [])
     manifest_cmd_names = set()
-    for cmd_path in manifest_commands:
-        full_path = os.path.join(PLUGIN_ROOT, cmd_path)
-        parts = cmd_path.split("/")
-        if len(parts) >= 2:
-            manifest_cmd_names.add(parts[1])
-        if not os.path.isfile(full_path):
-            errors.append(f"plugin.json references command not on disk: {cmd_path}")
+    if not minimal_manifest:
+        for cmd_path in manifest_commands:
+            full_path = os.path.join(PLUGIN_ROOT, cmd_path)
+            parts = cmd_path.split("/")
+            if len(parts) >= 2:
+                manifest_cmd_names.add(parts[1])
+            if not os.path.isfile(full_path):
+                errors.append(f"plugin.json references command not on disk: {cmd_path}")
 
     # --- 5. Disk commands -> plugin.json ---
     disk_commands = get_command_files_on_disk()
-    for cmd_file in sorted(disk_commands):
-        expected_path = f"commands/{cmd_file}"
-        if expected_path not in manifest_commands:
-            warnings.append(f"Command on disk not in plugin.json: {expected_path}")
+    if not minimal_manifest:
+        for cmd_file in sorted(disk_commands):
+            expected_path = f"commands/{cmd_file}"
+            if expected_path not in manifest_commands:
+                warnings.append(f"Command on disk not in plugin.json: {expected_path}")
 
     # --- 6. Commands reference valid skills ---
     commands_dir = os.path.join(PLUGIN_ROOT, "commands")
@@ -154,10 +160,11 @@ def main():
         warnings.append("Core skill not found — cannot validate routing references")
 
     # --- 8. Skill count sanity check ---
-    if len(manifest_skills) < 5:
-        warnings.append(f"Unusually few skills in plugin.json: {len(manifest_skills)}")
-    if len(manifest_commands) < 5:
-        warnings.append(f"Unusually few commands in plugin.json: {len(manifest_commands)}")
+    if not minimal_manifest:
+        if len(manifest_skills) < 5:
+            warnings.append(f"Unusually few skills in plugin.json: {len(manifest_skills)}")
+        if len(manifest_commands) < 5:
+            warnings.append(f"Unusually few commands in plugin.json: {len(manifest_commands)}")
 
     # --- 9. Command-skill pairing check ---
     # Each command should map to a skill that exists in the manifest
@@ -168,7 +175,7 @@ def main():
         if skill_ref and skill_ref in disk_skills:
             # Check the skill is also in the manifest
             expected_skill_path = f"skills/{skill_ref}/SKILL.md"
-            if expected_skill_path not in manifest_skills:
+            if not minimal_manifest and expected_skill_path not in manifest_skills:
                 warnings.append(
                     f"commands/{cmd_file} references skill '{skill_ref}' "
                     f"which exists on disk but is not in plugin.json"
