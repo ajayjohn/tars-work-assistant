@@ -1,0 +1,11 @@
+filters:
+  file.inFolder("inbox/pending")
+
+views:
+  - type: table
+    name: "Pending Items"
+    order:
+      - file.name
+      - file.ext
+      - file.size
+      - file.mtime

@@ -1,786 +1,475 @@
 ---
 name: maintain
-description: Workspace maintenance with health checks, index rebuilding, task sync, memory gap detection, archival, inbox processing, and reference file updates
+description: Health check, maintenance, housekeeping, file organization, inbox processing, sync, and reference updates for the TARS vault
 user-invocable: true
+triggers:
+  - "health check"
+  - "check vault health"
+  - "run maintenance"
+  - "housekeeping"
+  - "process inbox"
+  - "check inbox"
+  - "sync"
+  - "check for gaps"
+  - "update references"
 help:
   purpose: |-
-    Workspace maintenance: health checks, index rebuilding, task sync, inbox processing, and reference file updates.
+    Comprehensive vault maintenance with six distinct modes: health check, scheduled maintenance/housekeeping,
+    inbox processing (with multimodal support), sync/gap detection, and reference file updates.
   use_cases:
     - "Run a health check"
-    - "Rebuild indexes"
+    - "Run maintenance"
     - "Process my inbox"
-    - "Sync my tasks"
-  scope: maintenance,health,sync,rebuild,inbox,update
+    - "Sync tasks and calendar"
+    - "Check for gaps"
+    - "Update reference files"
+  scope: maintenance,health,sync,housekeeping,inbox,update,organize
 ---
-<!-- MAINTENANCE: If modifying this skill, run tests/validate-docs.py
-     to check for broken cross-references. See CONTRIBUTING.md. -->
 
-# Maintain skill: health, sync, rebuild, inbox, and update
+# Maintain skill: health, housekeeping, inbox, sync, and update
 
-Comprehensive workspace maintenance with five distinct modes: running health checks, syncing tasks and detecting gaps, rebuilding all index files, batch-processing inbox items with parallel sub-agents, and updating workspace reference files to match the latest plugin version.
+Comprehensive vault maintenance with six modes. Keeps the vault healthy, processes incoming content,
+detects drift between systems, and manages scheduled cleanup.
+
+---
+
+## Mode overview
+
+| Mode | Trigger | Purpose |
+|------|---------|---------|
+| Health check | "health check", "check vault health" | Schema validation, secret scan, broken links, alias consistency, staleness |
+| Maintenance | "run maintenance", "housekeeping", scheduled via cron | Full housekeeping: archive, organize, flagged review, health, sync |
+| Inbox processing | "process inbox", "check inbox" | Classify and process pending inbox items with multimodal support |
+| Sync | "sync", "check for gaps" | Calendar gaps, task drift, memory freshness |
+| Reference update | "update references", "update framework" | Migrate templates and schemas while preserving user data |
 
 ---
 
 ## Automatic vs user-initiated operations
 
-### Automatic (daily, session-start triggered)
+### Automatic (session-start or cron)
 
-These operations run silently at the start of the first session each day via the core skill's session-start housekeeping check. They require no user interaction and produce no output unless critical issues are found.
+These run silently via the core skill's session-start check or via CronCreate scheduled jobs. They require no user interaction and produce no output unless critical issues are found.
 
-| Operation | Script | What it does | Failure behavior |
-|-----------|--------|-------------|-----------------|
-| Archival sweep | `scripts/archive.py --auto` | Expire ephemeral lines past their `[expires:]` date, check staleness thresholds, move qualifying files to `archive/` | Log failure, continue session |
-| Health check | `scripts/health-check.py` | Validate indexes vs files on disk, check for broken wikilinks, flag naming violations | Log failure, continue session |
-| Task sync | `scripts/sync.py` | Check `reference/schedule.md` for due recurring/one-time items, scan for orphan tasks | Log failure, continue session |
-| Inbox count | (directory listing) | Count files in `inbox/pending/` and update `.housekeeping-state.yaml` | Non-critical, skip on error |
+| Operation | Script | What it does |
+|-----------|--------|-------------|
+| Schema validation | `scripts/validate-schema.py` | Validate frontmatter against _system/schemas.yaml |
+| Secret scan | `scripts/scan-secrets.py` | Check for blocked/warned patterns from _system/guardrails.yaml |
+| Health check | `scripts/health-check.py` | Links + aliases + staleness |
+| Archive sweep | `scripts/archive.py --auto` | Expire stale content past tier thresholds |
+| Sync check | `scripts/sync.py` | Calendar gaps + task drift |
 
-**Triggering:** The core skill reads `reference/.housekeeping-state.yaml` at session start. If `last_run` is not today, it runs the above scripts in sequence, updates the state file, and proceeds to the user's request.
+**Triggering**: The core skill reads `_system/housekeeping-state.yaml` at session start. If `last_run` is not today, it runs the above scripts, updates the state file, and proceeds to the user's request.
 
 ### User-initiated (explicit command only)
 
-These operations are more expensive, require user judgment, or have side-effects that need confirmation. They are invoked via `/maintain <mode>` or natural language ("rebuild indexes", "process inbox", "deep sync").
-
-| Operation | Command | Why not automatic |
+| Operation | Trigger | Why not automatic |
 |-----------|---------|------------------|
-| Full index rebuild | `/maintain rebuild` | Rewrites all `_index.md` files. Expensive for large workspaces. Only needed when indexes are known to be stale or corrupted. |
-| Inbox processing | `/maintain inbox` | Spawns sub-agents that create tasks and memory entries. Requires user to review and confirm the processing plan before execution. |
-| Comprehensive sync | `/maintain sync --comprehensive` | Queries MCP sources (project tracker, calendar), scans last 90 days of journal. Higher cost. Surfaces items that need user triage. |
-| Reference file update | `/maintain update` | Updates workspace reference files to match latest plugin version. Preserves user data. Requires user to review changes before applying. |
-| Unarchive content | (manual) | Requires user to select specific archived files to restore. No bulk unarchive. |
-| Manual health fixes | `/maintain health` | Script-detected issues that require human judgment (file renames, broken wikilink resolution, frontmatter corrections). |
+| Full maintenance | "run maintenance" | Includes flagged content review, file organization, user approvals |
+| Inbox processing | "process inbox" | Spawns processing that creates tasks and memory. Needs user confirmation. |
+| Comprehensive sync | "sync" | Queries external systems, surfaces items needing triage |
+| Reference update | "update references" | Structural changes that need user review |
 
-### Cowork scheduled shortcut
+### Cron scheduled execution
 
-If the user's environment supports Cowork shortcuts with schedules, a `daily-housekeeping` shortcut can run maintenance on a cron schedule (e.g., 8 AM daily) instead of relying on session-start detection. This is the preferred approach when available, as it runs even on days the user doesn't start a session. See the shortcut definition in the plugin's shortcut registry.
-
-The session-start check in the core skill serves as a fallback: if the scheduled shortcut already ran today, `last_run` will be current and the session-start check will be a no-op.
+If CronCreate registered a maintenance job during onboarding (Step 7 of welcome skill), maintenance runs at the configured time (default: Friday 5:00pm). The session-start check serves as fallback: if cron already ran today, `last_run` will be current and the session-start check is a no-op.
 
 ---
 
-## Health mode
+## Health check mode
 
-Scan for workspace issues, auto-fix where safe, and report problems requiring manual intervention.
+Triggered by: "health check", "check vault health"
 
-### Step 1: Load workspace state
+Scan for vault issues, auto-fix where safe, present problems requiring manual intervention.
 
-Read the following indexes:
-- `memory/_index.md` (master memory index)
-- `memory/decisions/_index.md`
-- `memory/people/_index.md`
-- `memory/initiatives/_index.md`
-- `contexts/products/_index.md` (if exists)
-- `reference/replacements.md`
+### Step 1: Run validation scripts
 
-### Step 2: Naming pattern validation
+Execute scripts in sequence. Each outputs JSON.
 
-#### Decision files
+```bash
+python3 scripts/validate-schema.py {vault_path}
+```
 
-Scan `memory/decisions/` for naming violations:
+Parse output: array of schema violations (file, property, expected type, actual value).
 
-**Standard pattern:** `YYYY-MM-DD-{slug}.md`
+```bash
+python3 scripts/scan-secrets.py {vault_path}
+```
 
-| Violation | Example | Suggested fix |
-|-----------|---------|---------------|
-| Missing date prefix | `ba-role-definition.md` | Extract date from frontmatter, rename |
-| Context-first | `ai-strategy-2026-01-20.md` | Reorder to `2026-01-20-ai-strategy.md` |
-| No date anywhere | `legacy-decision.md` | Check frontmatter `date` field, rename |
+Parse output: array of matches with severity (blocked, warned) and file locations.
 
-**Auto-fix (safe):** If frontmatter contains `date` field, suggest rename command.
+### Step 2: Check broken wikilinks
 
-### Step 3: Frontmatter validation
-
-Scan all memory files for required fields:
-
-| Type | Required fields |
-|------|-----------------|
-| All memory | `title`, `type`, `summary`, `updated` |
-| person | + `tags`, `aliases` |
-| decision | + `status`, `decision_maker` |
-| product-spec | + `status`, `owner` |
-
-#### Status value validation
-
-For decisions, verify `status` is one of: `proposed`, `decided`, `implemented`, `superseded`, `rejected`
-
-For products/product-specs, verify `status` is one of: `active`, `planned`, `deprecated`
-
-Report invalid values.
-
-### Step 4: Index synchronization
-
-#### Check for orphaned entries
-
-For each category index:
-1. List entries in `_index.md`
-2. List actual `.md` files in folder
-3. Flag entries in index that don't have corresponding files
-4. Flag files that aren't in the index
-
-#### Check for stale summaries
-
-For each file in memory:
-1. Compare file `updated` date with index entry
-2. Flag if file was modified more recently than index was regenerated
-
-**Auto-fix (safe):** Run `/maintain rebuild` to resync all indexes.
-
-### Step 5: Broken wikilink detection
-
-Scan all files in `memory/`, `journal/`, and `contexts/` for wikilinks:
-
-Pattern: `[[Entity Name]]`
+Scan all files in `memory/`, `journal/`, and `contexts/` for `[[Entity Name]]` patterns.
 
 For each wikilink:
-1. Check if entity exists in `memory/people/_index.md`
-2. Check if entity exists in `memory/initiatives/_index.md`
-3. Check if entity exists in `memory/products/_index.md`
-4. Check if entity exists in `memory/decisions/_index.md`
+1. Search via `obsidian search` for the target note
+2. Check if the entity resolves via Obsidian aliases
+3. Flag unresolved links as broken
 
-Flag broken wikilinks (reference to non-existent entity).
+Group broken links by target entity. Report count of references per broken target.
 
-### Step 6: Replacements coverage
+### Step 3: Alias consistency
 
-Scan all journal files from the last 30 days for names:
+Compare `_system/alias-registry.md` against actual note aliases:
 
-1. Extract all capitalized multi-word names (potential person names)
-2. Extract all acronyms (2-4 capital letters)
-3. Cross-reference against `reference/replacements.md`
+1. For each entry in the alias registry, verify the target note exists and has the alias in its frontmatter `aliases` property
+2. For each note with `aliases` in frontmatter, verify the alias is registered
+3. Flag mismatches:
+   - Registry entry pointing to missing note
+   - Registry entry with alias not in note's frontmatter
+   - Note alias not in registry
 
-Flag names/acronyms that appear multiple times but aren't in replacements.
+### Step 4: Check duplicate aliases
 
-**Auto-fix (safe):** Add flagged items to `reference/replacements.md` with placeholder:
-```markdown
-| NewName | ?? (needs canonical form) |
-```
+Scan all notes for `aliases` frontmatter. Build a reverse map: alias -> list of notes.
 
-### Step 7: Information redundancy check
+Flag any alias that maps to more than one note. These cause ambiguous resolution.
 
-#### Duplicate detection
+### Step 5: Stale content check
 
-Scan for potential duplicates:
-1. Same entity name in different folders (e.g., person also exists as initiative)
-2. Very similar file names in same folder (edit distance < 3)
-3. Same `aliases` values across different files
+Check content staleness by tier thresholds:
 
-#### Cross-reference check
+| Tier | Entity types | Staleness threshold |
+|------|-------------|-------------------|
+| Active | People in recent meetings, active initiatives | 30 days |
+| Reference | Products, vendors, competitors | 90 days |
+| Archival | Completed initiatives, old decisions | 180 days |
 
-For each person in `memory/people/`:
-1. Check if they're referenced in any task (via task integration notes)
-2. Check if they're referenced in any journal entry
-3. Flag people with zero references in last 90 days as potentially stale
+For each entity past its threshold:
+1. Read `tars-updated` property
+2. Calculate days since last update
+3. Flag with tier and days stale
 
-### Health mode output
-
-Generate report in this format:
+### Step 6: Present report
 
 ```markdown
-## Housekeeping report (YYYY-MM-DD)
+## Health check report (YYYY-MM-DD)
 
-### Auto-fixed
-| Category | File | Issue | Fix applied |
-|----------|------|-------|------------|
-| naming | decisions/ba-role-definition.md | Missing date prefix | Renamed to 2026-01-15-ba-role-definition.md |
-| index | memory/people/_index.md | Orphan entry "Jane Doe" | Removed from index |
-| index | (multiple) | Files not in index | Ran rebuild-indexes.py |
-| replacements | reference/replacements.md | "JT" uncovered (5 uses) | Added placeholder entry |
-
-### Manual action required
+### Critical ({N})
 | Category | File | Issue | Suggested fix |
 |----------|------|-------|---------------|
-| frontmatter | memory/decisions/old.md | Invalid status "pending" | Change to "proposed" |
-| wikilink | journal/2026-01/meeting.md | Broken link [[Unknown Person]] | Create memory entry or fix reference |
+| secret | memory/people/john.md | Contains SSN pattern | Remove line 42 immediately |
+| schema | memory/decisions/old.md | Missing required tars-status | Add property |
 
-### Summary
-- Auto-fixed: N issues (N renames, N index fixes, N replacement additions)
-- Manual action required: N issues
-- Workspace health: {healthy | needs attention | degraded}
+### Warnings ({N})
+| Category | File | Issue | Suggested fix |
+|----------|------|-------|---------------|
+| wikilink | journal/2026-03/meeting.md | Broken [[Unknown Person]] (3 refs) | Create person note or fix reference |
+| alias | _system/alias-registry.md | "JC" maps to 2 notes | Disambiguate in registry |
+| stale | memory/people/former-vendor.md | 95 days since update | Update or archive |
+
+### Auto-fixable ({N})
+| Category | File | Issue | Proposed fix |
+|----------|------|-------|-------------|
+| alias | memory/people/sarah.md | Alias "SC" not in registry | Add to _system/alias-registry.md |
+| schema | memory/initiatives/proj.md | tars-updated missing | Set to file modification date |
+
+"7 issues found (2 critical). Auto-fix all / Fix critical only / Review each?"
 ```
+
+### Step 7: Apply fixes and log
+
+Based on user choice:
+- **Auto-fix all**: Apply all proposed fixes via obsidian-cli, report results
+- **Fix critical only**: Apply only critical fixes
+- **Review each**: Present each issue individually for approve/skip
+
+After all fixes applied:
+1. Log results to today's daily note (create if needed):
+   ```
+   obsidian append --path journal/YYYY-MM/YYYY-MM-DD-daily.md --content "## Health check\n{summary}"
+   ```
+2. Update `_system/housekeeping-state.yaml` with run timestamp
 
 ---
 
-## Sync mode
+## Maintenance/housekeeping mode
 
-Sync tasks from integration, detect memory gaps, and triage stale items. Optional flag: `--comprehensive` for deep scan mode.
+Triggered by: "run maintenance", "housekeeping", or scheduled via cron.
 
-### Step 1: Load current state
+Full maintenance pipeline. Runs all health operations plus archive, file organization, flagged content review, and sync.
 
-Query task integration (read `reference/integrations.md` Tasks section for provider details):
-- Execute `list` operation for all configured lists (default: Active, Delegated, Backlog)
-- Execute `overdue` operation
+### Step 1: Check if already run today
 
-Read:
-- `memory/people/_index.md`
-- `memory/initiatives/_index.md`
+Read `_system/housekeeping-state.yaml`.
 
-### Step 1.5: Check scheduled items and memory gaps
+- If `last_run` equals today AND this is not a manual invocation: "Maintenance already ran today. Force re-run? [Y/N]"
+- If manual invocation (user explicitly asked): proceed regardless
 
-Run the automated sync script:
+### Step 2: Archive sweep
+
+Find notes past staleness threshold for archival.
+
+**GUARDRAIL**: Never archive notes with backlinks from the last 90 days.
+**GUARDRAIL**: Never archive notes referenced by active tasks (check via `obsidian search` and task system query).
+
+Process:
+1. Run `scripts/archive.py --dry-run {vault_path}` to get candidates
+2. For each candidate, verify guardrails:
+   - `obsidian search` for backlinks to the note
+   - Check if any backlink source was modified in last 90 days
+   - Check if note is referenced in any open task
+3. Remove candidates that fail guardrails
+4. Present remaining candidates for user approval:
+
+> "{N} archive candidates:
+>   1. memory/people/former-contractor.md (180 days stale, 0 recent backlinks)
+>   2. memory/decisions/2025-06-old-decision.md (270 days stale, 0 recent backlinks)
+>   3. memory/vendors/defunct-vendor.md (200 days stale, 0 recent backlinks)
+>
+> Archive all / Select specific / Skip"
+
+5. For approved items: move to `archive/` via filesystem, add `tars/archived` tag, log to changelog
+
+### Step 3: Organize human-added files
+
+Scan `inbox/` and `contexts/` for files without companion `.md` files.
+
+For each orphan file (non-markdown file without a companion note):
+
+1. Read the file (images via multimodal, PDFs via text extraction, etc.)
+2. Generate metadata: infer topic, date, source
+3. Create a companion note using the companion template:
+   ```
+   obsidian create --template templates/companion.md --path contexts/YYYY-MM/{new-slug}.md
+   obsidian property:set --property tars-original-file --value "{original_filename}"
+   obsidian property:set --property tars-original-type --value "{file_type}"
+   obsidian property:set --property tars-summary --value "{generated_summary}"
+   ```
+4. Propose date-based organization and consistent naming
+
+Present proposals:
+
+> "3 unorganized files. Proposed:
+>   1. IMG_2847.png -> contexts/2026-03/q1-roadmap-screenshot.png + companion note
+>   2. report.pdf -> contexts/2026-03/vendor-evaluation-report.pdf + companion note
+>   3. notes.txt -> contexts/2026-03/meeting-rough-notes.txt + companion note
+>
+> Organize? [all / review each / skip]"
+
+For approved items: move file to proposed location, create companion note, log to changelog.
+
+### Step 4: Flagged content review
+
+Run flagged content scanner:
 
 ```bash
-python3 scripts/sync.py {workspace_path}
+python3 scripts/scan-flagged.py {vault_path}
 ```
 
-This script checks `reference/schedule.md` for due items (recurring and one-time) and scans recent journal entries for memory gaps (people and initiatives referenced but not in memory). Parse the JSON output:
+Parse output: array of flagged statements with person, statement text, date, and age in days.
 
-- `schedule.recurring_due`: Recurring items past their next-due date. After completion, advance `next-due` to the next occurrence in schedule.md.
-- `schedule.onetime_due`: One-time items past their due date. After completion, remove the entry from schedule.md.
-- `memory_gaps.unknown_people`: People referenced in journal but not in memory/people/. Present to user.
-- `memory_gaps.unknown_initiatives`: Initiatives referenced but not in memory/initiatives/. Present to user.
+Present flagged items:
 
-Surface due items in the report under "Scheduled items." Merge memory gaps with Step 4 output.
+> "4 flagged statements:
+>   1. [[Steve Chen]]: 'slow to deliver' (6 days ago)
+>   2. [[Patty Kim]]: 'playing politics' (11 days ago)
+>   3. [[Dan Rivera]]: 'checked out' (75 days ago) -- STALE
+>
+> Actions per item: remove / keep / soften
+> Bulk actions: 'remove 1,3' / 'keep all' / 'soften 2' / 'remove all for Steve'"
 
-If `scripts/sync.py` is not available, fall back to manual schedule checking:
-Read `reference/schedule.md` if it exists. For each entry:
-- **[RECURRING]**: Check if `next-due` is today or past. If due, add to triage output as "Scheduled item due."
-- **[ONCE]**: Check if `due` is today or past. If due, surface it.
+Process user selections:
+- **Remove**: Delete the flagged statement from the person's note via obsidian-cli edit
+- **Keep**: No action, reset flag age counter
+- **Soften**: Present the statement and ask user for replacement wording, then update
 
-### Step 2: Sync from project tracker (if available)
+### Step 5: Run health check
 
-If project tracker integration is configured:
-1. Query for items assigned to user that are not in Active/Delegated tasks
-2. Query for items recently completed that are still open as tasks
-3. Present deltas: "Found {N} new items in project tracker not in your tasks. Add them?"
-4. If accepted, create tasks via the task integration `add` operation in the appropriate list
+Execute the full health check mode (Steps 1-7 above). Present results inline.
 
-### Step 3: Triage
+### Step 6: Sync check
 
-Scan all reminders/tasks and flag:
+Run lightweight sync operations:
 
-| Condition | Flag |
-|-----------|------|
-| Past due date (from task integration `overdue` operation) | OVERDUE |
-| Created >30 days ago without update (from notes field) | STALE |
-| No initiative in notes field | ORPHAN |
-| Owner in notes not in memory/people/ | UNKNOWN OWNER |
+**Calendar gaps**: Query calendar for last 7 days of events. Cross-reference against journal entries.
+- For each meeting without a journal entry: flag as "unprocessed meeting"
+- Report: "{N} meetings in last 7 days without journal entries"
 
-Present flagged items grouped by category. For each:
-- OVERDUE: "Update due date, complete, or remove?"
-- STALE: "Still relevant? Update, move to backlog, or remove?"
-- ORPHAN: "Link to an initiative or keep as standalone?"
-- UNKNOWN OWNER: "Add this person to memory?"
+**Task system drift**: If external task system is configured, query for:
+- Tasks in vault not in external system
+- Tasks in external system not in vault
+- Status mismatches (completed in one, open in other)
 
-### Step 4: Memory gap detection
+**Memory staleness**: Check people who appeared in recent meetings (last 14 days) but whose memory notes have `tars-updated` older than 30 days.
+- Report: "{N} people in recent meetings with stale memory profiles"
 
-Decode all entities referenced in tasks:
+### Step 7: Archive processed inbox items
 
-1. **People**: Extract all owner names and mentioned people from notes fields. Cross-reference against `memory/people/_index.md`. List undefined people.
-2. **Initiatives**: Extract all `[[Initiative]]` references from notes fields. Cross-reference against `memory/initiatives/_index.md`. List undefined initiatives.
-3. **Terms**: Scan task titles for capitalized terms, acronyms, and project names not in `reference/replacements.md` or memory indexes. List undefined terms.
+Move items in `inbox/processed/` older than 7 days to `archive/`:
+- Check `tars-inbox-processed` property date
+- If older than 7 days, move to archive
+- Never delete originals
 
-Present gaps:
-```
-## Memory gaps detected
+### Step 8: Update housekeeping state
 
-### Undefined people (referenced in tasks but not in memory)
-- "Sarah Chen" (owner of 3 tasks) -- Create memory entry?
-- "Mike R." (mentioned in 1 task) -- Add to replacements?
-
-### Undefined initiatives
-- "Project Phoenix" (linked to 2 tasks) -- Create initiative entry?
-
-### Undefined terms
-- "RBAC" (used in 2 task descriptions) -- Add to replacements?
+```yaml
+# _system/housekeeping-state.yaml
+last_run: YYYY-MM-DD
+last_success: true
+run_count: {incremented}
+last_archival: YYYY-MM-DD  # if archive sweep ran
+pending_inbox_count: {current count}
 ```
 
-For each gap, ask user to provide brief context, then create the memory entry or replacement.
+### Step 9: Log to daily note
 
-### Sync mode output (default)
+Append maintenance summary to today's daily note:
 
-```markdown
-## Update complete
-
-| Category | Count |
-|----------|-------|
-| Tasks synced from project tracker | N |
-| Overdue tasks flagged | N |
-| Stale tasks flagged | N |
-| Orphan tasks flagged | N |
-| Memory gaps found | N |
-| Memory entries created | N |
-| Replacements added | N |
 ```
-
-### Comprehensive mode (`--comprehensive`)
-
-All of default mode, PLUS:
-
-#### Step 5: MCP source scan
-
-If project tracker is configured:
-- Query recent items (last 14 days) for action items not captured
-- Surface items assigned to user's team members
-
-Query the calendar integration for last 7 days of meetings (see `reference/integrations.md` Calendar section):
-- Resolve the start date (7 days ago) to `YYYY-MM-DD` format, execute `list_events` operation with offset=7
-- Cross-reference against journal entries
-- Flag meetings that occurred but have no journal entry: "You had '{Meeting Title}' on {date} but no meeting notes. Process it?"
-
-If calendar integration is not reachable, skip calendar scan and note the gap.
-
-#### Step 6: Stale memory cleanup
-
-Scan memory for staleness:
-- Initiatives tagged `completed` that still have open reminders -> flag
-- People not referenced in any reminder or journal entry in last 90 days -> flag for review
-- Decisions older than 6 months -> flag for relevance check
-
-Present:
-```
-## Stale memory candidates
-
-- memory/initiatives/old-project.md -- Tagged completed, 2 open tasks reference it
-- memory/people/former-vendor.md -- Not referenced in 90+ days
-- memory/decisions/q3-decision.md -- 6+ months old, verify still relevant
-```
-
-#### Step 7: Entity discovery
-
-From MCP sources scanned in Step 5:
-- Surface new people names not in memory
-- Surface new project/initiative names not in memory
-- Offer to create entries
-
-#### Comprehensive report
-
-Append to default report:
-
-```markdown
-### Comprehensive scan results
-| Category | Count |
-|----------|-------|
-| Unprocessed meetings found | N |
-| New entities from MCP sources | N |
-| Stale memory candidates | N |
+obsidian append --path journal/YYYY-MM/YYYY-MM-DD-daily.md --content "## Maintenance ({timestamp})
+- Archived: {N} notes
+- Organized: {N} files
+- Flagged reviewed: {N} statements
+- Health issues: {N} found, {N} fixed
+- Calendar gaps: {N} unprocessed meetings
+- Task drift: {N} mismatches
+- Stale profiles: {N} people"
 ```
 
 ---
 
-## Rebuild mode
+## Inbox processing mode
 
-Regenerate all _index.md files from current file contents and frontmatter.
+Triggered by: "process inbox", "check inbox"
 
-### Step 1: Memory indexes
-
-For each category in `memory/` (people, initiatives, decisions, products, vendors, competitors, organizational-context):
-
-1. Scan all `.md` files in the folder (excluding `_index.md` and `_template.md`)
-2. Read frontmatter from each file: `title`, `aliases`, `tags`, `summary`, `updated`
-3. Generate `_index.md` with format:
-
-```markdown
-# [Category] index
-
-| Name | Aliases | File | Summary | Updated |
-|------|---------|------|---------|---------|
-| Entity Name | alias1, alias2 | filename.md | One-line summary | YYYY-MM-DD |
-```
-
-For initiatives, separate into Active and Completed sections based on tags.
-
-### Step 2: Master memory index
-
-Generate `memory/_index.md`:
-
-```markdown
-# Memory index
-
-| Category | Path | Count |
-|----------|------|-------|
-| People | memory/people/ | N |
-| Initiatives | memory/initiatives/ | N |
-| Decisions | memory/decisions/ | N |
-| Products | memory/products/ | N |
-| Vendors | memory/vendors/ | N |
-| Competitors | memory/competitors/ | N |
-| Organizational context | memory/organizational-context/ | N |
-```
-
-### Step 3: Journal indexes
-
-For each month folder in `journal/`:
-
-1. Scan all `.md` files (excluding `_index.md`)
-2. Read frontmatter: `date`, `type`, `title`, `participants`, `initiatives`
-3. Generate `journal/YYYY-MM/_index.md`:
-
-```markdown
-# [Month Year] journal index
-
-| Date | Type | Title | Participants | Initiatives |
-|------|------|-------|-------------|-------------|
-| YYYY-MM-DD | meeting | Title | Names | Initiatives |
-```
-
-### Step 4: Contexts/products index
-
-Scan `contexts/products/` for product specification files:
-
-1. Scan all `.md` files in the folder (excluding `_index.md`)
-2. Read frontmatter: `title`, `type`, `status`, `owner`, `summary`, `updated`
-3. Generate `contexts/products/_index.md`:
-
-```markdown
-# Product specifications index
-
-| Name | Status | Owner | Summary | Updated |
-|------|--------|-------|---------|---------|
-| Product Name | active | [[Owner Name]] | One-line summary | YYYY-MM-DD |
-```
-
-### Step 5: Decision file validation
-
-For files in `memory/decisions/`:
-
-1. Check naming convention: should be `YYYY-MM-DD-{slug}.md`
-2. Flag files that don't match the pattern:
-   - Missing date prefix
-   - Non-standard date format
-   - Context-first naming (e.g., `topic-YYYY-MM-DD.md`)
-3. Report suggested renames
-
-### Step 6: Annual rollup (if applicable)
-
-For completed years, generate `journal/YYYY-annual-index.md` consolidating all month indexes.
-
-### Rebuild mode output
-
-Report what was regenerated and any issues found:
-
-```markdown
-## Rebuild complete
-
-### Indexes regenerated
-| Area | Count |
-|------|-------|
-| Memory categories | N |
-| Journal months | N |
-| Contexts/products | N |
-
-### Issues found
-| Type | File | Issue | Suggested fix |
-|------|------|-------|---------------|
-| missing-frontmatter | path/file.md | No frontmatter | Add required fields |
-| naming-violation | decisions/file.md | Missing date prefix | Rename to YYYY-MM-DD-slug.md |
-| missing-required | path/file.md | Missing `summary` field | Add summary for index |
-```
-
-### Script invocation
-
-Run the automated rebuild script for deterministic index generation:
-
-```bash
-python3 scripts/rebuild-indexes.py {workspace_path}
-```
-
-This script performs Steps 1-5 deterministically (memory indexes, master index, journal indexes, contexts index, decision naming validation). Parse the JSON output and use it to populate the rebuild report.
-
-#### Interpreting script output
-
-The script returns JSON with:
-- `stats`: counts of memory categories, journal months, context products, and total entries rebuilt
-- `issues`: array of problems found (missing-frontmatter, naming-violation, missing-required fields)
-- `total_issues`: count of all issues
-
-Present the `stats` as the "Indexes regenerated" table. Present `issues` as the "Issues found" table. The script handles all file I/O — do not duplicate its work by manually reading and rewriting index files.
-
-#### When to skip the script
-
-If `scripts/rebuild-indexes.py` is not available (e.g., workspace predates script extraction), fall back to the manual procedure above.
-
-### Post-execution checklist
-- [ ] All memory category indexes regenerated
-- [ ] Master memory index regenerated
-- [ ] All journal month indexes regenerated
-- [ ] Contexts/products index regenerated
-- [ ] Decision naming validated
-- [ ] Any missing frontmatter flagged to user
-- [ ] Suggested fixes presented
-
----
-
-## Inbox mode
-
-Batch-process all pending items in the inbox using **isolated parallel sub-agents**. Each item is processed by an independent sub-agent with its own context, ensuring no cross-contamination between items.
+Classify and process all pending inbox items. Supports text, transcripts, images, PDFs, and mixed content.
 
 ### Step 1: Scan inbox
 
-List all files in `inbox/pending/`. For each file:
-1. Read the first 50 lines to determine content type
-2. Classify as one of: `transcript`, `article`, `email`, `notes`, `unknown`
-3. Build processing queue with file path, detected type, and file size
-
-If no pending items, report "Inbox is empty" and exit.
-
-### Step 2: Present processing plan
-
-Before spawning sub-agents, present the plan to the user:
-
-```markdown
-## Inbox processing plan
-
-| # | File | Detected type | Proposed action |
-|---|------|---------------|-----------------|
-| 1 | meeting-2026-02-05.txt | transcript | Process as meeting (tasks + memory) |
-| 2 | article-ai-strategy.md | article | Extract wisdom |
-| 3 | notes-from-call.txt | notes | Extract tasks + memory |
-| 4 | unknown-file.txt | unknown | Skip (manual review needed) |
-
-Process all items? (Confirm before proceeding)
+```
+obsidian search query="path:inbox/pending" limit=50
 ```
 
-Wait for user confirmation before spawning sub-agents. Allow the user to exclude specific items or change detected types.
+Or fall back to directory listing of `inbox/pending/`.
 
-### Step 2.5: Pre-resolve names across all transcript items
+For each file, read the first 50 lines (or full content for images) to determine content type.
 
-Before spawning sub-agents, perform a single pass of name resolution across ALL confirmed transcript items to ensure consistency and minimize user interruptions.
+### Step 2: Classify each item
 
-Apply the **name resolution protocol** (core skill, Memory protocol section):
-1. For each transcript item, scan for person names
-2. Cross-reference all names against `reference/replacements.md` and `memory/people/_index.md`
-3. For transcript items: query calendar integration for each meeting date to retrieve attendee lists
-4. Apply contextual resolution from calendar attendees and document context
-5. If any names remain ambiguous or unknown across ALL files, batch them into a single user clarification
-6. Build a consolidated name resolution table
+| Content type | Detection signals | Processing route |
+|-------------|-------------------|-----------------|
+| Transcript/meeting notes | Speaker labels, timestamp patterns, "Meeting:", Otter/Fireflies format | Meeting processing pipeline |
+| Screenshot/image | .png, .jpg, .jpeg, .gif, .webp extension | Multimodal analysis + context inference |
+| Article/link | URL, "http", article structure, byline | Wisdom extraction |
+| PDF/document | .pdf, .docx, .xlsx extension | Companion file + text extraction |
+| Task-like items | Checkbox patterns, "TODO", "Action item", numbered action lists | Task extraction |
+| Facts/memory items | Declarative statements, "Remember:", "Note:" | Memory save |
+| Mixed | Multiple types detected in one file | Split into components |
 
-Pass the resolution table to each sub-agent in its prompt: "Use these resolved canonical names: Christopher = Christopher Smith, Mick = Michael Johnson"
+### Step 3: Present inventory with classification
 
-This prevents: (a) each sub-agent independently guessing different resolutions for the same person, (b) the user being asked the same question by multiple sub-agents, (c) wrong names propagating to memory and tasks.
+> "5 items in inbox:
+>   1. ClientCo-sync-notes.txt -- meeting transcript (Otter format)
+>   2. IMG_2847.png -- screenshot of Slack message from Sarah about API deadline
+>   3. api-patterns.pdf -- research paper on API design
+>   4. quick-notes.md -- mixed (2 tasks + 3 facts)
+>   5. strategy-article.md -- article on platform strategy
+>
+> Process all? [all / pick specific / reclassify any]"
 
-Skip this step if no transcript items are in the confirmed plan.
+Allow user to:
+- Override classification for any item
+- Exclude items from processing
+- Reorder processing priority
 
-### Step 3: Parallel sub-agent processing
+### Step 4: Process each item
 
-After user confirmation:
+Process items sequentially (or in parallel for independent items). Between items, report progress:
 
-1. Move ALL files from `inbox/pending/` to `inbox/processing/` as a sequential batch. Complete all moves before proceeding.
-2. Spawn **one sub-agent per inbox item** using the Task tool. **Launch all sub-agents in a single message** for maximum parallelism.
+> "Item 1 complete. Item 2 of 5..."
 
-The move-all-first ordering prevents any concurrent session from double-processing items.
+#### 4a: Transcript processing
 
-##### Sub-agent template by content type
+Route to meeting skill pipeline (`skills/meeting/SKILL.md`):
+1. Load reference files (alias registry, integrations, memory)
+2. Resolve speaker names
+3. Generate structured report (topics, updates, concerns, decisions, action items)
+4. Save to journal with frontmatter
+5. Extract tasks (with user review)
+6. Extract durable memory
+7. Archive original transcript to `archive/transcripts/YYYY-MM/`
 
-**Transcript items:**
+#### 4b: Screenshot/image processing
+
+Multimodal analysis pipeline:
+
+1. Read image via multimodal capability
+2. Detect content type:
+   - Meeting slide/presentation
+   - Email screenshot
+   - Chat/Slack message
+   - Document/whiteboard
+   - Chart/diagram
+   - Other
+3. Check image timestamp against calendar for concurrent meetings:
+   - If meeting content detected, query calendar for events at that time
+   - "This appears to be from your 2pm Platform Review. Associate? [Y/N]"
+4. Extract text, tasks, key information from the image
+5. Create companion note with extracted content:
+   ```
+   obsidian create --template templates/companion.md --path contexts/YYYY-MM/{slug}.md
+   obsidian property:set --property tars-original-file --value "{image_filename}"
+   obsidian property:set --property tars-original-type --value "{png|jpg|etc}"
+   obsidian property:set --property tars-summary --value "{extracted_summary}"
+   ```
+6. If meeting-associated: link companion note to the journal entry
+7. Extract any tasks or facts from the image content
+
+#### 4c: Article/link processing
+
+Route to learn skill wisdom mode (`skills/learn/SKILL.md`):
+1. Read article content (use defuddle skill for web content)
+2. Extract insights, apply durability test
+3. Persist durable insights to memory
+4. Save wisdom journal entry
+5. Extract any actionable items as tasks
+
+#### 4d: PDF/document processing
+
+1. Read document content (PDF via text extraction, use available tools)
+2. Create companion note with metadata and summary
+3. Extract key information, facts, tasks
+4. If document is relevant to an initiative or person, link via wikilinks
+5. Move original to organized location in `contexts/YYYY-MM/`
+
+#### 4e: Task extraction
+
+1. Parse task-like items from content
+2. Apply accountability test (concrete, owned, verifiable)
+3. Present extracted tasks for user review:
+   > "3 tasks extracted:
+   >   1. Review API spec by Friday -> Active (owner: you, due: 2026-03-27)
+   >   2. Send Sarah the deployment plan -> Delegated (owner: Sarah, due: 2026-03-24)
+   >   3. Consider new monitoring tool -> Backlog (no date)
+   >
+   > Create all / select / edit / skip"
+4. Create approved tasks via task integration
+
+#### 4f: Fact/memory processing
+
+1. Parse factual statements
+2. Apply durability test (lookup value, signal, durability, behavior change)
+3. For passing facts, identify target memory file (person, initiative, org-context, etc.)
+4. Present for user confirmation:
+   > "2 durable facts extracted:
+   >   1. Sarah Chen promoted to VP Engineering -> update memory/people/sarah-chen.md
+   >   2. Platform Rewrite target moved to Q3 -> update memory/initiatives/platform-rewrite.md
+   >
+   > Save all / select / skip"
+5. Persist approved facts via obsidian-cli
+
+### Step 5: Mark processed
+
+For each processed item:
 ```
-You are processing a meeting transcript from the inbox.
-Use the meeting skill pipeline (skills/meeting/SKILL.md) as your execution guide.
-
-Source file: inbox/processing/{filename}
-
-Step 1: Load reference files (MANDATORY before reading transcript)
-- Read reference/replacements.md. Apply canonical names to ALL content.
-- If the main agent provided a name resolution table, apply those resolved names.
-  Do NOT re-resolve names in the table. Only resolve names NOT in the table using replacements.md.
-- Read reference/integrations.md (Calendar and Tasks sections).
-- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  These indexes are required for wikilink validation in Step 4.
-
-Step 2: Resolve transcript content
-- Read the transcript file.
-- Resolve speaker names: if speakers are generic ("Speaker 1"), infer real names from context.
-  NEVER use generic speaker labels in output.
-- Query calendar integration for this meeting date to retrieve attendee list, official title, and organizer.
-  If calendar is unavailable, proceed with transcript data and note the gap.
-
-Step 3: Generate structured report
-Produce ALL five sections:
-- Topics: discussion points as bullets
-- Updates: status updates from people other than the user (name, project, date)
-- Concerns: risks raised (who, issue, deadline)
-- Decisions: what was decided and who made the call
-- Action items: classified as For me / For others / Unassigned
-
-Step 4: Save to journal
-- Filename: journal/YYYY-MM/YYYY-MM-DD-meeting-{slug}.md
-- Frontmatter: date, title, type: meeting, participants, organizer, topics, initiatives, source
-- Body: use [[wikilink]] syntax for all entity references (people, initiatives, decisions)
-- BEFORE writing any [[Name]], verify the name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index AND is not in replacements.md: add it to reference/replacements.md
-  with placeholder "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
-
-Step 5: Extract tasks
-- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
-- Check for duplicates across all configured task lists
-- Create via task integration. Resolve relative dates to YYYY-MM-DD.
-- Check each tool response. Only count a task as created if the response confirms success.
-- After all creation attempts, execute list_reminders for each list that received new tasks.
-  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
-  NEVER report tasks as created without verification.
-
-Step 6: Extract memory
-- Apply durability test to each insight
-- Persist durable insights to memory/ using the folder mapping from the core skill
-- Update relevant _index.md files after writing
-- Use .lock files for memory writes (cowork protocol)
-
-After all steps complete, move the source file to inbox/completed/{filename}.
-
-Return JSON:
-{
-  "status": "ok" | "partial" | "error",
-  "source_file": "{filename}",
-  "content_type": "transcript",
-  "journal_path": "journal/YYYY-MM/...",
-  "tasks_created": 0,
-  "memory_updates": 0,
-  "creation_unverified": [],
-  "unverified_wikilinks": [],
-  "errors": []
-}
-Status "partial": journal entry was saved but one or more downstream steps failed.
-Status "error": the journal entry could not be saved.
-```
-
-**Article/wisdom items:**
-```
-You are extracting wisdom from an article in the inbox.
-Use the wisdom extraction pipeline (skills/learn/SKILL.md, Mode B) as your execution guide.
-
-Source file: inbox/processing/{filename}
-
-Step 1: Load reference files (MANDATORY before reading article)
-- Read reference/replacements.md. Apply canonical names to ALL content.
-- If the main agent provided a name resolution table, apply those resolved names.
-  Do NOT re-resolve names in the table.
-- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  Required for wikilink validation before writing to memory.
-
-Step 2: Read and classify article content.
-
-Step 3: Extract insights
-- Apply durability test to each insight (all four criteria from core skill memory protocol).
-- Discard insights that fail.
-
-Step 4: Persist durable insights to memory
-- Map each passing insight to the correct memory folder (people, initiatives, decisions, etc.)
-- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
-  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
-- Update relevant _index.md after each write.
-- Use .lock files for memory writes (cowork protocol).
-
-Step 5: Save extraction report
-- Filename: journal/YYYY-MM/YYYY-MM-DD-wisdom-{slug}.md
-
-Step 6: Extract tasks
-- Apply accountability test.
-- Create via task integration.
-- Check each tool response. Only count a task as created if the response confirms success.
-- After all creation attempts, execute list_reminders for each list that received new tasks.
-  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
-  NEVER report tasks as created without verification.
-
-After all steps complete, move the source file to inbox/completed/{filename}.
-
-Return JSON:
-{
-  "status": "ok" | "partial" | "error",
-  "source_file": "{filename}",
-  "content_type": "article",
-  "journal_path": "journal/YYYY-MM/...",
-  "insights_persisted": 0,
-  "tasks_created": 0,
-  "creation_unverified": [],
-  "unverified_wikilinks": [],
-  "errors": []
-}
-Status "partial": journal entry was saved but one or more downstream steps failed.
-Status "error": the journal entry could not be saved.
+obsidian property:set --path inbox/pending/{file} --property tars-inbox-processed --value true
 ```
 
-**Notes items:**
-```
-You are processing notes from the inbox.
+Move processed files to `inbox/processed/`. NEVER delete originals.
 
-Source file: inbox/processing/{filename}
-
-Step 1: Load reference files (MANDATORY before reading notes)
-- Read reference/replacements.md. Apply canonical names to ALL content.
-- If the main agent provided a name resolution table, apply those resolved names.
-  Do NOT re-resolve names in the table.
-- Read reference/integrations.md Tasks section for task creation.
-- Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md.
-  Required for wikilink validation before writing to memory or journal.
-
-Step 2: Read the notes file.
-
-Step 3: Extract tasks
-- Apply accountability test (never create tasks for "Team" or "We" without a specific lead)
-- Check for duplicates across all configured task lists
-- Create via task integration. Resolve relative dates to YYYY-MM-DD.
-- Check each tool response. Only count a task as created if the response confirms success.
-- After all creation attempts, execute list_reminders for each list that received new tasks.
-  Verify each task appears by matching title. Add any missing tasks to creation_unverified.
-  NEVER report tasks as created without verification.
-
-Step 4: Extract durable memory
-- Apply durability test to each insight.
-- BEFORE writing any [[wikilink]], verify the entity name exists in the memory indexes read in Step 1.
-  If a name does NOT appear in any index: add it to reference/replacements.md with placeholder
-  "?? (needs canonical form)" and include it in the unverified_wikilinks field.
-  Do NOT fabricate wikilinks for unverified names.
-- Persist passing insights to memory/. Update relevant _index.md files.
-- Use .lock files for memory writes (cowork protocol).
-
-Step 5: Save notes summary
-- Filename: journal/YYYY-MM/YYYY-MM-DD-notes-{slug}.md
-- Body: use [[wikilink]] syntax for verified entity references only.
-
-After all steps complete, move the source file to inbox/completed/{filename}.
-
-Return JSON:
-{
-  "status": "ok" | "partial" | "error",
-  "source_file": "{filename}",
-  "content_type": "notes",
-  "journal_path": "journal/YYYY-MM/...",
-  "tasks_created": 0,
-  "memory_updates": 0,
-  "creation_unverified": [],
-  "unverified_wikilinks": [],
-  "errors": []
-}
-Status "partial": journal entry was saved but one or more downstream steps failed.
-Status "error": the journal entry could not be saved.
-```
-
-### Step 4: Collect results and handle failures
-
-After all sub-agents complete, collect JSON results from each sub-agent and evaluate status:
-
-**Status "ok"**: All steps completed successfully. No action needed beyond reporting.
-
-**Status "partial"**: The journal entry was saved but one or more downstream steps failed.
-- Do NOT move the source file to `inbox/failed/` (the journal entry exists and is valid).
-- Source file is already in `inbox/completed/` (sub-agent moved it).
-- In the consolidated report, flag the item with status "partial" and list which steps failed (derive from the `errors[]` array).
-- Surface any `unverified_wikilinks[]` so the user can resolve them.
-- Surface any `creation_unverified[]` tasks prominently so the user knows to check.
-
-**Status "error"**: The journal entry could not be saved. The sub-agent failed entirely.
-- Move the source file from `inbox/processing/` to `inbox/failed/`.
-- Create a companion `.error` file at `inbox/failed/{filename}.error` containing the `errors[]` array.
-
-Generate consolidated report (format defined in "Inbox mode output" below).
-
-### Sub-agent input/output contracts (inbox mode)
-
-| Content type | Input | Output | Failure mode |
-|-------------|-------|--------|-------------|
-| Transcript | Source file, replacements.md, integrations.md, memory indexes (people, initiatives, decisions) | JSON: journal path, tasks created, memory updates, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
-| Article | Source file, replacements.md, memory indexes (people, initiatives, decisions) | JSON: journal path, insights persisted, tasks created, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
-| Notes | Source file, replacements.md, integrations.md, memory indexes (people, initiatives, decisions) | JSON: journal path, tasks created, memory updates, creation unverified, unverified wikilinks | ok/partial: source to completed; error: source to failed with .error file |
-
-**Shared constraints for all inbox sub-agents:**
-- Each sub-agent operates with fully isolated context
-- Each sub-agent reads its own copy of reference files (no shared state)
-- Memory writes must use `.lock` files (see core skill cowork protocol)
-- Task creation checks for duplicates independently per sub-agent
-- Task creation MUST be verified via `list_reminders` after all creation attempts
-- If a sub-agent fails, other sub-agents continue unaffected
-
-### Inbox mode output
+### Step 6: Summary and log
 
 ```markdown
 ## Inbox processing complete
@@ -788,263 +477,278 @@ Generate consolidated report (format defined in "Inbox mode output" below).
 ### Processed items
 | # | File | Type | Journal | Tasks | Memory | Status |
 |---|------|------|---------|-------|--------|--------|
-| 1 | meeting-2026-02-05.txt | transcript | journal/2026-02/... | 3 | 2 | ok |
-| 2 | article-ai-strategy.md | article | journal/2026-02/... | 0 | 4 | partial (tasks failed) |
-| 3 | notes-from-call.txt | notes | journal/2026-02/... | 2 | 1 | ok |
-
-### Partial items
-| File | Journal saved | Failed steps | Unverified wikilinks | Unverified tasks |
-|------|---------------|-------------|----------------------|------------------|
-| article-ai-strategy.md | journal/2026-02/... | tasks (0 created) | [[Unknown Vendor]] | -- |
-
-### Failed items
-| File | Error |
-|------|-------|
-| (none) | |
+| 1 | ClientCo-sync-notes.txt | transcript | journal/2026-03/... | 3 | 2 | ok |
+| 2 | IMG_2847.png | image | -- | 1 | 0 | ok |
+| 3 | api-patterns.pdf | document | -- | 0 | 1 | ok |
+| 4 | quick-notes.md | mixed | -- | 2 | 3 | ok |
+| 5 | strategy-article.md | article | journal/2026-03/... | 0 | 4 | ok |
 
 ### Summary
-- Items processed: N (ok: N, partial: N)
-- Items failed: N
-- Tasks created: N (total across all items, verified via list_reminders)
-- Tasks unverified: N (created but not confirmed in list)
-- Memory updates: N (total across all items)
-- Journal entries created: N
-- Unverified wikilinks: N (names not found in memory indexes)
+- Items processed: 5
+- Tasks created: 6 (verified)
+- Memory updates: 10
+- Journal entries: 2
+- Companion notes: 2
 ```
 
-### Progress tracking (TodoWrite) for inbox mode
-
-```
-1. Scan inbox and classify items                   [in_progress → completed]
-2. Present processing plan for approval            [pending → completed]
-3. Process item: {filename1} (parallel)            [pending → completed]
-4. Process item: {filename2} (parallel)            [pending → completed]
-5. Process item: {filename3} (parallel)            [pending → completed]
-6. Collect results and generate report             [pending → completed]
-```
-
-Mark all item-processing todos as `in_progress` simultaneously when spawning sub-agents. Mark each `completed` as its sub-agent returns.
+Log to daily note.
 
 ---
 
-## Update mode
+## Sync mode
 
-Update workspace reference files to match the installed plugin version. Preserves user customizations (name replacements, KPI definitions, schedule items) while applying structural changes from plugin updates.
+Triggered by: "sync", "check for gaps"
+
+Compare vault state against external systems and detect drift.
+
+### Step 1: Calendar gaps
+
+Query calendar for last 7 days of events:
+```
+calendar_get_events with start_date=(today - 7 days) end_date=today
+```
+
+Cross-reference each meeting against journal entries:
+1. Search journal for matching date and meeting title
+2. Search journal for matching participants
+3. Flag meetings without journal entries
+
+Report:
+> "Calendar gaps (last 7 days):
+>   1. 2026-03-17 Platform Review (45 min, 5 attendees) -- no journal entry
+>   2. 2026-03-19 1:1 with Sarah (30 min) -- no journal entry
+>
+> Process any? [select / skip all]"
+
+For selected meetings: create placeholder journal entries or route to meeting processing if transcript is available.
+
+### Step 2: Task drift
+
+If external task system is configured:
+
+1. Query all vault tasks (via active-tasks.base and overdue-tasks.base)
+2. Query external task system for user's tasks
+3. Compare and flag:
+   - **Vault-only**: Tasks in vault not in external system
+   - **External-only**: Tasks in external system not in vault
+   - **Status mismatch**: Completed in one, open in other
+   - **Date mismatch**: Different due dates between systems
+
+Report:
+> "Task drift detected:
+>   - 2 tasks in vault not in Reminders
+>   - 1 task completed in Reminders but open in vault
+>   - 1 due date mismatch
+>
+> Resolve? [auto-sync / review each / skip]"
+
+### Step 3: Memory freshness
+
+Check people who appeared in recent meetings (last 14 days) but have stale memory profiles:
+
+1. Extract participant names from journal entries in last 14 days
+2. For each person, check `tars-updated` date in their memory note
+3. Flag if `tars-updated` is older than 30 days
+
+Report:
+> "3 people in recent meetings with stale profiles:
+>   1. [[Sarah Chen]] -- last updated 45 days ago, appeared in 3 meetings
+>   2. [[Bob Kim]] -- last updated 60 days ago, appeared in 1 meeting
+>   3. [[New Person]] -- no memory profile exists
+>
+> Update profiles? [update all / select / skip]"
+
+For selected people:
+- Existing profiles: scan recent journal entries for new facts, apply durability test, update
+- Missing profiles: create new person note with info from journal entries
+
+### Step 4: Present consolidated report
+
+```markdown
+## Sync report (YYYY-MM-DD)
+
+| Category | Found | Resolved |
+|----------|-------|----------|
+| Calendar gaps | {N} | {N} |
+| Task drift | {N} | {N} |
+| Stale profiles | {N} | {N} |
+
+### Actionable items remaining
+- {list of items user deferred or skipped}
+```
+
+Log to daily note.
+
+---
+
+## Reference update mode
+
+For framework updates. Migrate templates, schemas, _system files while preserving user data.
 
 ### Step 1: Version check
 
-Read `reference/.housekeeping-state.yaml` for `plugin_version`.
-Read the plugin's `.claude-plugin/plugin.json` for the current version.
+Read `_system/housekeeping-state.yaml` for `plugin_version`.
+Compare against the current TARS version in the source tree.
 
-If both versions match, report "Workspace reference files are up to date (v{version})" and exit.
-If the workspace has no `plugin_version` field, this is the first update — proceed.
+If versions match: "Vault is up to date (v{version})." Exit.
+If no `plugin_version` field: first update, proceed.
 
 ### Step 2: Dry-run preview
 
-Run the update script in preview mode:
+Categorize files by update strategy:
 
-```bash
-python3 scripts/update-reference.py {workspace_path} {plugin_path} --dry-run
-```
+**Safe to overwrite** (no user data):
+- `_system/taxonomy.md`
+- `_system/schemas.yaml`
+- `_system/guardrails.yaml` (block/warn patterns only, not custom additions)
+- `templates/*.md`
+- `_views/*.base`
+- `scripts/*.py`
 
-Parse the JSON output and present to the user:
+**Requires merge** (contain user data):
+- `_system/config.md` -- preserve all user properties, add new framework properties
+- `_system/integrations.md` -- preserve provider config, update structure
+- `_system/alias-registry.md` -- preserve all entries, update format
+- `_system/kpis.md` -- preserve user KPIs, update instructions
+- `_system/schedule.md` -- preserve user items, update format
+
+**State files** (machine-managed):
+- `_system/housekeeping-state.yaml` -- add new keys, keep existing values
+- `_system/maturity.yaml` -- add new keys, keep existing values
+
+Present preview:
 
 ```markdown
-## Reference file update preview (v{old} → v{new})
+## Reference update preview (v{old} -> v{new})
 
-### Files to update
-| File | Action | User data preserved |
-|------|--------|-------------------|
-| taxonomy.md | Full replace | (none — no user data) |
-| integrations.md | Section merge | status: configured (Tasks) |
+### Files to overwrite ({N})
+| File | Reason |
+|------|--------|
+| _system/taxonomy.md | No user data, full replace |
+| templates/person.md | Template update with new properties |
 
-### New files to create
-| File | Description |
-|------|-------------|
-| shortcuts.md | Command reference |
+### Files to merge ({N})
+| File | User data preserved |
+|------|-------------------|
+| _system/config.md | All tars-user-* properties |
+| _system/integrations.md | Provider configuration |
 
-### Files unchanged
-- replacements.md, schedule.md
+### New files ({N})
+| File | Purpose |
+|------|---------|
+| templates/new-type.md | New entity template |
 
-### Warnings
-- (any conflicts or issues)
+### Unchanged ({N})
+- _system/alias-registry.md (no structural changes)
 
-Proceed with update?
+Proceed? [Y/N]
 ```
-
-Wait for user confirmation.
 
 ### Step 3: Apply update
 
-After user confirmation, run without `--dry-run`:
+For each file category:
 
-```bash
-python3 scripts/update-reference.py {workspace_path} {plugin_path}
-```
+1. **Overwrite**: Replace file content entirely
+2. **Merge**: Read current file, extract user data sections, write new structure with user data preserved
+3. **New**: Create file from template
+4. **State**: Add missing keys with defaults, preserve existing values
 
-Parse the JSON output and report:
+After update:
+1. Update `plugin_version` in `_system/housekeeping-state.yaml`
+2. Log changes to `_system/changelog/YYYY-MM-DD.md`
+3. Git commit: "Update TARS framework to v{new}"
 
-```markdown
-## Reference files updated (v{new})
-
-- Files updated: N
-- Files created: N
-- Files unchanged: N
-- User data preserved: (list)
-- Warnings: (list)
-```
-
-### When the script is not available
-
-If `scripts/update-reference.py` is not found, provide manual update guidance:
-
-1. **Safe to overwrite** (no user data): `taxonomy.md`, `workflows.md`, `shortcuts.md`, `guardrails.yaml`
-   - Copy from plugin source directly
-
-2. **Requires manual merge** (contain user data):
-   - `integrations.md`: Copy new constraint rules from plugin, keep your `status:` fields
-   - `replacements.md`: Copy updated header/instructions from plugin, keep your name/team/product rows
-   - `schedule.md`: Copy updated format spec from plugin, keep your recurring/one-time items
-   - `kpis.md`: Copy updated header/instructions from plugin, keep your team/initiative sections
-
-3. **State files** (machine-managed): `.housekeeping-state.yaml`, `maturity.yaml`
-   - Add any new keys from plugin source, keep existing values
-
-### Update mode output
+Report:
 
 ```markdown
-## Update complete
+## Reference update complete (v{new})
 
 | Category | Count |
 |----------|-------|
-| Files updated | N |
-| Files created | N |
-| Files unchanged | N |
-| User data preserved | N sections |
-| Warnings | N |
+| Files overwritten | {N} |
+| Files merged | {N} |
+| Files created | {N} |
+| Files unchanged | {N} |
+| User data preserved | {N} sections |
 ```
-
----
-
-## Script invocation for health mode
-
-Before performing manual checks, run the automated scripts for deterministic validation:
-
-### Step 0: Run health-check.py
-
-```bash
-python3 scripts/health-check.py {workspace_path}
-```
-
-This script performs Steps 2-6 deterministically (naming validation, frontmatter checks, index sync, wikilink detection, replacements coverage). Parse the JSON output and use it to populate the issues table in the report. Only manually investigate items the script cannot assess (Step 7: information redundancy, cross-reference depth).
-
-### Step 0b: Run archive.py (optional)
-
-```bash
-python3 scripts/archive.py {workspace_path}
-```
-
-or for preview only:
-
-```bash
-python3 scripts/archive.py {workspace_path} --dry-run
-```
-
-This script scans memory files for staleness and archives expired content. Run with `--dry-run` first to preview, then confirm with the user before running without the flag. Parse the JSON output and include archived file counts in the report.
-
-### Interpreting script output
-
-The scripts return JSON. Key fields:
-- `health-check.py`: `issues` array (each with category, file, issue, suggested_fix), `auto_fixes` array, `summary` stats
-- `archive.py`: `files_archived`, `expired_lines_removed`, `archived_files` array with paths and reasons
-
-After parsing health-check.py JSON, classify each issue by fixability and execute safe auto-fixes:
-
-**Auto-fixable (execute immediately):**
-
-| Issue category | Fix action | Safety condition |
-|---------------|-----------|-----------------|
-| `naming` (decision files) | Rename file to the `suggested_fix` target | Only if frontmatter `date` field exists and is valid YYYY-MM-DD |
-| `index` (orphan entries) | Remove orphan row from the category `_index.md` | Only if source file confirmed absent from disk |
-| `index` (files not in index / stale summaries) | Run `python3 scripts/rebuild-indexes.py {workspace_path}` once | Deterministic index regeneration |
-| `replacements` (uncovered names) | Add `??` placeholder entries to `reference/replacements.md` | Existing behavior |
-
-**NOT auto-fixable (present to user):**
-
-| Issue category | Why |
-|---------------|-----|
-| `frontmatter` (missing fields) | Values require user judgment |
-| `frontmatter` (invalid status) | Correct status requires understanding intent |
-| `wikilink` (broken references) | May need entity creation or reference correction |
-| `replacements` (with `??` placeholder) | User must provide canonical name |
-
-If any auto-fix fails (file locked, permission error, target exists), demote it to the manual-fix list with the error reason.
 
 ---
 
 ## Context budget
 
-**Health mode:**
-- Memory indexes: Read all `_index.md` files
-- Memory files: Scan frontmatter only (not full content) unless checking wikilinks
-- Journal: Scan last 30 days of entries
-- Reference: Read `replacements.md`
+**Health check mode**:
+- _system/ files: Read schemas.yaml, guardrails.yaml, alias-registry.md
+- Memory: Scan frontmatter only (not full content) unless checking wikilinks
+- Journal: Scan last 30 days of entries for wikilink validation
+- Scripts: Execute validate-schema.py, scan-secrets.py
 
-**Sync mode:**
-- Task integration: Up to 3 queries per list
-- Memory indexes: Read people and initiatives indexes
-- Schedule: Read `reference/schedule.md` if exists
-- Project tracker: Up to 3 queries per team
-- Calendar: Last 7 days of events (comprehensive mode)
-- Journal: Scan last 90 days for staleness and entity discovery (comprehensive mode)
+**Maintenance mode**:
+- All of health check budget, plus:
+- Scripts: Execute archive.py, scan-flagged.py, sync.py
+- Calendar: Last 7 days of events
+- Task system: Query all configured lists
+- Memory: Full read for archive candidates only
+- Inbox/contexts: Directory listing for file organization
 
-**Rebuild mode:**
-- Memory: Scan all files in all categories
-- Journal: Scan all month folders
-- Contexts: Scan products folder (if exists)
-- Reference: None required
+**Inbox mode**:
+- Inbox: Read all files in inbox/pending/ (first 50 lines for classification, full for processing)
+- Reference: alias-registry.md, integrations.md
+- Memory: people, initiatives, decisions (for wikilink validation)
+- Calendar: Query per transcript item for meeting correlation
+- Per-item budget: full file read + template writes + task/memory updates
 
-**Inbox mode:**
-- Main agent: Read `inbox/pending/` file list + first 50 lines of each file for classification
-- Each sub-agent: Read its assigned source file + `reference/replacements.md` + `reference/integrations.md` + `memory/people/_index.md` + `memory/initiatives/_index.md` + `memory/decisions/_index.md` (all three indexes mandatory for wikilink validation) + `list_reminders` queries for task verification
-- Sub-agents have isolated context; budget is per-item, not cumulative
+**Sync mode**:
+- Calendar: Last 7 days of events
+- Task system: Query all configured lists + overdue
+- Journal: Last 14 days of entries
+- Memory: People notes referenced in recent journal entries
+
+**Reference update mode**:
+- _system/: Read all files for version comparison and merge
+- Templates/scripts/_views: Read current versions for diff
+- Source tree: Read new versions for comparison
 
 ---
 
 ## Absolute constraints
 
-**Health mode:**
+### Health check
 - NEVER delete files (only suggest deletions with user confirmation)
-- NEVER modify file content (only metadata like replacements and index entries)
+- NEVER modify note body content without user approval
 - NEVER change wikilink targets without user approval
-- **Auto-fix scope:** Execute deterministic fixes (file renames from frontmatter dates, index orphan removal, index rebuilds, replacement placeholder additions). Present non-deterministic issues (missing frontmatter values, invalid enums, broken wikilinks) to the user. If an auto-fix fails, demote to manual.
+- Auto-fix scope: deterministic fixes only (alias registry sync, schema defaults, missing properties with computable values)
 
-**Sync mode:**
-- NEVER create tasks without user approval
-- NEVER fabricate data from missing integrations (report gaps)
-- NEVER modify tasks without user confirmation
-- ALWAYS use provider-agnostic language (no hardcoded Jira/Asana terminology)
-- NEVER skip memory gap detection
+### Maintenance
+- NEVER archive notes with backlinks from last 90 days
+- NEVER archive notes referenced by active tasks
+- NEVER delete flagged content without explicit user instruction per item
+- NEVER auto-process inbox during maintenance (only report count)
+- ALWAYS present archive candidates for user approval before moving
+- ALWAYS present flagged content actions for user selection
 
-**Rebuild mode:**
-- NEVER modify file content (only regenerate indexes)
-- NEVER delete files
-- ALWAYS validate decision naming patterns
-- ALWAYS report missing frontmatter
-- NEVER skip any category
+### Inbox processing
+- NEVER process items without user confirmation of the classification and processing plan
+- NEVER delete source files (move to processed/, never remove)
+- NEVER skip multimodal analysis for image files
+- NEVER create tasks without user review of the extracted task list
+- NEVER persist memory facts without user confirmation
+- ALWAYS check calendar correlation for images and transcripts
+- ALWAYS preserve originals in inbox/processed/ or archive/
 
-**Inbox mode:**
-- NEVER process items without user confirmation of the processing plan
-- NEVER delete source files (move to completed/ or failed/, never remove)
-- ALWAYS create .error companion files for failed items
-- ALWAYS use `.lock` files for memory writes from parallel sub-agents
-- NEVER spawn sub-agents for items classified as `unknown` (require manual review)
-- ALWAYS move ALL `inbox/pending/` files to `inbox/processing/` BEFORE spawning any sub-agents
-- NEVER write `[[wikilinks]]` for names not verified against memory indexes (flag as unverified instead)
-- NEVER report tasks as created without verifying via `list_reminders` after creation
+### Sync
+- NEVER auto-resolve task drift (always present for user decision)
+- NEVER fabricate journal entries for missed meetings (create placeholders only)
+- NEVER update memory profiles without showing what changed
+- ALWAYS report gaps even if no action is taken
 
----
+### Reference update
+- NEVER overwrite files containing user data without merge strategy
+- NEVER lose user configuration during framework updates
+- ALWAYS preview changes before applying
+- ALWAYS git commit after successful update
 
-## Documentation note
-
-When building future functionality, consider whether the housekeeping script should be updated to include relevant validation elements.
+### Universal
+- ALWAYS log all maintenance actions to the daily note
+- ALWAYS update _system/housekeeping-state.yaml after any maintenance run
+- ALWAYS use obsidian-cli for note creation and property updates
+- NEVER use direct file I/O for writes when obsidian-cli is available

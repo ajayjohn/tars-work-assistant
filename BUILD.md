@@ -95,18 +95,20 @@ Cowork **auto-discovers** skills and commands from the directory structure. Incl
 ```
 tars/
 ├── .claude-plugin/
-│   └── plugin.json          # SOURCE OF TRUTH (with arrays)
+│   ├── plugin.json          # SOURCE OF TRUTH
+│   └── marketplace.json     # Auto-synced from plugin.json
+├── .claude/skills/           # Obsidian skills references
 ├── .github/workflows/
-│   └── release.yml           # CI/CD for releases
-├── .git/hooks/
-│   └── pre-push             # Auto-rebuild before push
+│   ├── release.yml           # CI/CD for releases
+│   └── validate.yml          # PR validation
+├── _system/                  # System configuration and state
+├── _views/                   # .base live query files
 ├── skills/                   # 12 skill definitions
-├── commands/                 # 11 command definitions
-├── scripts/                  # Utility scripts
-├── reference/                # Reference files
-├── tests/                    # Test suite
-├── build-plugin.sh          # Local build script
-├── .gitignore               # Ignores tars-cowork-plugin/
+├── scripts/                  # Python validation/scanning scripts
+├── templates/                # 15 Obsidian templates
+├── tests/                    # Smoke tests and fixtures
+├── CLAUDE.md                 # Vault-level agent configuration
+├── build-plugin.sh           # Local build script
 └── ...
 ```
 
@@ -114,14 +116,16 @@ tars/
 ```
 tars-cowork-plugin/
 ├── .claude-plugin/
-│   └── plugin.json          # MINIMAL (no arrays)
+│   └── plugin.json          # MINIMAL (auto-discovery)
+├── .claude/skills/           # Obsidian skills references
+├── _system/                  # System configuration
+├── _views/                   # .base live queries
 ├── skills/                   # Copied from source
-├── commands/                 # Copied from source
 ├── scripts/                  # Copied from source
-├── reference/                # Copied from source
+├── templates/                # Copied from source
+├── CLAUDE.md                 # Agent configuration
 ├── Archive.zip              # Compressed distribution
 ├── LICENSE
-├── .mcp.json
 └── README.md
 ```
 

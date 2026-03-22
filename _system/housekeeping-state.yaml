@@ -1,0 +1,43 @@
+# TARS Housekeeping State
+# Tracks maintenance runs and cron job registrations
+
+last_maintenance:
+  date: null
+  result: null
+  issues_found: 0
+  issues_fixed: 0
+
+last_health_check:
+  date: null
+  schema_errors: 0
+  broken_links: 0
+  alias_issues: 0
+  stale_content: 0
+
+last_sync:
+  date: null
+  calendar_gaps: 0
+  task_drift: 0
+  memory_stale: 0
+
+cron_jobs:
+  daily_briefing:
+    id: null
+    schedule: null
+    status: not_registered
+  weekly_briefing:
+    id: null
+    schedule: null
+    status: not_registered
+  maintenance:
+    id: null
+    schedule: null
+    status: not_registered
+
+inbox:
+  last_processed: null
+  pending_count: 0
+
+archive:
+  last_sweep: null
+  items_archived: 0

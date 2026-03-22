@@ -1,0 +1,21 @@
+filters:
+  file.hasTag("tars/decision")
+
+views:
+  - type: table
+    name: "Recent Decisions"
+    order:
+      - file.name
+      - tars-summary
+      - tars-status
+      - tars-decided-by
+      - tars-date
+  - type: table
+    name: "By Status"
+    order:
+      - file.name
+      - tars-summary
+      - tars-decided-by
+      - tars-date
+    groupBy:
+      property: tars-status

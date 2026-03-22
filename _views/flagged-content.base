@@ -1,0 +1,12 @@
+filters:
+  and:
+    - file.hasTag("tars/person")
+    - 'tars-has-flagged-content == true'
+
+views:
+  - type: table
+    name: "People with Flagged Content"
+    order:
+      - file.name
+      - tars-summary
+      - tars-modified

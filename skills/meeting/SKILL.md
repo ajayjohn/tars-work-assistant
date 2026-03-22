@@ -1,374 +1,757 @@
 ---
 name: meeting
-description: Process meeting transcripts to extract reports, tasks, and memory. Handles "Process this meeting", action item extraction, meeting summaries. Calendar integration for scheduling context.
-user-invocable: true
-help:
-  purpose: |-
-    Process meeting transcripts with automatic extraction and calendar integration.
-  use_cases:
-    - "Process this meeting [transcript]"
-    - "Extract action items from this meeting"
-    - "Summarize this meeting"
-  scope: meetings,transcripts,action-items
+description: Process meeting transcripts into journal entries, tasks, and memory updates
+triggers: ["process this meeting", "meeting transcript", "meeting notes"]
 ---
 
-# Meeting processor protocol
+# Meeting processing pipeline
 
-Process meeting transcripts to extract structured reports, persist to journal, create tasks, and extract memory using a unified orchestrated pipeline.
+The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline with mandatory user review gates.
+
+All vault writes use obsidian-cli. All names use canonical forms from the alias registry. All persistence requires user confirmation.
 
 ---
 
 ## Pipeline overview
 
-This skill combines transcript analysis, structured report generation, task extraction, memory persistence, and journal creation into a single coordinated workflow. Progress is tracked with real-time TodoWrite updates.
-
-**Parallelization**: After the journal entry is saved (Step 3), task extraction (Step 4) and memory extraction (Step 5) run as **parallel sub-agents** using the Task tool. This yields a 30-40% wall-clock improvement on typical meetings. Both sub-agents read from the saved journal file, ensuring isolated context and no cross-contamination.
-
----
-
-## Step 1: Process transcript (MANDATORY)
-
-### 1.1: Load replacements (MANDATORY)
-
-Read `reference/replacements.md` BEFORE processing any content. Apply canonical names to ALL text: frontmatter, prose, action items, task assignments.
-
-### 1.2: Input handling
-
-The transcript may be:
-1. **Plain text** with speaker labels and timestamps
-2. **JSON array** with `SPEAKER`, `LINE_TEXT`, `LINE_ID` fields
-
-### 1.3: Calendar lookup (MANDATORY WHEN AVAILABLE)
-
-Read `reference/integrations.md` Calendar section for provider details and status. If calendar integration is configured, query for this meeting if date/time can be inferred. Resolve the meeting date to `YYYY-MM-DD` format before querying. Execute the `list_events` operation with the meeting date and offset=1.
-
-**Why:** Calendar provides full attendee list (including silent participants), official meeting title, organizer, and meeting notes/agenda. The attendee list is also critical for name resolution in Step 1.4.
-
-**Extract:**
-- Complete attendee list (for `participants` frontmatter and name resolution)
-- Meeting time
-- Organizer
-- **Calendar meeting title** (authoritative source for filename and title)
-
-If meeting not found or calendar integration is unreachable, proceed with transcript-only processing and note the gap.
-
-### 1.4: Speaker name resolution (MANDATORY)
-
-Apply the **name resolution protocol** (core skill, Memory protocol section):
-
-1. For each speaker name in the transcript, check `reference/replacements.md` for an exact match
-2. If a name is ambiguous (matches multiple canonical entries) or unknown (no match), attempt contextual resolution using:
-   - Calendar attendees from Step 1.3 (primary source — narrows to people actually present)
-   - Transcript context (role references, team mentions, topic expertise)
-   - Memory people files (recent interactions, team membership)
-3. If any names remain unresolved, batch ALL unresolved names into a single user clarification before proceeding
-4. Identify the user from role references matching CLAUDE.md identity
-5. NEVER use generic speaker labels ("Speaker 1") in output — resolve or ask
-
-Build a name resolution table mapping each raw speaker label to its canonical form. Apply this table to all downstream steps (report, tasks, memory).
+```
+Steps 1-6:   Preparation (load context, detect format, resolve calendar/participants, check knowledge, scan secrets)
+Step 7:      Processing (LLM analysis of transcript)
+Steps 8-9:   Persistence (journal entry + transcript archive)
+Steps 10-11: Extraction with review (tasks + memory, user confirms each)
+Steps 12-14: Cleanup (unresolved names, daily note, self-evaluation)
+```
 
 ---
 
-## Step 2: Generate structured report (MANDATORY)
+## Step 1: Load alias registry (MANDATORY)
 
-Produce ALL of the following sections from the transcript analysis:
+```bash
+obsidian read file="alias-registry"
+```
+
+Load the full alias registry into context. This is the canonical source for name resolution throughout the pipeline. Every speaker label, attendee name, and entity reference downstream must be checked against this registry.
+
+---
+
+## Step 2: Detect transcript format (Issue 1)
+
+Inspect the raw transcript and classify its format and available metadata.
+
+### Format classification
+
+| Format | Identifying signals |
+|--------|-------------------|
+| `otter` | "Otter.ai" header, `Speaker N` labels, MM:SS timestamps |
+| `fireflies` | "Fireflies.ai" header, structured JSON with `SPEAKER`/`LINE_TEXT` fields |
+| `zoom` | "WEBVTT" header or Zoom chat export format |
+| `teams` | Microsoft Teams transcript format, `<v>` tags or Teams metadata |
+| `raw_text` | Speaker labels present but no platform markers |
+| `unknown` | No recognizable structure |
+
+### Metadata inventory
+
+Produce a checklist of what the transcript provides:
+
+```
+Format: [detected format]
+Has date:             yes/no
+Has duration:         yes/no
+Has attendees header: yes/no
+Has speaker labels:   yes/no
+Has timestamps:       yes/no
+```
+
+Fill in whatever the transcript provides. Missing fields will be resolved in subsequent steps. Do not guess missing values.
+
+---
+
+## Step 3: MANDATORY calendar check (Issue 1)
+
+ALWAYS query the calendar, even when the transcript provides a date. Calendar data is authoritative for meeting title, full attendee list (including silent participants), organizer, and precise time.
+
+### Query logic
+
+**a. Transcript has a date:**
+Use the transcript date to define a narrow calendar query window (that day, +/- 1 day).
+
+```bash
+# Example: transcript says "March 19"
+# Query calendar for March 18-20
+```
+
+**b. Transcript lacks a date:**
+Query the past 3 business days from today.
+
+**c. Match criteria:**
+Score each calendar event against the transcript using:
+- Title keyword overlap with transcript topics/header
+- Attendee name overlap with transcript speakers
+- Time window alignment with any timestamps in transcript
+- Duration alignment if transcript has duration metadata
+
+### Resolution flow
+
+**d. Single strong match:**
+Present for confirmation with a binary question.
+```
+This appears to be the "Q1 Planning Sync" from Mon 2026-03-16 at 10:00am. Correct? [Y/N]
+```
+
+**e. Multiple matches (Issue 3):**
+Present as a multiple-choice list.
+```
+Which meeting is this transcript from?
+  1. Mon 2026-03-16, 10:00am -- "Q1 Planning" with Jane Smith, Bob Chen
+  2. Tue 2026-03-17, 2:00pm -- "Platform Review" with Sarah Lopez
+  3. None of these -- I'll specify
+```
+
+**f. No match and calendar unavailable:**
+Ask the user directly.
+```
+When did this meeting happen? (e.g., "yesterday at 2pm" or "2026-03-19")
+```
+
+**g. NEVER proceed without a resolved date and time.** The pipeline halts here until date/time is confirmed.
+
+### Extract from calendar
+
+Once matched, extract and carry forward:
+- Complete attendee list (for participant resolution in Step 4)
+- Meeting time (for `tars-meeting-datetime` frontmatter)
+- Organizer name
+- Calendar meeting title (authoritative source for filename and journal title)
+
+---
+
+## Step 4: Resolve participants (Issue 3)
+
+Merge two participant sources into one canonical list:
+1. Speaker labels from the transcript
+2. Attendee list from the calendar event (Step 3)
+
+### Resolution cascade for each name
+
+**Pass 1: Alias registry**
+Check the alias registry loaded in Step 1 for an exact match or known variation. If found, map to canonical form.
+
+**Pass 2: Vault search**
+```bash
+obsidian search query="tag:tars/person [name]" limit=5
+```
+If the name matches exactly one person note, use it.
+
+**Pass 3: Contextual disambiguation**
+If ambiguous (multiple candidates), use context clues:
+- Calendar attendees narrow the pool to people actually present
+- Transcript context: role references ("the PM said"), team mentions, topic expertise
+- Memory files: recent interactions, team membership
+
+**Pass 4: Ask the user**
+If any names remain unresolved after passes 1-3, batch ALL unresolved names into a single interaction.
+
+For ambiguous names, present multiple-choice:
+```
+Who is "Dan" in this meeting?
+  1. Dan Rivera (Engineering)
+  2. Dan Chen (Infrastructure)
+  3. Someone new -- I'll provide details
+```
+
+For unknown names, ask directly:
+```
+Who is "Mick"? Please provide their full name.
+```
+
+### Confirm participant list
+
+Present the final resolved participant list for confirmation before proceeding:
+```
+Participants resolved:
+  - Jane Smith (from calendar + transcript)
+  - Bob Chen (from calendar + transcript)
+  - Sarah Lopez (from calendar only, silent in transcript)
+  - You
+
+Correct? [Y / Edit]
+```
+
+NEVER use generic speaker labels ("Speaker 1", "Unknown") in any output.
+
+---
+
+## Step 5: Knowledge inventory (Issue 7)
+
+Before extracting anything, check what the vault already knows about the entities and topics in this transcript.
+
+### Vault scan
+
+For each person, initiative, decision, or topic identified in the transcript:
+
+```bash
+obsidian search query="tag:tars/person [entity]" limit=5
+obsidian search query="tag:tars/initiative [entity]" limit=5
+obsidian search query="tag:tars/decision [entity]" limit=5
+```
+
+### Classification
+
+Classify each piece of information from the transcript against existing vault knowledge:
+
+| Classification | Meaning | Action |
+|---------------|---------|--------|
+| `NEW` | Not in the vault at all | Include in extraction |
+| `UPDATE` | Exists but transcript has newer/additional info | Show diff in Step 11 |
+| `REDUNDANT` | Already captured with same detail | Skip silently |
+| `CONTRADICTS` | Transcript says X, vault says Y | Flag for user resolution in Step 11 |
+
+### Report to user
+
+```
+Knowledge check:
+  - Jane Smith: 12 entries in memory. Last updated 2026-03-15.
+  - Platform Rewrite: active initiative, 8 related entries.
+  - "REST vs GraphQL": decision already recorded (2026-02-28).
+  Will focus on what's new or changed.
+```
+
+If processing a batch of transcripts chronologically, note the position:
+```
+This is transcript 2 of 5. Later transcripts will supersede earlier ones on overlapping topics.
+```
+
+---
+
+## Step 6: Secret scan
+
+Run the secrets scanner against transcript content BEFORE any vault writes.
+
+```bash
+python3 scripts/scan-secrets.py --content "{transcript_content}"
+```
+
+### Block patterns (halt and redact)
+- Social Security numbers
+- API keys and tokens
+- Passwords and credentials
+- Connection strings
+- Credit card numbers
+
+### Warn patterns (flag for review)
+- Dates of birth
+- Salary and compensation figures
+- PIP (performance improvement plan) references
+- Termination details
+- Medical diagnoses
+
+**If blocked:** Redact the sensitive content and notify the user. Do not proceed with the redacted content without confirmation.
+
+**If warned:** Flag the content for user review. Present the flagged items and ask whether to include, redact, or rephrase before proceeding.
+
+---
+
+## Step 7: Process transcript (LLM reasoning)
+
+Analyze the transcript and produce structured output for ALL of the following sections. Do not skip any section. If a section has no content, state "None identified."
 
 ### Topics
 - Discussion points as bullet points
-- Infer meeting type but do NOT state it
+- Infer the meeting type but do NOT state it explicitly
 
 ### Updates
 - Status updates from anyone OTHER than the user
-- Be specific: names, projects, dates
+- Be specific: names, projects, dates, deliverables
 
 ### Concerns
-- Risks raised with WHO, ISSUE, DEADLINE
+- Risks raised, formatted as WHO / ISSUE / DEADLINE
+- Include both explicit risks and implied risks from context
 
 ### Decisions
-- What was decided and who made the call
+- What was decided, who made the call, and rationale if stated
+- Distinguish firm decisions from tentative agreements
 
 ### Action items
 Classify into:
 - **For me**: Tasks the user committed to
 - **For others**: Tasks assigned to specific people
-- **Unassigned**: Needed but not assigned
+- **Unassigned**: Tasks that need doing but have no clear owner
 
 Format: **"Owner"** -- Task description (deadline if stated)
 
+### Unresolved items
+- Topics discussed without reaching a conclusion
+- Questions raised but not answered
+- Items explicitly deferred ("let's revisit next week")
+
+### Key quotes
+- Notable statements attributed to specific speakers
+- Include approximate timestamp if available
+- Focus on statements that carry weight: commitments, concerns, strategic direction
+
 ---
 
-## Step 3: Save to journal (MANDATORY)
+## Step 8: Create journal entry (Issue 6)
 
-Create file in `journal/YYYY-MM/`:
+```bash
+obsidian create name="YYYY-MM-DD Meeting Title" \
+  path="journal/YYYY-MM/YYYY-MM-DD-meeting-slug.md" \
+  template="meeting-journal" silent
+```
 
-**Filename:** `YYYY-MM-DD-meeting-slug.md`
+### Frontmatter properties
 
-**Template:**
+Set all of the following via `obsidian property:set`:
+
 ```yaml
 ---
-date: YYYY-MM-DD
-title: Meeting Title
-calendar_title: Original Calendar Title  # Only if different from title
-type: meeting
-participants: [Name1, Name2, Name3]
-organizer: Name  # From calendar if available
-topics: [topic1, topic2]
-initiatives: [Initiative1, Initiative2]
-source: calendar | transcript  # Indicate primary data source
+tags: [tars/journal, tars/meeting]
+tars-date: YYYY-MM-DD
+tars-meeting-datetime: YYYY-MM-DDTHH:MM:SS
+tars-participants: ["[[Jane Smith]]", "[[Bob Chen]]"]
+tars-organizer: "[[Jane Smith]]"
+tars-topics: [topic-slug-1, topic-slug-2]
+tars-initiatives: ["[[Platform Rewrite]]"]
+tars-source: calendar | transcript
+tars-calendar-title: "Original Calendar Title"
+tars-transcript: "[[YYYY-MM-DD-meeting-slug-transcript]]"
+tars-transcript-format: otter | fireflies | zoom | teams | raw_text
+tars-created: YYYY-MM-DD
 ---
 ```
 
+### Body content
+
+Append the structured report from Step 7 to the journal entry body:
+
 ```markdown
 # Meeting Title
-**Date:** YYYY-MM-DD | **Participants:** [[Name1]], [[Name2]], [[Name3]]
-**Initiatives:** [[Initiative1]], [[Initiative2]]
+**Date:** YYYY-MM-DD | **Time:** HH:MM | **Participants:** [[Jane Smith]], [[Bob Chen]]
+**Initiatives:** [[Platform Rewrite]]
 
 ## Topics
-[From report]
+[From Step 7]
 
 ## Updates
-[From report]
+[From Step 7]
 
 ## Concerns
-[From report]
+[From Step 7]
 
 ## Decisions
-[From report]
+[From Step 7]
 
 ## Action items
-[From report]
+[From Step 7]
+
+## Unresolved items
+[From Step 7]
+
+## Key quotes
+[From Step 7]
+
+## Associated captures
+[Screenshots and images related to this meeting, if any]
 ```
 
 ### Title and slug generation
 
-**Title priority hierarchy:**
-1. **Calendar meeting title** (authoritative source when available)
-2. **Transcript header/title** (fallback when no calendar data)
-3. **Context-inferred title** (last resort, based on content analysis)
+**Title priority:**
+1. Calendar meeting title (authoritative when available)
+2. Transcript header/title (fallback)
+3. Context-inferred title (last resort)
 
 **Slug rules:**
 - Lowercase, hyphenated
-- Remove filler words
-- Example: "MCP Planning Session" -> `mcp-planning`
+- Remove filler words (the, a, an, and, or, for, to, in, on, at, of)
+- Example: "MCP Planning Session" becomes `mcp-planning`
 
-When calendar title is used, if it differs significantly from transcript context, keep `calendar_title` in frontmatter for reference.
-
----
-
-## Steps 4 and 5: Parallel sub-agent execution (MANDATORY)
-
-After saving the journal entry in Step 3, spawn **two parallel sub-agents** using the Task tool. Both sub-agents run concurrently, reading from the saved journal file path rather than from the raw transcript in context.
-
-**Launch both sub-agents in a single message** using multiple Task tool calls. Do NOT wait for one to complete before starting the other.
-
-### Sub-agent A: Task extraction
-
-Spawn a Task sub-agent with the following prompt structure:
-
-```
-You are extracting tasks from a meeting journal entry.
-
-Read the journal file at: {journal_file_path}
-Read the task integration config at: reference/integrations.md (Tasks section)
-
-For each action item in the journal:
-1. Apply accountability test (NEVER create tasks for "Team" or "We" without a specific lead)
-2. Check for duplicates: execute the task integration `list` operation for all configured lists
-3. Resolve metadata:
-   - Map relative dates to YYYY-MM-DD using date resolution
-   - Default to `backlog` if no due date
-   - Source: {journal_file_path}
-4. Execute the `add` operation via the task integration with metadata in notes field
-5. Check each tool response. Only add to tasks_created if the response confirms success.
-   If the response indicates failure, add to errors[].
-6. Place in appropriate list based on owner and due date:
-   - Has due date + owner is user -> `Active` list
-   - Has due date + owner is other -> `Delegated` list
-   - No due date -> `Backlog` list
-
-After all creation attempts, execute `list_reminders` for each list that received
-new tasks. Verify each task appears by matching title. Add any tasks that were
-reported as created but are missing from the list to the "creation_unverified" array.
-
-NEVER populate tasks_created based on intent. Only include tasks confirmed present
-in the verification query.
-
-Return a JSON summary of tasks created:
-{
-  "tasks_created": [
-    {"title": "...", "owner": "...", "list": "...", "due": "..."}
-  ],
-  "creation_unverified": [],
-  "duplicates_skipped": [...],
-  "errors": [...]
-}
-```
-
-Standard task creation fields:
-```
-title: "Task description"
-list: Active
-due: YYYY-MM-DD
-notes: |
-  source: journal/YYYY-MM/YYYY-MM-DD-slug.md
-  created: YYYY-MM-DD
-  initiative: [[Initiative Name]]
-  owner: Name
-```
-
-### Sub-agent B: Memory extraction
-
-Spawn a Task sub-agent with the following prompt structure:
-
-```
-You are extracting durable memory from a meeting journal entry.
-
-Read the journal file at: {journal_file_path}
-Read memory indexes: memory/people/_index.md, memory/initiatives/_index.md, memory/decisions/_index.md
-Read reference/replacements.md and apply canonical names.
-If the main agent provided a name resolution table, use those resolved names.
-
-Apply durability test to insights from the meeting:
-- Stakeholder updates -> memory/people/{name}.md
-- Initiative updates -> memory/initiatives/{name}.md
-- Decisions -> memory/decisions/{slug}.md
-- Update relevant _index.md files
-
-Do NOT persist: scheduling logistics, temporary blockers, action items.
-
-BEFORE writing any [[wikilink]] in a memory file, verify the referenced entity exists
-in one of the memory indexes read above. If the entity does NOT exist in any index,
-do NOT fabricate the wikilink. Instead, write the name as plain text and note it in
-the "skipped" array with reason "unverified entity reference".
-
-Return a JSON summary of memory updates:
-{
-  "created": [{"path": "...", "summary": "..."}],
-  "updated": [{"path": "...", "summary": "..."}],
-  "skipped": [{"insight": "...", "reason": "failed durability test"}]
-}
-```
-
-### Collecting sub-agent results
-
-After both sub-agents complete, collect their results and merge into the output summary. If either sub-agent fails:
-- Log the failure in the output summary
-- Do NOT retry automatically (the user can re-run the failed step manually)
-- The other sub-agent's results are still valid and should be reported
-
-### Sub-agent input/output contracts
-
-| Sub-agent | Input | Output | Failure mode |
-|-----------|-------|--------|-------------|
-| Task extraction | Journal file path, integrations.md Tasks section, replacements.md | JSON: tasks created, creation unverified, duplicates skipped, errors | Report errors in summary, do not block memory extraction |
-| Memory extraction | Journal file path, memory indexes, replacements.md | JSON: files created, files updated, insights skipped | Report errors in summary, do not block task extraction |
-
-**Shared constraints for both sub-agents:**
-- Read from the saved journal file, NEVER from raw transcript context
-- Read `reference/replacements.md` and apply canonical names
-- Each sub-agent operates with isolated context (no shared state)
-- Neither sub-agent should modify the journal file
-- Memory extraction must use `.lock` files when writing shared memory files (see core skill cowork protocol)
+When the calendar title differs from the transcript header, keep `tars-calendar-title` in frontmatter for reference.
 
 ---
 
-## Step 6: Replacement verification (MANDATORY)
+## Step 9: Archive transcript (Issue 6)
 
-Scan ENTIRE output for any terms from `reference/replacements.md` that were not replaced. Correct before saving.
+Move the original transcript to the archive with a standardized filename and bidirectional links.
 
-### Auto-add unknown names
+### Create archived transcript
 
-When processing transcripts, if new names are found that:
-- Are not in `reference/replacements.md`
-- Appear to be nicknames, abbreviations, or informal names (e.g., "Mick", "JT", "Dan")
-
-Add them to `reference/replacements.md` with a placeholder for the user to complete:
-
-```markdown
-| Mick | ?? (needs full name) |
-| JT | ?? (needs full name) |
+```bash
+obsidian create name="YYYY-MM-DD-meeting-slug-transcript" \
+  path="archive/transcripts/YYYY-MM/YYYY-MM-DD-meeting-slug-transcript.md" \
+  template="transcript" silent
 ```
 
-This allows the user to update canonical names as needed without losing track of unknown references. Report these additions in the output summary.
+### Set transcript frontmatter
+
+```bash
+obsidian property:set name="tags" value="[tars/transcript]" file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-journal-entry" value="[[YYYY-MM-DD Meeting Title]]" file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-date" value="YYYY-MM-DD" file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-meeting-datetime" value="YYYY-MM-DDTHH:MM:SS" file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-participants" value='["[[Jane Smith]]", "[[Bob Chen]]"]' file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-format" value="otter" file="YYYY-MM-DD-meeting-slug-transcript"
+obsidian property:set name="tars-created" value="YYYY-MM-DD" file="YYYY-MM-DD-meeting-slug-transcript"
+```
+
+### Append raw transcript content
+
+```bash
+obsidian append file="YYYY-MM-DD-meeting-slug-transcript" content="[full raw transcript text]"
+```
+
+### Bidirectional links
+
+- The journal entry's `tars-transcript` property points to the archived transcript
+- The archived transcript's `tars-journal-entry` property points back to the journal entry
+
+**NEVER delete the original transcript.** Archive it, link it, preserve it.
+
+---
+
+## Step 10: Extract tasks with review (Issue 2)
+
+Every task candidate goes through the accountability test. The user always sees and selects which tasks to create.
+
+### Accountability test
+
+For each potential action item from Step 7, test ALL three criteria:
+
+| Criterion | Question | Pass example | Fail example |
+|-----------|----------|-------------|-------------|
+| Concrete | Is it a specific deliverable? | "Review hiring plan" | "Think about Q4" |
+| Owned | Does it have a clear single owner? | "Bob will send the report" | "The team needs to align" |
+| Verifiable | Will we know when it's done? | "Share migration report by Friday" | "Stay on top of things" |
+
+All three must pass. If any criterion fails, the item is filtered out.
+
+### Present numbered review list
+
+Always present ALL candidates, showing both kept and filtered items:
+
+```
+15 potential tasks found. 8 pass the accountability test:
+
+  1. [KEEP] Review hiring plan (you, due 2026-03-25, high)
+  2. [KEEP] Share migration report (Bob Chen, due 2026-03-24, medium)
+  3. [KEEP] Update API documentation (you, due 2026-03-28, medium)
+  4. [KEEP] Schedule vendor demo (Sarah Lopez, due 2026-03-26, low)
+  5. [KEEP] Draft budget proposal (you, due 2026-03-31, high)
+  6. [KEEP] Send test results to QA (Bob Chen, due 2026-03-25, medium)
+  7. [KEEP] Review platform architecture doc (you, due 2026-03-28, low)
+  8. [KEEP] Follow up with Sarah on API timeline (you, due 2026-03-28, low)
+
+  -- Filtered out --
+   9. "We should think about Q4" -- no owner, not concrete
+  10. "The team needs to align on priorities" -- no specific owner
+  11. "Keep an eye on the timeline" -- not verifiable
+  12. "Stay on top of vendor responses" -- not concrete
+  13. "Someone should look into that" -- no owner
+  14. "We need to be more proactive" -- not concrete, not verifiable
+  15. "Let's circle back on that" -- not concrete
+
+Which to create?
+  - "all" to create 1-8
+  - "1, 3, 7" to keep specific ones
+  - "all except 4" to exclude specific ones
+  - "move 10 to keep" to override a filter decision
+  - "none" to skip all
+```
+
+### Create selected tasks
+
+After the user responds, create ONLY the selected tasks using the tasks skill protocol:
+
+```bash
+obsidian create name="Task Title" \
+  path="tasks/YYYY-MM-DD-task-slug.md" \
+  template="task" silent
+
+obsidian property:set name="tags" value="[tars/task]" file="Task Title"
+obsidian property:set name="tars-status" value="open" file="Task Title"
+obsidian property:set name="tars-owner" value="[[Owner Name]]" file="Task Title"
+obsidian property:set name="tars-due" value="YYYY-MM-DD" file="Task Title"
+obsidian property:set name="tars-priority" value="high" file="Task Title"
+obsidian property:set name="tars-source" value="[[YYYY-MM-DD Meeting Title]]" file="Task Title"
+obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Task Title"
+```
+
+### Task placement logic
+
+| Condition | Category |
+|-----------|----------|
+| Has due date, owner is user | Active |
+| Has due date, owner is someone else | Delegated |
+| No due date | Backlog |
+
+### Date resolution
+
+| User says | Resolution |
+|-----------|------------|
+| "today" | Current date YYYY-MM-DD |
+| "tomorrow" | Current date + 1 day |
+| "this week" | Thursday of current week |
+| "next week" | Monday of next week |
+| "Friday" / "next Friday" | First occurrence of that day after today |
+| "end of month" | Last day of current month |
+| "later" / no date | Backlog (no due date) |
+
+NEVER use relative dates in output. Always resolve to YYYY-MM-DD.
+
+---
+
+## Step 11: Extract memory with review (Issues 7, 8)
+
+Memory persistence requires passing the durability test, checking against existing knowledge, handling negative sentiment, and getting user confirmation.
+
+### Durability test
+
+All 4 criteria must pass:
+
+| Criterion | Question |
+|-----------|----------|
+| Lookup value | Will this be useful for lookup next week or next month? |
+| Signal | Is this high-signal and broadly applicable? |
+| Durability | Is this durable, not transient or tactical? |
+| Behavior change | Does this change how TARS should interact in the future? |
+
+**Pass examples:** "Jane now leads both platform and mobile teams." / "Vendor contract renews June 2026." / "Decision: REST over GraphQL for public API."
+
+**Fail examples:** "Meeting rescheduled to Thursday." / "Bob will send the report by Friday." / "We discussed the timeline."
+
+### Knowledge check (Issue 7)
+
+For each item passing the durability test, compare against the vault inventory from Step 5:
+
+| Classification | Action |
+|---------------|--------|
+| `NEW` | Include in the review list |
+| `UPDATE` | Show diff: "Current: 'Jane leads platform.' Update to: 'Jane leads platform and mobile.' Save update?" |
+| `REDUNDANT` | Skip: "Already in memory. Skipping." |
+| `CONTRADICTS` | Ask: "Memory says REST. Transcript says GraphQL. Which is current?" |
+
+### Negative sentiment detection (Issue 8)
+
+Scan proposed memory updates for negative patterns:
+- Performance concerns: slow, underperforming, missing deadlines, unreliable
+- Interpersonal: difficult, political, confrontational, unresponsive
+- Capability: struggling, not up to speed, out of depth
+
+When negative sentiment is detected, present with options:
+
+```
+This about Steve has negative sentiment: "Steve has been slow to deliver on infrastructure commitments."
+Save with flag for periodic review? [Y / Rephrase / Skip]
+```
+
+**If saved with flag:**
+- Wrap the content in markers: `<!-- tars-flag:negative YYYY-MM-DD -->content<!-- /tars-flag -->`
+- Set `tars-has-flagged-content: true` on the person's note via `obsidian property:set`
+- Flagged content appears in the `_views/flagged-content.base` for periodic cleanup
+
+**If rephrase:** Ask user for alternative wording and save the rephrased version without a flag.
+
+**If skip:** Do not persist.
+
+### Present review list with selection syntax
+
+```
+Proposed memory updates:
+  1. [[Jane Smith]]: Now leads both platform and mobile teams (UPDATE -- was platform only)
+  2. [[Bob Chen]]: Concerned about Q3 timeline, may need additional hires (NEW)
+  3. [[Platform Rewrite]]: Decision to use REST over GraphQL for public API (NEW decision)
+  4. [[Steve Park]]: Slow to deliver on infrastructure [FLAGGED -- negative sentiment]
+
+  -- Skipped --
+  5. "We discussed the roadmap" -- failed durability test (no specific insight)
+  6. "Jane mentioned the Q1 results" -- redundant (already in memory from 2026-03-15)
+
+Save? [all / 1, 3 / none / edit #2]
+```
+
+### Persist confirmed updates
+
+For each confirmed memory update:
+
+**New person/entity notes:**
+```bash
+obsidian create name="Entity Name" path="memory/[type]/entity-name.md" template="[type]" silent
+obsidian property:set name="tags" value="[tars/[type]]" file="Entity Name"
+obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Entity Name"
+```
+
+**Updates to existing notes:**
+```bash
+obsidian append file="Entity Name" content="## Update YYYY-MM-DD\n[New information from meeting]\nSource: [[YYYY-MM-DD Meeting Title]]"
+obsidian property:set name="tars-modified" value="YYYY-MM-DD" file="Entity Name"
+```
+
+**New decisions:**
+```bash
+obsidian create name="Decision Title" path="memory/decisions/decision-slug.md" template="decision" silent
+obsidian property:set name="tags" value="[tars/decision]" file="Decision Title"
+obsidian property:set name="tars-date" value="YYYY-MM-DD" file="Decision Title"
+obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Decision Title"
+```
+
+### Memory folder mapping
+
+| Type | Folder |
+|------|--------|
+| Person | `memory/people/` |
+| Vendor | `memory/vendors/` |
+| Competitor | `memory/competitors/` |
+| Product | `memory/products/` |
+| Initiative | `memory/initiatives/` |
+| Decision | `memory/decisions/` |
+| Org context | `memory/org-context/` |
+
+---
+
+## Step 12: Scan for unresolved names
+
+After all writes are complete, scan every wikilink in the journal entry and any newly created/updated notes.
+
+For any wikilink that does not resolve to an existing note:
+
+```bash
+obsidian append file="alias-registry" content="| [Unresolved Name] | ?? (needs full name) |"
+```
+
+Report all unresolved names in the output summary.
+
+---
+
+## Step 13: Log to daily note and changelog
+
+### Daily note
+
+```bash
+obsidian daily:append content="## Meeting processed: [[YYYY-MM-DD Meeting Title]]
+- Participants: [[Jane Smith]], [[Bob Chen]], [[Sarah Lopez]]
+- Tasks: N created (of M candidates)
+- Memory: N updates (X new, Y updated)
+- Transcript: archived to [[YYYY-MM-DD-meeting-slug-transcript]]
+- Unresolved names: N"
+```
+
+### Changelog
+
+Write a changelog entry with a batch ID for potential rollback:
+
+```bash
+obsidian create name="YYYY-MM-DD-batch-[id]" \
+  path="_system/changelog/YYYY-MM-DD.md" silent
+
+obsidian append file="YYYY-MM-DD-batch-[id]" content="## Batch [id]: Meeting processing
+- Source: [transcript format] transcript
+- Journal: [[YYYY-MM-DD Meeting Title]]
+- Transcript: [[YYYY-MM-DD-meeting-slug-transcript]]
+- Tasks created: [list]
+- Memory updated: [list]
+- Timestamp: YYYY-MM-DDTHH:MM:SS"
+```
+
+---
+
+## Step 14: Self-evaluation (Issue 9)
+
+If any errors occurred during the pipeline (failed calendar lookup, obsidian-cli error, script failure, unresolved ambiguity):
+
+### Check for existing issue
+
+```bash
+obsidian search query="tag:tars/issue [error signature keywords]" limit=5
+```
+
+### If existing issue found
+
+```bash
+obsidian property:set name="tars-occurrence-count" value="[incremented]" file="[issue note]"
+obsidian property:set name="tars-last-seen" value="YYYY-MM-DD" file="[issue note]"
+obsidian append file="[issue note]" content="## Occurrence YYYY-MM-DD\n[Error context from this run]"
+```
+
+### If new issue
+
+```bash
+obsidian create name="Issue: [Brief Description]" \
+  path="_system/backlog/issues/issue-slug.md" \
+  template="issue" silent
+
+obsidian property:set name="tags" value="[tars/backlog, tars/issue]" file="Issue: [Brief Description]"
+obsidian property:set name="tars-issue-type" value="cli-error" file="Issue: [Brief Description]"
+obsidian property:set name="tars-severity" value="warning" file="Issue: [Brief Description]"
+obsidian property:set name="tars-occurrence-count" value="1" file="Issue: [Brief Description]"
+obsidian property:set name="tars-first-seen" value="YYYY-MM-DD" file="Issue: [Brief Description]"
+obsidian property:set name="tars-last-seen" value="YYYY-MM-DD" file="Issue: [Brief Description]"
+obsidian property:set name="tars-status" value="open" file="Issue: [Brief Description]"
+obsidian property:set name="tars-context" value="Meeting processing, [step where error occurred]" file="Issue: [Brief Description]"
+obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Issue: [Brief Description]"
+```
 
 ---
 
 ## Output summary
 
-End your response with:
+End every meeting processing run with this summary, regardless of whether all steps succeeded:
 
 ```markdown
 ---
-## Meeting context
-Created: `journal/YYYY-MM/YYYY-MM-DD-meeting-slug.md`
+## Meeting processed
 
-## Task updates
-| Operation | Task | Details |
-|-----------|------|---------|
-| Created | Task description | Owner, due date, destination |
+**Journal:** `journal/YYYY-MM/YYYY-MM-DD-meeting-slug.md`
+**Transcript:** `archive/transcripts/YYYY-MM/YYYY-MM-DD-meeting-slug-transcript.md`
+
+## Task extraction
+| # | Task | Owner | Due | Category | Status |
+|---|------|-------|-----|----------|--------|
+| 1 | Review hiring plan | You | 2026-03-25 | Active | Created |
+| 2 | Share migration report | Bob Chen | 2026-03-24 | Delegated | Created |
 
 ## Memory updates
-| Action | File | Summary |
-|--------|------|---------|
-| Created/Updated | `memory/path/file.md` | What changed |
+| Action | Entity | Summary |
+|--------|--------|---------|
+| Updated | [[Jane Smith]] | Now leads platform and mobile |
+| Created | REST vs GraphQL | New decision record |
 
 ## Summary
-- Journal entry created (file path)
-- Tasks created (count by list)
-- Memory entries created or updated (count by category)
-- Any warnings or gaps (e.g., names not in replacements.md, calendar lookup failed)
+- Journal entry created
+- Transcript archived with bidirectional links
+- Tasks: N created (M candidates, K filtered, J skipped by user)
+- Memory: N updates (X new, Y updated, Z skipped)
+- Unresolved names: N (added to alias registry)
+- Errors: [any errors, or "None"]
 ```
-
----
-
-## Progress tracking (TodoWrite)
-
-Use the `TodoWrite` tool to give the user real-time visibility into pipeline progress. Create the todo list at the start and update as steps complete:
-
-```
-1. Process transcript and generate structured report     [in_progress → completed]
-2. Save journal entry                                    [pending → completed]
-3. Extract tasks (parallel sub-agent)                    [pending → completed]
-4. Extract memory (parallel sub-agent)                   [pending → completed]
-5. Replacement verification                              [pending → completed]
-6. Compile and return summary                            [pending → completed]
-```
-
-**Parallelization note**: Steps 3 and 4 run concurrently. Mark BOTH as `in_progress` when spawning the sub-agents. Mark each `completed` as its sub-agent returns. If one sub-agent completes before the other, update its status immediately without waiting for the other.
-
-Mark each step `in_progress` before starting it and `completed` immediately after. If a step fails, keep it as `in_progress` and add a new todo describing the issue.
-
----
-
-## Context management
-
-For long transcripts (>30 minutes or >5,000 words), offload intermediate results to files rather than keeping everything in context:
-
-1. After Step 3 (save to journal), the journal file path becomes the canonical source for all subsequent steps
-2. Both parallel sub-agents (task extraction and memory extraction) read from the saved journal file, NOT from the raw transcript in context
-3. Each sub-agent operates in isolated context via the Task tool, which naturally prevents context overflow
-4. The main agent only needs to hold the journal file path and the sub-agent results for the final summary
-
-This architecture means transcript length has minimal impact on Steps 4-5 performance, since sub-agents load only the structured journal output.
 
 ---
 
 ## Context budget
-- Memory: Read `_index.md` + up to 5 targeted files
-- Tasks: Execute task integration `list` operation for all configured lists (duplicate check)
-- Calendar: Execute calendar integration `list_events` operation for meeting metadata
-- Reference: `reference/replacements.md` (mandatory)
+
+| Resource | Budget |
+|----------|--------|
+| Alias registry | Full read (Step 1) |
+| Calendar | 1 query for event matching (Step 3) |
+| Vault search | Up to 5 queries per entity/topic (Step 5) |
+| Scripts | 1 scan-secrets.py invocation (Step 6) |
+| Memory reads | Up to 10 targeted file reads for knowledge inventory |
+| Backlog search | 1 query for existing issues (Step 14) |
 
 ---
 
 ## Absolute constraints
 
-- NEVER skip any of the 6 core steps
-- ALWAYS return a summary (even if some steps failed)
-- ALWAYS preserve the source transcript metadata in journal frontmatter
-- NEVER skip any of the 5 report sections
-- NEVER use generic speaker labels
-- NEVER skip saving to journal
-- NEVER skip creating tasks from action items
-- NEVER omit the replacement verification step
-- NEVER output names that appear in replacements.md without using canonical form
+1. NEVER skip any of the 14 pipeline steps
+2. NEVER proceed past Step 3 without a confirmed date and time
+3. NEVER use generic speaker labels ("Speaker 1") in any output
+4. NEVER create tasks without presenting the numbered review list and waiting for user selection
+5. NEVER persist memory without presenting the review list and waiting for user confirmation
+6. NEVER delete the original transcript
+7. NEVER write to the vault before the secret scan (Step 6) completes
+8. NEVER guess when a name is ambiguous. Ask the user.
+9. NEVER skip the knowledge inventory. Redundant information wastes vault space and creates contradictions.
+10. NEVER persist negative sentiment without flagging it and getting explicit user consent
+11. NEVER use relative dates in output. Always resolve to YYYY-MM-DD.
+12. ALWAYS apply canonical names from the alias registry to all output
+13. ALWAYS save a summary to the daily note and changelog
+14. ALWAYS report errors in the output summary even if processing completed partially

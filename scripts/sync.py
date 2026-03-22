@@ -1,216 +1,259 @@
 #!/usr/bin/env python3
-"""TARS sync script.
+"""
+TARS v3 Sync Script
+Identifies gaps between calendar events and journal entries,
+task system drift, and memory staleness.
+Outputs JSON for agent consumption.
 
-Checks schedule.md for due items, scans for orphan tasks,
-and identifies memory gaps. Designed to be invoked by the
-/update skill which handles task tool queries separately.
-
-Output: JSON report with due_items, orphan_tasks, and gaps.
-Uses only Python standard library.
+Usage: python3 scripts/sync.py [vault_path]
 """
 
-import json
-import os
-import re
 import sys
-from datetime import datetime, timedelta
+import os
+import json
+import re
 from pathlib import Path
+from datetime import datetime, date, timedelta
+
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
 
 
-def parse_schedule(workspace):
-    """Parse reference/schedule.md for due items."""
-    schedule_path = workspace / 'reference' / 'schedule.md'
-    if not schedule_path.exists():
-        return [], []
+def parse_frontmatter(file_path):
+    """Extract YAML frontmatter from a markdown file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except (UnicodeDecodeError, IOError):
+        return None
+
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if not match:
+        return None
 
     try:
-        with open(schedule_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except (OSError, UnicodeDecodeError):
-        return [], []
+        if HAS_YAML:
+            fm = yaml.safe_load(match.group(1))
+        else:
+            fm = {}
+            for line in match.group(1).split("\n"):
+                line = line.strip()
+                if ":" in line and not line.startswith("#"):
+                    key, _, val = line.partition(":")
+                    val = val.strip().strip("'\"")
+                    if val.startswith("[") and val.endswith("]"):
+                        val = [v.strip().strip("'\"") for v in val[1:-1].split(",") if v.strip()]
+                    fm[key.strip()] = val
+        return fm if isinstance(fm, dict) else None
+    except Exception:
+        return None
 
-    today = datetime.now().strftime('%Y-%m-%d')
-    recurring_due = []
-    onetime_due = []
 
-    # Parse recurring items: look for [RECURRING] markers
-    recurring_pattern = re.compile(
-        r'\[RECURRING\].*?next-due:\s*(\d{4}-\d{2}-\d{2}).*?(?:title|name|description):\s*(.+?)(?:\n|$)',
-        re.IGNORECASE | re.DOTALL
-    )
-    # Simpler pattern: table rows or list items with dates
-    line_pattern = re.compile(
-        r'(?:\||\-)\s*(?:\[RECURRING\]|\[ONCE\])?\s*(.*?)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|?'
-    )
+def find_meeting_journals(vault_path, days_back=7):
+    """Find meeting journal entries from the past N days."""
+    vault = Path(vault_path)
+    journal_dir = vault / "journal"
+    today = date.today()
+    cutoff = today - timedelta(days=days_back)
 
-    for line in content.split('\n'):
-        line = line.strip()
-        if not line:
+    meetings = []
+    if not journal_dir.exists():
+        return meetings
+
+    for md_file in journal_dir.rglob("*.md"):
+        fm = parse_frontmatter(md_file)
+        if not fm:
             continue
 
-        # Check for recurring items
-        if '[RECURRING]' in line.upper():
-            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', line)
-            if date_match:
-                due_date = date_match.group(1)
-                if due_date <= today:
-                    # Extract description (everything that's not the date or tag)
-                    desc = re.sub(r'\[RECURRING\]', '', line, flags=re.IGNORECASE)
-                    desc = re.sub(r'\d{4}-\d{2}-\d{2}', '', desc)
-                    desc = re.sub(r'[|*\-]', ' ', desc).strip()
-                    recurring_due.append({
-                        'type': 'recurring',
-                        'description': desc or 'Recurring item',
-                        'due_date': due_date,
-                    })
+        tags = fm.get("tags", [])
+        if not isinstance(tags, list):
+            tags = [tags] if tags else []
 
-        # Check for one-time items
-        elif '[ONCE]' in line.upper():
-            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', line)
-            if date_match:
-                due_date = date_match.group(1)
-                if due_date <= today:
-                    desc = re.sub(r'\[ONCE\]', '', line, flags=re.IGNORECASE)
-                    desc = re.sub(r'\d{4}-\d{2}-\d{2}', '', desc)
-                    desc = re.sub(r'[|*\-]', ' ', desc).strip()
-                    onetime_due.append({
-                        'type': 'once',
-                        'description': desc or 'One-time item',
-                        'due_date': due_date,
-                    })
+        if "tars/meeting" not in tags:
+            continue
 
-    return recurring_due, onetime_due
-
-
-def scan_journal_for_entities(workspace):
-    """Scan recent journal entries for entity references."""
-    journal_dir = workspace / 'journal'
-    if not journal_dir.exists():
-        return set(), set(), set()
-
-    cutoff = datetime.now() - timedelta(days=30)
-    people_refs = set()
-    initiative_refs = set()
-    term_refs = set()
-
-    wikilink_pattern = re.compile(r'\[\[([^\]]+)\]\]')
-    name_pattern = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
-
-    for root, dirs, files in os.walk(journal_dir):
-        for fname in files:
-            if not fname.endswith('.md') or fname.startswith('_'):
-                continue
-            filepath = Path(root) / fname
+        meeting_date = fm.get("tars-date")
+        if meeting_date:
             try:
-                stat = filepath.stat()
-                if datetime.fromtimestamp(stat.st_mtime) < cutoff:
+                if isinstance(meeting_date, str):
+                    md = datetime.strptime(meeting_date, "%Y-%m-%d").date()
+                elif isinstance(meeting_date, date):
+                    md = meeting_date
+                else:
                     continue
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            except (OSError, UnicodeDecodeError):
+
+                if md >= cutoff:
+                    meetings.append({
+                        "file": str(md_file.relative_to(vault)),
+                        "date": str(meeting_date),
+                        "title": fm.get("tars-calendar-title", md_file.stem),
+                        "participants": fm.get("tars-participants", []),
+                    })
+            except ValueError:
                 continue
 
-            for match in wikilink_pattern.finditer(content):
-                entity = match.group(1)
-                # Simple heuristic: if it looks like a person name, add to people
-                if re.match(r'^[A-Z][a-z]+ [A-Z][a-z]+', entity):
-                    people_refs.add(entity)
-                else:
-                    initiative_refs.add(entity)
-
-            for match in name_pattern.finditer(content):
-                people_refs.add(match.group(1))
-
-    return people_refs, initiative_refs, term_refs
+    return meetings
 
 
-def load_known_entities(workspace):
-    """Load known entities from memory indexes."""
-    known_people = set()
-    known_initiatives = set()
+def find_recent_people_in_meetings(vault_path, days_back=7):
+    """Find people referenced in recent meetings."""
+    meetings = find_meeting_journals(vault_path, days_back)
+    people = set()
 
-    # Load people
-    people_index = workspace / 'memory' / 'people' / '_index.md'
-    if people_index.exists():
-        try:
-            with open(people_index, 'r', encoding='utf-8') as f:
-                for line in f:
-                    # Extract names from table rows
-                    match = re.match(r'\|\s*([^|]+?)\s*\|', line)
-                    if match:
-                        name = match.group(1).strip()
-                        if name and name != 'Name' and not name.startswith('-'):
-                            known_people.add(name)
-        except (OSError, UnicodeDecodeError):
-            pass
+    for meeting in meetings:
+        participants = meeting.get("participants", [])
+        if isinstance(participants, list):
+            for p in participants:
+                # Extract name from wikilink: [[Name]] → Name
+                name = re.sub(r'\[\[|\]\]', '', str(p))
+                if name:
+                    people.add(name)
 
-    # Load initiatives
-    init_index = workspace / 'memory' / 'initiatives' / '_index.md'
-    if init_index.exists():
-        try:
-            with open(init_index, 'r', encoding='utf-8') as f:
-                for line in f:
-                    match = re.match(r'\|\s*([^|]+?)\s*\|', line)
-                    if match:
-                        name = match.group(1).strip()
-                        if name and name != 'Name' and not name.startswith('-'):
-                            known_initiatives.add(name)
-        except (OSError, UnicodeDecodeError):
-            pass
-
-    return known_people, known_initiatives
+    return people
 
 
-def detect_gaps(workspace):
-    """Find entities referenced in journal but not in memory."""
-    people_refs, initiative_refs, _ = scan_journal_for_entities(workspace)
-    known_people, known_initiatives = load_known_entities(workspace)
+def check_memory_freshness(vault_path, recent_people, days_stale=60):
+    """Check if people in recent meetings have stale memory files."""
+    vault = Path(vault_path)
+    people_dir = vault / "memory" / "people"
+    stale = []
+    missing = []
+    today = date.today()
 
-    unknown_people = []
-    for name in sorted(people_refs - known_people):
-        unknown_people.append({'name': name, 'source': 'journal'})
+    if not people_dir.exists():
+        return stale, list(recent_people)
 
-    unknown_initiatives = []
-    for name in sorted(initiative_refs - known_initiatives):
-        if name not in known_people:  # Don't flag people as initiatives
-            unknown_initiatives.append({'name': name, 'source': 'journal'})
+    existing_people = {}
+    for md_file in people_dir.rglob("*.md"):
+        fm = parse_frontmatter(md_file)
+        if fm:
+            name = md_file.stem
+            existing_people[name.lower()] = {
+                "file": str(md_file.relative_to(vault)),
+                "modified": fm.get("tars-modified"),
+            }
+            # Also check aliases
+            aliases = fm.get("aliases", [])
+            if isinstance(aliases, list):
+                for alias in aliases:
+                    existing_people[str(alias).lower()] = existing_people[name.lower()]
 
-    return unknown_people, unknown_initiatives
+    for person in recent_people:
+        person_lower = person.lower()
+        if person_lower in existing_people:
+            info = existing_people[person_lower]
+            modified = info.get("modified")
+            if modified:
+                try:
+                    if isinstance(modified, str):
+                        mod_date = datetime.strptime(modified, "%Y-%m-%d").date()
+                    elif isinstance(modified, date):
+                        mod_date = modified
+                    else:
+                        continue
+
+                    age = (today - mod_date).days
+                    if age > days_stale:
+                        stale.append({
+                            "person": person,
+                            "file": info["file"],
+                            "last_modified": str(modified),
+                            "days_since_update": age,
+                        })
+                except ValueError:
+                    pass
+        else:
+            missing.append(person)
+
+    return stale, missing
+
+
+def check_task_freshness(vault_path):
+    """Find tasks that may need attention."""
+    vault = Path(vault_path)
+    today = date.today()
+    issues = []
+
+    # Scan for task files
+    for scan_dir in ["memory"]:
+        dir_path = vault / scan_dir
+        if not dir_path.exists():
+            continue
+
+        for md_file in dir_path.rglob("*.md"):
+            fm = parse_frontmatter(md_file)
+            if not fm:
+                continue
+
+            tags = fm.get("tags", [])
+            if not isinstance(tags, list):
+                tags = [tags] if tags else []
+
+            if "tars/task" not in tags:
+                continue
+
+            status = fm.get("tars-status", "")
+            if status in ("done", "cancelled"):
+                continue
+
+            due = fm.get("tars-due")
+            if due:
+                try:
+                    if isinstance(due, str):
+                        due_date = datetime.strptime(due, "%Y-%m-%d").date()
+                    elif isinstance(due, date):
+                        due_date = due
+                    else:
+                        continue
+
+                    days_overdue = (today - due_date).days
+                    if days_overdue > 0:
+                        issues.append({
+                            "file": str(md_file.relative_to(vault)),
+                            "task": md_file.stem,
+                            "due": str(due),
+                            "days_overdue": days_overdue,
+                            "status": status,
+                        })
+                except ValueError:
+                    pass
+
+    return issues
 
 
 def main():
-    if len(sys.argv) > 1:
-        workspace = Path(sys.argv[1])
-    else:
-        workspace = Path('.')
+    vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
 
-    if not workspace.exists():
-        print(json.dumps({'error': f'Workspace not found: {workspace}'}))
-        sys.exit(1)
+    # Check for meeting-journal gaps
+    recent_meetings = find_meeting_journals(vault_path, days_back=7)
 
-    # Check schedule
-    recurring_due, onetime_due = parse_schedule(workspace)
+    # Check memory freshness
+    recent_people = find_recent_people_in_meetings(vault_path, days_back=7)
+    stale_people, missing_people = check_memory_freshness(vault_path, recent_people)
 
-    # Detect memory gaps
-    unknown_people, unknown_initiatives = detect_gaps(workspace)
+    # Check task freshness
+    overdue_tasks = check_task_freshness(vault_path)
 
-    report = {
-        'workspace': str(workspace),
-        'timestamp': datetime.now().isoformat(),
-        'schedule': {
-            'recurring_due': recurring_due,
-            'onetime_due': onetime_due,
-            'total_due': len(recurring_due) + len(onetime_due),
+    output = {
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "recent_meetings": len(recent_meetings),
+            "stale_people": len(stale_people),
+            "missing_people": len(missing_people),
+            "overdue_tasks": len(overdue_tasks),
         },
-        'memory_gaps': {
-            'unknown_people': unknown_people,
-            'unknown_initiatives': unknown_initiatives,
-            'total_gaps': len(unknown_people) + len(unknown_initiatives),
-        },
+        "recent_meetings": recent_meetings,
+        "stale_people": stale_people,
+        "missing_people": missing_people,
+        "overdue_tasks": overdue_tasks,
     }
 
-    print(json.dumps(report, indent=2))
+    print(json.dumps(output, indent=2))
+    sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,0 +1,34 @@
+filters:
+  and:
+    - file.hasTag("tars/person")
+    - not:
+        - file.hasTag("tars/archived")
+
+formulas:
+  days_since_update: 'if(tars-modified, (now() - date(tars-modified)).days, 999)'
+  needs_review: 'if(days_since_update > 90, "Yes", "No")'
+
+properties:
+  formula.days_since_update:
+    displayName: "Days Since Update"
+  formula.needs_review:
+    displayName: "Needs Review"
+
+views:
+  - type: table
+    name: "All People"
+    order:
+      - file.name
+      - tars-summary
+      - tars-staleness
+      - tars-modified
+  - type: table
+    name: "Stale (90+ days)"
+    filters:
+      and:
+        - 'formula.needs_review == "Yes"'
+    order:
+      - file.name
+      - tars-summary
+      - tars-modified
+      - formula.days_since_update

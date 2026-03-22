@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node modules (if any MCP deps are installed locally)
+node_modules/
+
+# Workspace runtime data (only exists in deployed vault, not in framework repo)
+data/
+
+# Claude settings (except skills which are framework source)
+.claude/*
+!.claude/skills/
+
+# Distribution build artifacts (regenerated from source)
+tars-cowork-plugin/
+
+# Antigravity compatibility layer (v2 legacy)
+antigravity-wrapper/
+
+# Trash folder
+trash/
+ROADMAP.md
+IMPLEMENTATION_PLAN.md
+COWORK_PLUGIN_ANALYSIS.md

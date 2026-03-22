@@ -1,0 +1,12 @@
+filters:
+  file.hasTag("tars/transcript")
+
+views:
+  - type: table
+    name: "All Transcripts"
+    order:
+      - file.name
+      - tars-journal-entry
+      - tars-date
+      - tars-participants
+      - tars-format

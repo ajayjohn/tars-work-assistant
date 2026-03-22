@@ -1,0 +1,27 @@
+filters:
+  and:
+    - file.hasTag("tars/vendor")
+    - not:
+        - file.hasTag("tars/archived")
+
+formulas:
+  days_since_update: 'if(tars-modified, (now() - date(tars-modified)).days, 999)'
+
+views:
+  - type: table
+    name: "All Vendors"
+    order:
+      - file.name
+      - tars-summary
+      - tars-key-contact
+      - tars-contract-renewal
+      - tars-modified
+  - type: table
+    name: "Renewals Upcoming"
+    filters:
+      and:
+        - 'tars-contract-renewal != ""'
+    order:
+      - file.name
+      - tars-contract-renewal
+      - tars-key-contact

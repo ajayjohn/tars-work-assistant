@@ -1,0 +1,29 @@
+filters:
+  and:
+    - file.hasTag("tars/initiative")
+    - not:
+        - file.hasTag("tars/archived")
+
+views:
+  - type: table
+    name: "Active"
+    filters:
+      and:
+        - 'tars-status == "active"'
+    order:
+      - file.name
+      - tars-summary
+      - tars-health
+      - tars-owner
+      - tars-target-date
+      - tars-modified
+  - type: table
+    name: "All"
+    order:
+      - file.name
+      - tars-summary
+      - tars-status
+      - tars-health
+      - tars-owner
+    groupBy:
+      property: tars-status

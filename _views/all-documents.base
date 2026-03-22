@@ -1,0 +1,12 @@
+filters:
+  file.hasTag("tars/companion")
+
+views:
+  - type: table
+    name: "All Documents"
+    order:
+      - file.name
+      - tars-original-file
+      - tars-original-type
+      - tars-summary
+      - tars-added-date

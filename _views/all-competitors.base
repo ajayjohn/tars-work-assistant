@@ -1,0 +1,14 @@
+filters:
+  and:
+    - file.hasTag("tars/competitor")
+    - not:
+        - file.hasTag("tars/archived")
+
+views:
+  - type: table
+    name: "All Competitors"
+    order:
+      - file.name
+      - tars-summary
+      - tars-staleness
+      - tars-modified

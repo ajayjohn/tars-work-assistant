@@ -1,414 +1,697 @@
 ---
 name: welcome
-description: Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering
+description: Onboarding wizard that scaffolds the vault structure, installs obsidian-skills, configures integrations, gathers user context, registers scheduled jobs, and initializes git
 user-invocable: true
+triggers:
+  - first run (no _system/config.md)
+  - "setup"
+  - "onboarding"
+  - "welcome"
+  - "initialize TARS"
+  - "bootstrap"
 help:
   purpose: |-
-    Interactive first-run workspace setup with directory scaffolding, integration verification, and context gathering.
+    Interactive first-run workspace setup. Creates vault scaffolding, installs obsidian-skills,
+    configures integrations, gathers user context progressively, registers cron jobs for
+    briefings and maintenance, and initializes git.
   use_cases:
     - "Set up TARS"
     - "Bootstrap my workspace"
     - "Initialize TARS"
-  scope: setup,bootstrap,onboarding,welcome
+    - "Run onboarding"
+  scope: setup,bootstrap,onboarding,welcome,initialize
 ---
 
-# Welcome to TARS
+# Welcome: onboarding wizard
 
-Interactive first-run setup. Creates workspace scaffolding and learns user context.
+Interactive first-run setup for TARS v3. Creates the full vault structure, installs obsidian-skills,
+configures integrations, gathers user context progressively, registers scheduled jobs, and
+initializes git. This skill replaces both `install.sh` and the legacy `/welcome` command.
 
-**This skill replaces both `install.sh` and the legacy `/welcome` command.**
+---
 
-## Protocol
+## Pipeline overview
 
-No external protocol file. Self-contained setup command.
+| Step | Name | Purpose |
+|------|------|---------|
+| 1 | Pre-flight check | Detect existing vault, offer resume or fresh start |
+| 2 | Create vault structure | All folders, _system files, templates, _views, scripts |
+| 3 | Install obsidian-skills | Copy/verify skills into .claude/skills/ |
+| 4 | Configure integrations | Calendar provider, task manager selection |
+| 5 | Initial context gathering | Progressive user profiling (4 rounds) |
+| 6 | Configure schedule | Briefing times, maintenance window |
+| 7 | Register cron jobs | Daily briefing, weekly briefing, maintenance via CronCreate |
+| 8 | Initialize git | Repo init, .gitignore, initial commit |
+| 9 | Welcome summary | Report, next steps, maturity update |
 
-## Procedure
+---
 
-### Step 1: Check existing workspace
+## Step 1: Pre-flight check
 
-Check for existing workspace files:
-- `CLAUDE.md` (root config)
-- `memory/` directory
-- `tasks/` directory
-- `journal/` directory
-- `contexts/` directory
-- `reference/replacements.md`
+Check whether the vault has already been set up.
 
-If files exist, ask: "Existing workspace detected. A) Add to it, B) Start fresh, C) Cancel"
+**Detection**: Read `_system/config.md`. If it exists and contains a filled `tars-user-name` property:
 
-### Step 2: Create directory scaffolding and verify integrations
+> "TARS is already set up for {user_name}. Run health check? [Y/N]"
 
-Run the automated scaffolding script:
+- **Y**: Route to `skills/maintain/` health check mode. Exit this skill.
+- **N**: Ask: "Start fresh (overwrites config) or cancel?"
+  - **Fresh**: Continue to Step 2. Existing memory/journal content is preserved.
+  - **Cancel**: Exit.
 
-```bash
-bash scripts/scaffold.sh {workspace_path} {plugin_path}
+If `_system/config.md` does not exist or has no user profile, proceed to Step 2.
+
+---
+
+## Step 2: Create vault structure
+
+Create the complete vault directory tree. Use `obsidian create` for all note creation (never direct file I/O for writes). Use filesystem tools only for creating empty directories.
+
+### 2a: Directories
+
+Create every directory in the vault structure:
+
 ```
-
-This script creates all directories, copies reference templates, creates empty indexes, and verifies configured integrations. Parse the JSON output to determine what was created and which integrations are available.
-
-Then run integration verification separately for detailed health info:
-
-```bash
-python3 scripts/verify-integrations.py {workspace_path}
-```
-
-This script checks each configured integration's health and returns JSON with status per integration (`configured`, `error`, `not_configured`, `check_mcp_servers`). Report integration status to the user.
-
-If the scripts are not available, create directories manually:
-
-```
+_system/
+_system/changelog/
+_system/backlog/
+_system/backlog/issues/
+_system/backlog/ideas/
+_views/
 memory/
-  people/
-  vendors/
-  competitors/
-  products/
-  initiatives/
-  decisions/
-  organizational-context/
+memory/people/
+memory/vendors/
+memory/competitors/
+memory/products/
+memory/initiatives/
+memory/decisions/
+memory/org-context/
 journal/
 contexts/
-  products/
-  artifacts/
+contexts/products/
+contexts/artifacts/
+inbox/
+inbox/pending/
+inbox/processed/
+archive/
+archive/transcripts/
+templates/
+scripts/
+skills/
+.claude/
+.claude/skills/
 ```
 
-And verify manually:
-1. **Task integration**: Read `reference/integrations.md` Tasks section. Execute a test `list` operation. If it fails, warn and continue.
-2. **Calendar integration**: Read `reference/integrations.md` Calendar section. Execute a test `list_events` operation. If it fails, warn and continue.
+For each directory, check if it already exists before creating. Report skipped directories.
 
-Display integration status clearly using symbols:
-- ✓ (ok/configured)
-- ⚠ (not configured)
-- ✗ (error)
-- ℹ (check MCP servers)
+### 2b: _system files
 
-### Step 2.5: MCP Integration Setup Guidance
+Create the following system files with default content:
 
-After verifying integrations in Step 2, check the status of calendar and tasks integrations. For each integration that is not configured, provide guidance to the user.
+**_system/config.md**
+```yaml
+---
+tags: [tars/system]
+tars-user-name: ""
+tars-user-title: ""
+tars-user-company: ""
+tars-user-industry: ""
+tars-user-org: ""
+tars-calendar-provider: ""
+tars-task-provider: ""
+tars-daily-briefing-time: "07:30"
+tars-daily-briefing-tz: "America/Chicago"
+tars-weekly-briefing-day: "Monday"
+tars-weekly-briefing-time: "08:00"
+tars-maintenance-day: "Friday"
+tars-maintenance-time: "17:00"
+tars-created: YYYY-MM-DD
+---
 
-**For Calendar (if not configured):**
+# TARS configuration
 
-Display:
+User profile and system preferences. Populated by onboarding wizard.
 ```
-⚠ Calendar not configured
 
-TARS needs calendar access for:
-- Daily and weekly briefings with schedule awareness
-- Meeting attendee context and calendar lookups
-- "When did I last meet X?" queries
-- Full meeting processing pipeline
+**_system/integrations.md**
+```yaml
+---
+tags: [tars/system]
+tars-created: YYYY-MM-DD
+---
 
-Recommended MCP Servers:
-- Apple Calendar: @modelcontextprotocol/server-apple-calendar
-- Google Calendar: @modelcontextprotocol/server-google-calendar
-- Microsoft 365: @modelcontextprotocol/server-microsoft-365
+# Integration registry
 
-Setup Instructions:
-1. Create .mcp.json in your workspace root (if it doesn't exist)
-2. Add calendar MCP server configuration
-3. Restart Claude Cowork/Code
-4. Re-run /welcome to verify
+Provider-agnostic integration configuration.
 
-Example .mcp.json for Apple Calendar:
+## Calendar
+
+| Field | Value |
+|-------|-------|
+| Provider | (not configured) |
+| MCP server | (not configured) |
+| Status | pending |
+
+## Tasks
+
+| Field | Value |
+|-------|-------|
+| Provider | (not configured) |
+| MCP server | (not configured) |
+| Status | pending |
+| Lists | Active, Delegated, Backlog |
+```
+
+**_system/alias-registry.md** -- Empty registry with header and table structure for name-to-canonical mappings.
+
+**_system/taxonomy.md** -- Tag taxonomy and entity type definitions per the tag taxonomy table in the vault structure spec.
+
+**_system/kpis.md** -- Empty KPI template with instructions for adding metrics per team and initiative.
+
+**_system/schedule.md** -- Empty schedule template with sections for recurring and one-time items.
+
+**_system/guardrails.yaml** -- Default guardrails with block patterns (SSN, credit card, API key) and warn patterns (salary, compensation, performance rating).
+
+**_system/maturity.yaml**
+```yaml
+onboarding:
+  vault_structure: false
+  obsidian_skills: false
+  integrations: false
+  user_profile: false
+  schedule: false
+  cron_jobs: false
+  git_initialized: false
+  completed: false
+  completed_date: null
+last_updated: null
+```
+
+**_system/housekeeping-state.yaml**
+```yaml
+last_run: null
+last_success: null
+run_count: 0
+last_archival: null
+pending_inbox_count: 0
+cron_jobs:
+  daily_briefing: null
+  weekly_briefing: null
+  maintenance: null
+plugin_version: "3.0.0"
+```
+
+**_system/schemas.yaml** -- Frontmatter validation schemas for all entity types (person, vendor, competitor, product, initiative, decision, org-context, journal, task, transcript, companion). Each schema lists required and optional properties with types.
+
+### 2c: Templates
+
+Create Obsidian templates in `templates/`:
+
+| Template | Frontmatter tags | Key properties |
+|----------|-----------------|----------------|
+| person.md | `tars/person` | tars-role, tars-org, tars-relationship, aliases |
+| vendor.md | `tars/vendor` | tars-category, tars-status, tars-contract-renewal |
+| competitor.md | `tars/competitor` | tars-category, tars-threat-level |
+| product.md | `tars/product` | tars-status, tars-owner |
+| initiative.md | `tars/initiative` | tars-status, tars-owner, tars-health, tars-target-date |
+| decision.md | `tars/decision` | tars-status, tars-decision-maker, tars-date |
+| org-context.md | `tars/org-context` | tars-scope, tars-last-validated |
+| meeting-journal.md | `tars/journal, tars/meeting` | tars-date, tars-meeting-datetime, tars-participants, tars-organizer, tars-topics, tars-initiatives, tars-source, tars-transcript |
+| daily-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: daily |
+| weekly-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: weekly |
+| wisdom-journal.md | `tars/journal, tars/wisdom` | tars-date, tars-source-title, tars-source-url |
+| companion.md | `tars/companion` | tars-original-file, tars-original-type, tars-file-size, tars-added-date, tars-source, tars-summary |
+| transcript.md | `tars/transcript` | tars-journal-entry, tars-date, tars-meeting-datetime, tars-participants, tars-format |
+| issue.md | `tars/backlog, tars/issue` | tars-issue-type, tars-severity, tars-status |
+| idea.md | `tars/backlog, tars/idea` | tars-requested-by, tars-priority, tars-status |
+
+Each template should include the full frontmatter block with placeholder values and a minimal body structure appropriate to the entity type.
+
+### 2d: _views base files
+
+Create `.base` files in `_views/`. Each .base file is a YAML-formatted Obsidian Bases live query.
+
+| Base file | Query filter | Columns |
+|-----------|-------------|---------|
+| all-people.base | `tags contains tars/person` | Name, Role, Org, Last updated, Staleness formula |
+| all-initiatives.base | `tags contains tars/initiative` | Name, Status, Owner, Health, Target date |
+| all-decisions.base | `tags contains tars/decision` | Name, Date, Status, Decision maker |
+| all-products.base | `tags contains tars/product` | Name, Status, Owner |
+| all-vendors.base | `tags contains tars/vendor` | Name, Category, Status, Contract renewal |
+| all-competitors.base | `tags contains tars/competitor` | Name, Category, Threat level |
+| recent-journal.base | `tags contains tars/journal` | Date, Type, Title, Participants (last 30d filter) |
+| active-tasks.base | `tags contains tars/task AND tars-status = open` | Title, Owner, Due, Priority, Initiative |
+| overdue-tasks.base | `tags contains tars/task AND tars-due < today()` | Title, Owner, Due, Days overdue |
+| stale-memory.base | Formula: days since tars-updated > staleness threshold | Name, Type, Last updated, Days stale |
+| inbox-pending.base | `tags contains tars/inbox AND tars-inbox-processed != true` | Name, Type, Added date |
+| all-documents.base | `tags contains tars/companion` | Name, Original file, Type, Added date, Summary |
+| all-transcripts.base | `tags contains tars/transcript` | Name, Journal entry, Date, Format |
+| flagged-content.base | `tags contains tars/flagged` | Person, Statement, Date flagged, Age |
+| backlog.base | `tags contains tars/backlog` | Type, Severity/Priority, Status, Description |
+
+Refer to the obsidian-bases skill (`obsidian-bases/SKILL.md`) for exact .base YAML syntax.
+
+### 2e: Scripts
+
+Create the following Python scripts in `scripts/`:
+
+| Script | Purpose |
+|--------|---------|
+| validate-schema.py | Validates frontmatter against _system/schemas.yaml |
+| scan-secrets.py | Scans for blocked/warned patterns from _system/guardrails.yaml |
+| scan-flagged.py | Finds negative sentiment markers in people notes |
+| health-check.py | Comprehensive: schema + links + aliases + staleness |
+| archive.py | Staleness-based archival with `--auto` and `--dry-run` flags |
+| sync.py | Calendar gap detection + task system drift check |
+
+Each script should:
+- Accept the vault path as first argument
+- Output JSON to stdout
+- Exit 0 on success, 1 on error
+- Read configuration from `_system/` files
+- Never modify files directly (output recommendations for the agent to apply via obsidian-cli)
+
+After creating all structure, update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  vault_structure: true
+```
+
+---
+
+## Step 3: Install obsidian-skills
+
+Copy or verify the following obsidian-skills are present in `.claude/skills/`:
+
+| Skill | Path | Contents |
+|-------|------|----------|
+| obsidian-cli | `.claude/skills/obsidian-cli/SKILL.md` | CLI tool for all vault writes |
+| obsidian-bases | `.claude/skills/obsidian-bases/SKILL.md` + `references/` | .base file creation and querying |
+| obsidian-markdown | `.claude/skills/obsidian-markdown/SKILL.md` + `references/` | Markdown and frontmatter conventions |
+| json-canvas | `.claude/skills/json-canvas/SKILL.md` + `references/` | Canvas file creation |
+| defuddle | `.claude/skills/defuddle/SKILL.md` | Web content extraction |
+
+### Installation procedure
+
+1. Check if each skill directory exists and contains SKILL.md
+2. If missing, copy from the TARS source tree (this repo's skill definitions)
+3. If already present, verify file is not empty and report as "verified"
+4. Report installation status for each skill
+
+After installation, update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  obsidian_skills: true
+```
+
+---
+
+## Step 4: Configure integrations
+
+Present integration choices using multiple-choice questions. Ask both in a single interaction round.
+
+### Calendar provider
+
+> "Calendar provider?
+>   1. Apple Calendar
+>   2. Google Calendar
+>   3. Outlook / Microsoft 365
+>   4. None for now"
+
+### Task manager
+
+> "Task manager?
+>   1. Apple Reminders
+>   2. Todoist
+>   3. Linear
+>   4. None for now"
+
+### Save selections
+
+For each configured integration:
+
+1. Update `_system/integrations.md` with provider name, expected MCP server, and status
+2. Update `_system/config.md` properties: `tars-calendar-provider`, `tars-task-provider`
+
+### Verify connectivity
+
+For each selected integration (not "None"):
+
+1. Attempt a test query via the expected MCP tool:
+   - Calendar: list events for today
+   - Tasks: list all task lists
+2. Report status:
+   - Connected: "Calendar: Apple Calendar (connected)"
+   - Error: "Calendar: Apple Calendar (MCP server not responding). Add to .mcp.json and restart Claude."
+   - Not configured: "Calendar: None selected"
+
+### MCP setup guidance
+
+If any integration fails connectivity or user selects "None":
+
+> "TARS needs calendar access for briefings, meeting context, and schedule queries.
+> TARS needs task manager access for action item creation and tracking.
+>
+> To configure later:
+> 1. Add the MCP server to your .mcp.json
+> 2. Restart Claude
+> 3. Run 'setup' again to verify
+>
+> Continue with reduced functionality? [Y/N]"
+
+- **Y**: Proceed to Step 5
+- **N**: Display .mcp.json examples and exit
+
+### .mcp.json examples
+
+```json
 {
   "mcpServers": {
     "apple-calendar": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
-    }
-  }
-}
-```
-
-**For Tasks (if not configured):**
-
-Display:
-```
-⚠ Tasks not configured
-
-TARS needs task manager access for:
-- Automatic action item creation from meetings
-- Task tracking in daily/weekly briefings
-- Task triage and prioritization
-- Accountability tracking
-
-Recommended MCP Servers:
-- Apple Reminders: @modelcontextprotocol/server-apple-reminders
-- Todoist: @modelcontextprotocol/server-todoist
-- TickTick: @modelcontextprotocol/server-ticktick
-- Microsoft To-Do: @modelcontextprotocol/server-microsoft-todo
-- Linear: @modelcontextprotocol/server-linear (for engineering teams)
-
-Setup Instructions:
-1. Add to your .mcp.json file
-2. Restart Claude Cowork/Code
-3. Re-run /welcome to verify
-
-Example .mcp.json with both calendar and tasks:
-{
-  "mcpServers": {
-    "apple-calendar": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-calendar"]
+      "args": ["-y", "@anthropic/apple-calendar-mcp"]
     },
     "apple-reminders": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-apple-reminders"]
+      "args": ["-y", "@anthropic/apple-reminders-mcp"]
     }
   }
 }
 ```
 
-**If both calendar and tasks are configured (MCP or legacy):**
-→ Report: "✓ Calendar: Configured" and "✓ Tasks: Configured"
-→ Skip guidance and proceed directly to Step 3
-
-**If one or both integrations have errors:**
-→ Display troubleshooting:
-  - Check if MCP server package exists and is accessible
-  - Verify .mcp.json syntax is valid JSON
-  - Suggest restart of Claude Cowork/Code
-  - Continue anyway (don't block setup)
-
-**Ask user before proceeding:**
-If calendar and/or tasks are not configured, ask:
-"I notice calendar and/or tasks are not configured. You can:
-1. Exit now to configure .mcp.json and restart Claude
-2. Continue with reduced functionality (you can set up integrations later)
-
-What would you like to do?"
-
-If user chooses to continue, proceed to Step 3. If user chooses to exit, display:
-"Setup incomplete. To configure integrations:
-1. Create/edit .mcp.json in your workspace root with the examples above
-2. Restart Claude Cowork/Code
-3. Re-run /welcome
-
-See GETTING-STARTED.md 'Essential Integrations' section for more details."
-
-### Step 3: Interactive setup wizard
-
-Gather context through bounded questions (max 3 questions per round):
-
-**Round 1: Identity**
-- "What is your name?"
-- "What is your title/role?"
-- "What is your company name and industry?"
-
-**Round 2: Organization**
-- "What teams do you manage or work with? (List team names and their focus areas)"
-- "What products or services do you own/oversee?"
-- "Who is your manager, and who are 2-3 key executives you work with? (Name, title)"
-
-**Round 3: People**
-- "List your top 10-15 key people with their roles and any nicknames/abbreviations. Format: Full Name (Role) - also known as: nickname"
-
-**Round 4: Context**
-- "What are your current active initiatives/projects? (Name and one-line description each)"
-- "Any common acronyms or shorthand your team uses? (Format: abbreviation = full name)"
-
-### Step 4: Generate workspace files
-
-Using the gathered information, create:
-
-#### `CLAUDE.md` (workspace root)
-
-```markdown
-# TARS Framework
-
-You are TARS, the intelligent assistant for **{user_name}, {title} at {company}**.
-{company_description}
-Teams: {team_list}.
-Products: {product_list}.
-
----
-
-## Core directives
-
-- **BLUF**: Lead every response with the bottom line. No preambles.
-- **Anti-sycophancy**: Challenge flawed premises. Never default to agreement.
-- **Clarification**: If critical context is missing after checking sources, STOP and ask using bounded techniques (menu, strawman, binary). Never guess.
-- **Wikilinks**: Use `[[Entity Name]]` for all internal entity references.
-- **Name normalization**: Read `reference/replacements.md` before processing any names. Always use canonical forms.
-- **Framework citation**: When applying a decision framework, state which one and why.
-
----
-
-## MCP integrations
-
-External tools available via MCP. See `reference/integrations.md` for query patterns.
-Configured: {configured_mcps}. Placeholder: {placeholder_mcps}.
-```
-
-#### `reference/replacements.md`
-
-Populate People section with nicknames from Round 3. Populate Teams section with abbreviations. Populate Products/Initiatives section with acronyms from Round 4.
-
-#### `reference/taxonomy.md`
-
-Copy the template taxonomy from the plugin's `reference/taxonomy.md`. No user-specific modifications needed (it's already generic structure).
-
-#### `reference/kpis.md`
-
-Create a template KPI file with sections for each team and initiative gathered in setup:
-
-```markdown
-# KPI definitions
-
-User-maintained file. Add metrics per team and initiative.
-
----
-
-## {Team Name}
-
-- **Velocity**: Average story points per sprint (~~project tracker)
-- **Cycle time**: Average days from start to done (~~project tracker)
-
-[Repeat for each team]
-
----
-
-## {Initiative Name}
-
-- **Feature completion**: Done / Total stories (~~project tracker)
-- **Blocked items**: Issues in Blocked status (~~project tracker)
-
-[Repeat for each initiative]
-
----
-
-## Adding new KPIs
-
-1. Add under the appropriate team or initiative heading
-2. Format: `- **Metric Name**: Description (data source)`
-3. Include the data source so the report protocol knows where to query
-```
-
-#### Memory folder indexes
-
-For each memory category, create an empty `_index.md`:
-
-```markdown
-# {Category} index
-
-| Name | Aliases | File | Summary | Updated |
-|------|---------|------|---------|---------|
-```
-
-#### Contexts indexes
-
-Create `contexts/products/_index.md`:
-
-```markdown
-# Product specifications index
-
-| Name | Status | Owner | Summary | Updated |
-|------|--------|-------|---------|---------|
-```
-
-Create `contexts/artifacts/_index.md`:
-
-```markdown
-# Artifacts index
-
-| Name | Type | Created | Source | Summary |
-|------|------|---------|--------|---------|
-```
-
-#### Initial people entries
-
-For each key person from Round 3, create `memory/people/{slug}.md`:
-
+After configuration, update `_system/maturity.yaml`:
 ```yaml
----
-title: Full Name
-type: person
-tags: [stakeholder]
-aliases: [nickname1, nickname2]
-summary: Role description
-related: []
-updated: YYYY-MM-DD
----
+onboarding:
+  integrations: true
 ```
 
-```markdown
-# [[Full Name]]
+---
 
-**Role:** {role}
-**Relationship:** {relationship to user}
+## Step 5: Initial context gathering
+
+Progressive context gathering. Do not ask everything at once. Each round is a bounded set of questions (max 3 per round). Use multiple-choice where possible.
+
+### Round 1: Identity
+
+> "What's your name and role?"
+
+Single open question. Parse response for:
+- Full name
+- Title/role
+- Optional: company name if mentioned
+
+Save to `_system/config.md`: `tars-user-name`, `tars-user-title`
+
+### Round 2: Organization
+
+> "What organization or team are you part of? And what industry?"
+
+Parse response for:
+- Company/organization name
+- Team name(s)
+- Industry
+
+Save to `_system/config.md`: `tars-user-company`, `tars-user-industry`, `tars-user-org`
+
+Create `memory/org-context/` note for the organization using the org-context template.
+
+### Round 3: Key people
+
+> "Name 3-5 people you work with most. For each, give their name and role (e.g., 'Sarah Chen, VP Engineering')."
+
+For each person mentioned:
+1. Create a person note in `memory/people/` using the person template:
+   ```
+   obsidian create --template templates/person.md --path memory/people/{slug}.md
+   obsidian property:set --path memory/people/{slug}.md --property tars-role --value "{role}"
+   ```
+2. Set basic properties: name, role, relationship to user
+3. Add aliases if nicknames are mentioned
+4. Add to `_system/alias-registry.md`
+
+### Round 4: Active initiatives
+
+> "What are your main projects or initiatives right now? (Name and one-line description for each)"
+
+For each initiative mentioned:
+1. Create an initiative note in `memory/initiatives/` using the initiative template:
+   ```
+   obsidian create --template templates/initiative.md --path memory/initiatives/{slug}.md
+   obsidian property:set --path memory/initiatives/{slug}.md --property tars-owner --value "[[{user_name}]]"
+   obsidian property:set --path memory/initiatives/{slug}.md --property tars-status --value "active"
+   ```
+2. Set owner (default: user), status: active
+
+After gathering, update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  user_profile: true
 ```
 
-Update `memory/people/_index.md` with all entries.
+---
 
-#### Master memory index
+## Step 6: Configure schedule
 
-Create `memory/_index.md` with counts.
+Ask for schedule preferences with sensible defaults.
 
-#### `reference/schedule.md`
+> "When would you like your daily briefing? [default: 7:30am CT]"
 
-Create empty schedule template from the plugin's `reference/schedule.md` for recurring and one-time scheduled items.
+> "Weekly briefing day and time? [default: Monday 8:00am CT]"
 
-### Step 5: MCP and integration scan (optional)
+> "Maintenance window? [default: Friday 5:00pm CT]"
 
-If MCP tools are available, offer:
-- "I detected ~~project tracker is configured. Want me to scan for active initiatives and recent items?"
+Accept natural language time inputs. Resolve to 24-hour format and timezone.
 
-If the calendar integration is reachable, offer:
-- "Calendar integration is connected. Want me to check your upcoming meetings for additional people context?"
+Save to `_system/config.md`:
+- `tars-daily-briefing-time`: "07:30"
+- `tars-daily-briefing-tz`: "America/Chicago"
+- `tars-weekly-briefing-day`: "Monday"
+- `tars-weekly-briefing-time`: "08:00"
+- `tars-maintenance-day`: "Friday"
+- `tars-maintenance-time`: "17:00"
 
-If accepted, run lightweight queries and add findings to memory.
+Update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  schedule: true
+```
 
-### Step 6: Offer daily housekeeping shortcut
+---
 
-If the environment supports Cowork shortcuts with schedules:
+## Step 7: Register cron jobs
 
-1. Ask the user: "Would you like TARS to run daily maintenance automatically? This keeps indexes healthy, archives stale content, and syncs scheduled items."
-2. If accepted, ask for preferred time (default: 5:30 PM) using AskUserQuestion
-3. Create the shortcut manually using the task description from `reference/shortcuts.md` and the user's preferred cron schedule (see shortcuts.md for the Cowork shortcut creation steps)
-4. Note: Even without the shortcut, TARS runs a session-start housekeeping check as a fallback (see core skill)
+Use CronCreate to register scheduled jobs. Store job IDs in `_system/housekeeping-state.yaml`.
 
-If the environment does not support scheduled shortcuts, skip this step. The session-start check will handle daily housekeeping.
+### Daily briefing
 
-### Step 7: Report
+```
+CronCreate:
+  name: "TARS daily briefing"
+  schedule: "{configured_time} {configured_tz}"  # e.g., "0 7 30 * * *" for 7:30am
+  command: "Run daily briefing"
+  description: "Generate morning briefing with schedule, tasks, and context"
+```
 
-Display summary:
+### Weekly briefing
+
+```
+CronCreate:
+  name: "TARS weekly briefing"
+  schedule: "{configured_day} {configured_time}"  # e.g., Monday 8:00am
+  command: "Run weekly briefing"
+  description: "Generate weekly planning briefing with initiative health, upcoming meetings, and priorities"
+```
+
+### Maintenance
+
+```
+CronCreate:
+  name: "TARS maintenance"
+  schedule: "{configured_day} {configured_time}"  # e.g., Friday 5:00pm
+  command: "Run maintenance"
+  description: "Health check, archive sweep, inbox processing, sync check, and flagged content review"
+```
+
+Store returned job IDs:
+```yaml
+# _system/housekeeping-state.yaml
+cron_jobs:
+  daily_briefing: "{job_id}"
+  weekly_briefing: "{job_id}"
+  maintenance: "{job_id}"
+```
+
+If CronCreate is not available in the environment:
+- Log that cron registration was skipped
+- Note that session-start housekeeping (core skill) serves as fallback
+- Inform user they can register jobs manually later
+
+Update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  cron_jobs: true  # or false if skipped
+```
+
+---
+
+## Step 8: Initialize git
+
+### Check existing repo
+
+```bash
+git status
+```
+
+If already a git repo, skip `git init`.
+
+### Create .gitignore
+
+```
+# Obsidian workspace (user-specific, not shareable)
+.obsidian/workspace*
+.obsidian/graph.json
+.obsidian/app.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Sensitive
+.env
+*.key
+*.pem
+
+# Lock files (transient)
+*.lock
+```
+
+### Initial commit
+
+```bash
+git init  # if needed
+git add -A
+git commit -m "Initialize TARS v3 vault structure
+
+Created by TARS onboarding wizard.
+Includes: vault structure, templates, _views, scripts, _system config, obsidian-skills."
+```
+
+Update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  git_initialized: true
+```
+
+---
+
+## Step 9: Welcome summary
+
+Display a comprehensive summary of what was configured.
 
 ```markdown
-## Setup complete
+## TARS v3 setup complete
 
-### Workspace created
-- CLAUDE.md (root config)
-- reference/replacements.md ({N} entries)
-- reference/kpis.md ({N} teams, {N} initiatives)
-- memory/ ({N} people created, {N} category indexes)
-- journal/ (ready)
-- contexts/ (products index, artifacts index ready)
+### Vault structure
+- _system/: {N} config files created
+- _views/: {N} base queries created
+- templates/: {N} templates created
+- scripts/: {N} validation scripts created
+- memory/: {N} entity folders ready
+- journal/: ready
+- contexts/: ready (products, artifacts)
+- inbox/: ready (pending, processed)
+- archive/: ready
 
-### Integration status
-- Calendar: {✓ Configured (MCP) | ✓ Configured (legacy) | ⚠ Not configured | ✗ Error}
-- Tasks: {✓ Configured (MCP) | ✓ Configured (legacy) | ⚠ Not configured | ✗ Error}
+### Obsidian skills
+- obsidian-cli: {installed | verified | missing}
+- obsidian-bases: {installed | verified | missing}
+- obsidian-markdown: {installed | verified | missing}
+- json-canvas: {installed | verified | missing}
+- defuddle: {installed | verified | missing}
 
-{If any integration is not configured or errored:}
-⚠ Missing integrations will limit functionality. See GETTING-STARTED.md "Essential Integrations" section for setup instructions.
+### Integrations
+- Calendar: {provider} ({connected | error | not configured})
+- Tasks: {provider} ({connected | error | not configured})
+
+### User profile
+- Name: {user_name}
+- Role: {user_title}
+- Organization: {company}
+
+### Context created
+- People: {N} profiles created
+- Initiatives: {N} initiatives created
+- Org context: {N} notes created
+
+### Scheduled jobs
+- Daily briefing: {time} {tz} ({registered | skipped})
+- Weekly briefing: {day} {time} ({registered | skipped})
+- Maintenance: {day} {time} ({registered | skipped})
+
+### Git
+- Repository: {initialized | already existed}
+- Initial commit: {hash}
 
 ### Next steps
-1. {If integrations configured:} Run `/briefing` to see your first morning briefing
-   {If not:} Configure calendar and tasks in .mcp.json, restart Claude, and re-run /welcome
-2. Run `/meeting` with your next meeting transcript
-3. Add more people and context as you use TARS
-4. Edit `reference/kpis.md` to define your team metrics
-5. Daily housekeeping runs automatically (shortcut or session-start check)
+1. Run "daily briefing" to see your first morning briefing
+2. Drop a meeting transcript into inbox/pending/ and run "process inbox"
+3. Ask "help" to see all available TARS capabilities
+4. Edit _system/kpis.md to define your team metrics
+5. Add more people and context as you use TARS -- it learns as you go
 ```
 
-## Post-execution checklist
-- [ ] All directories created
-- [ ] CLAUDE.md generated with user identity
-- [ ] replacements.md populated with name mappings
-- [ ] kpis.md templated with teams and initiatives
-- [ ] Task and calendar integrations verified
-- [ ] Memory indexes created for all categories
-- [ ] Contexts indexes created (products, artifacts)
-- [ ] People entries created from setup wizard
-- [ ] Summary report displayed
+Update `_system/maturity.yaml`:
+```yaml
+onboarding:
+  completed: true
+  completed_date: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+```
+
+---
+
+## Error handling
+
+| Failure | Recovery |
+|---------|----------|
+| Directory creation fails | Log error, continue with remaining directories, report at end |
+| obsidian-cli not available | Fall back to direct file creation with warning that Obsidian cache may be stale |
+| MCP server not responding | Mark integration as "error", continue setup, user can re-run later |
+| CronCreate unavailable | Skip cron registration, rely on session-start fallback |
+| Git init fails | Log error, continue, user can initialize manually |
+| User cancels mid-setup | Save progress to _system/maturity.yaml, user can resume with "setup" |
+
+### Resume capability
+
+If the user runs "setup" after a partial completion:
+1. Read `_system/maturity.yaml`
+2. Skip steps marked `true`
+3. Resume from the first `false` step
+4. Report: "Resuming setup from Step {N}: {step_name}"
+
+---
+
+## Absolute constraints
+
+- NEVER skip the pre-flight check (Step 1)
+- NEVER overwrite existing memory, journal, or context files during setup
+- NEVER persist user data without confirmation
+- NEVER create task integration entries without verified connectivity
+- NEVER commit sensitive data (.env, API keys) to git
+- ALWAYS use obsidian-cli for note creation when available
+- ALWAYS validate integration connectivity before marking as "connected"
+- ALWAYS save progress to maturity.yaml after each step
+- ALWAYS use bounded questions (multiple-choice, max 3-4 per round)
+- ALWAYS include a skip/escape option for optional configuration
+
+---
+
+## Context budget
+
+- _system/ files: Read all during pre-flight check
+- Templates: Write-only during creation (no reads needed)
+- Memory: Write-only during person/initiative creation
+- obsidian-skills: Read SKILL.md header only to verify installation
+- No journal, contexts, or archive reads during onboarding

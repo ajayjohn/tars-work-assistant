@@ -1,20 +1,25 @@
 #!/bin/bash
 set -e
 
-echo "Building TARS Cowork plugin..."
+echo "Building TARS v3 plugin..."
 
 # Clean old build
 rm -rf tars-cowork-plugin
 
-# Create distribution structure
-mkdir -p tars-cowork-plugin/{skills,commands,scripts,reference,.claude-plugin}
+# Create v3 distribution structure
+mkdir -p tars-cowork-plugin/{skills,scripts,templates,_system,_views,.claude-plugin,.claude/skills}
 
-# Copy all content from source
+# Copy v3 content from source
 cp -r skills/* tars-cowork-plugin/skills/
-cp -r commands/* tars-cowork-plugin/commands/
-cp -r scripts/* tars-cowork-plugin/scripts/
-cp -r reference/* tars-cowork-plugin/reference/
-cp LICENSE .mcp.json tars-cowork-plugin/
+cp -r scripts/*.py tars-cowork-plugin/scripts/
+cp -r templates/* tars-cowork-plugin/templates/
+cp -r _system/* tars-cowork-plugin/_system/
+cp -r _views/* tars-cowork-plugin/_views/
+cp -r .claude/skills/* tars-cowork-plugin/.claude/skills/
+cp LICENSE CLAUDE.md tars-cowork-plugin/
+
+# Copy .mcp.json if it exists
+[ -f .mcp.json ] && cp .mcp.json tars-cowork-plugin/
 
 # Create minimal plugin.json and sync marketplace.json using Python
 python3 << 'PYTHON_SCRIPT'
@@ -25,7 +30,7 @@ import os
 with open('.claude-plugin/plugin.json', 'r') as f:
     source = json.load(f)
 
-# Create minimal version for Cowork (auto-discovers skills/commands from directory)
+# Create minimal version for Cowork (auto-discovers skills from directory)
 minimal = {
     "name": source["name"],
     "version": source["version"],
@@ -44,7 +49,7 @@ if os.path.exists(marketplace_path):
     with open(marketplace_path, 'r') as f:
         marketplace = json.load(f)
 
-    # Update the TARS plugin version in marketplace
+    # Update the TARS plugin entry in marketplace
     for plugin in marketplace.get('plugins', []):
         if plugin['name'] == 'tars':
             plugin['version'] = source['version']
@@ -62,21 +67,28 @@ else:
 PYTHON_SCRIPT
 
 cat > tars-cowork-plugin/README.md << 'EOF'
-# TARS — Task-Aware Research & Strategy Assistant
+# TARS 3.0 — Persistent Executive Assistant for Obsidian
 
-**Your executive assistant for strategy, research, communication, and initiatives.**
+**Obsidian-native knowledge work operating system with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications.**
 
 ## Installation
-1. Cowork → Settings → Plugins → Install from Folder
+1. Claude Code → Install from marketplace or folder
 2. Select: `tars-cowork-plugin/`
-3. Run: `/welcome` to set up workspace
+3. Run: `/welcome` to set up your vault
 
 ## Quick Start
 ```
-/welcome          # Set up workspace
-/briefing today   # Daily briefing
+/welcome          # Set up vault and integrations
+/briefing         # Daily briefing
+/meeting          # Process a meeting transcript
+/tasks            # Extract or manage tasks
 /think "topic"    # Strategic analysis
 ```
+
+## Requirements
+- Obsidian desktop app running
+- obsidian-cli installed (`brew install kepano/tap/obsidian-cli`)
+- An Obsidian vault for TARS to use
 
 Full docs: https://github.com/ajayjohn/tars-work-assistant
 EOF

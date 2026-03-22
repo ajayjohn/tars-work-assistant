@@ -1,0 +1,35 @@
+filters:
+  and:
+    - or:
+        - file.hasTag("tars/person")
+        - file.hasTag("tars/vendor")
+        - file.hasTag("tars/competitor")
+        - file.hasTag("tars/product")
+        - file.hasTag("tars/initiative")
+        - file.hasTag("tars/org-context")
+    - 'tars-staleness != "durable"'
+    - not:
+        - file.hasTag("tars/archived")
+
+formulas:
+  days_since_update: 'if(tars-modified, (now() - date(tars-modified)).days, 999)'
+  threshold: 'if(tars-staleness == "seasonal", 180, if(tars-staleness == "transient", 90, 30))'
+  overdue: 'days_since_update > threshold'
+
+properties:
+  formula.days_since_update:
+    displayName: "Days Since Update"
+  formula.threshold:
+    displayName: "Threshold"
+
+views:
+  - type: table
+    name: "Archive Candidates"
+    filters:
+      and:
+        - 'formula.overdue == true'
+    order:
+      - file.name
+      - tars-staleness
+      - tars-modified
+      - formula.days_since_update
