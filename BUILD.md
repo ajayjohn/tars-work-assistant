@@ -4,7 +4,7 @@ This document describes the supported packaging path for the current framework.
 
 ## Build model
 
-TARS is maintained from the repository root and packaged into a distributable plugin directory. The active packaging entrypoint is [build-plugin.sh](/Users/ajayjohn/Sync/Applications/Library/tars/build-plugin.sh).
+TARS is maintained from the repository root and packaged into a distributable plugin directory. The active packaging entrypoint is [build-plugin.sh](build-plugin.sh).
 
 The build model is:
 - repository source is the maintainer-facing truth

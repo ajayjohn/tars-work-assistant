@@ -151,6 +151,6 @@ The framework becomes more useful as it compounds context. The highest-leverage 
 ## Where to go next
 
 If you want to understand the system in more depth:
-- read [README.md](/Users/ajayjohn/Sync/Applications/Library/tars/README.md) for the product overview
-- read [ARCHITECTURE.md](/Users/ajayjohn/Sync/Applications/Library/tars/ARCHITECTURE.md) for the full framework model
-- read [CLAUDE.md](/Users/ajayjohn/Sync/Applications/Library/tars/CLAUDE.md) for the live agent operating rules
+- read [README.md](README.md) for the product overview
+- read [ARCHITECTURE.md](ARCHITECTURE.md) for the full framework model
+- read [CLAUDE.md](CLAUDE.md) for the live agent operating rules

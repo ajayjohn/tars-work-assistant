@@ -95,4 +95,4 @@ The public framework includes:
 - deterministic maintenance scripts
 - documentation for setup, architecture, release, and contribution
 
-For release and packaging details, see [BUILD.md](/Users/ajayjohn/Sync/Applications/Library/tars/BUILD.md).
+For release and packaging details, see [BUILD.md](BUILD.md).

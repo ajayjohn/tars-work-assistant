@@ -83,13 +83,13 @@ TARS is designed to preserve signal and avoid silent drift:
 ## Documentation map
 
 Start here depending on what you need:
-- [GETTING-STARTED.md](/Users/ajayjohn/Sync/Applications/Library/tars/GETTING-STARTED.md) for setup and first workflows
-- [ARCHITECTURE.md](/Users/ajayjohn/Sync/Applications/Library/tars/ARCHITECTURE.md) for the current system model
-- [BUILD.md](/Users/ajayjohn/Sync/Applications/Library/tars/BUILD.md) for packaging and release mechanics
-- [CONTRIBUTING.md](/Users/ajayjohn/Sync/Applications/Library/tars/CONTRIBUTING.md) for maintenance and change hygiene
-- [CHANGELOG.md](/Users/ajayjohn/Sync/Applications/Library/tars/CHANGELOG.md) for release history
-- [CATALOG.md](/Users/ajayjohn/Sync/Applications/Library/tars/CATALOG.md) for the product and adoption overview
+- [GETTING-STARTED.md](GETTING-STARTED.md) for setup and first workflows
+- [ARCHITECTURE.md](ARCHITECTURE.md) for the current system model
+- [BUILD.md](BUILD.md) for packaging and release mechanics
+- [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
+- [CHANGELOG.md](CHANGELOG.md) for release history
+- [CATALOG.md](CATALOG.md) for the product and adoption overview
 
 ## License
 
-This repository is licensed under PolyForm Noncommercial 1.0.0. See [LICENSE](/Users/ajayjohn/Sync/Applications/Library/tars/LICENSE).
+This repository is licensed under PolyForm Noncommercial 1.0.0. See [LICENSE](LICENSE).

@@ -208,6 +208,6 @@ This transcript fallback is one of the defining v3 behaviors because it lets TAR
 
 ## Release and packaging model
 
-The supported release packaging path is the repository-root [build-plugin.sh](/Users/ajayjohn/Sync/Applications/Library/tars/build-plugin.sh). It packages the v3 framework, helper skills, templates, system files, and scripts into `tars-cowork-plugin/`.
+The supported release packaging path is the repository-root [build-plugin.sh](build-plugin.sh). It packages the v3 framework, helper skills, templates, system files, and scripts into `tars-cowork-plugin/`.
 
 The packaged plugin is intentionally slimmer than the repository, but it should describe the same architecture and behaviors. Release documentation must stay aligned with the repository source, the packaged README, and `.claude-plugin/plugin.json`.
