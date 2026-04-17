@@ -1,0 +1,55 @@
+# TARS v3.1 capability classifier — starter pattern map (PRD §26.9).
+# Each entry matches against tool.name AND tool.description. Case-insensitive.
+# First match wins within a tool. User overrides: <vault>/_system/capability-overrides.yaml
+
+patterns:
+  calendar:
+    - "\\blist.*events?\\b"
+    - "\\bget.*event\\b"
+    - "\\bcreate.*event\\b"
+    - "\\bcalendar\\b"
+    - "\\boutlook.*calendar\\b"
+    - "\\bgcal\\b"
+  tasks:
+    - "\\b(task|reminder|todo)s?\\b"
+    - "\\bcomplete.*(task|reminder)\\b"
+  email:
+    - "\\bemail\\b"
+    - "\\bmessages?\\b.*(inbox|thread)"
+    - "\\bsend.*mail\\b"
+  meeting-recording:
+    - "\\brecording\\b"
+    - "\\btranscript\\b"
+    - "\\bminutes\\b"
+  office-docs:
+    - "\\b(pptx|powerpoint|xlsx|excel|docx|word)\\b"
+    - "\\bworkbook\\b"
+    - "\\bspreadsheet\\b"
+  file-storage:
+    - "\\b(onedrive|dropbox|drive|files?)\\b"
+    - "\\bshar(e|ing).*point\\b"
+  design:
+    - "\\bfigma\\b"
+    - "\\bsketch\\b"
+    - "\\bprototype\\b"
+  data-warehouse:
+    - "\\b(snowflake|bigquery|databricks|redshift)\\b"
+    - "\\bwarehouse\\b"
+    - "\\bquery.*sql\\b"
+  analytics:
+    - "\\b(pendo|mixpanel|amplitude|posthog)\\b"
+    - "\\banalytics\\b"
+  project-tracker:
+    - "\\b(jira|linear|github|azure.*devops)\\b"
+    - "\\b(issue|ticket|sprint|backlog)\\b"
+  documentation:
+    - "\\b(confluence|notion|sharepoint.*pages|google.*docs)\\b"
+  monitoring:
+    - "\\b(datadog|pagerduty|cloudwatch|grafana)\\b"
+    - "\\balert\\b"
+  communication:
+    - "\\b(slack|teams|discord)\\b"
+    - "\\bsend.*message\\b"
+
+# Fallback: tools that don't match any pattern are classified as `uncategorized`
+# and surfaced for the user to add an override.

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://claude.ai/schemas/plugin-mcp-servers.schema.json",
+  "_comment": "TARS v3.1 plugin-shipped MCP servers. Phase 1a skeleton — only tars-vault is shipped; office rendering delegates to Anthropic's first-party pptx/docx/xlsx/pdf skills per PRD §3.1b.",
+  "mcpServers": {
+    "tars-vault": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["-m", "tars_vault"],
+      "env": {
+        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}/mcp/tars-vault/src",
+        "TARS_VAULT_PATH": "${TARS_VAULT_PATH}"
+      }
+    }
+  }
+}

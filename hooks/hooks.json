@@ -1,0 +1,50 @@
+{
+  "$schema": "https://claude.ai/schemas/plugin-hooks.schema.json",
+  "_comment": "TARS v3.1 plugin-level hook wiring (Phase 1a skeleton). Claude Code plugins load hooks from hooks/hooks.json. Matchers are intentionally narrow so the hooks fire only on TARS-relevant tool calls. Full behaviour per PRD §3.2 lands in later phases.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py"}
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/instructions-loaded.py"}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__tars_vault__.*|Bash",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use.py"}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__tars_vault__.*|Bash",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use.py"}
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pre-compact.py"}
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/session-end.py"}
+        ]
+      }
+    ]
+  }
+}

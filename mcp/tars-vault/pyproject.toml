@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tars-vault"
+version = "3.1.0-dev"
+description = "TARS v3.1 vault MCP server — validated obsidian-cli wrapper, auto-wikilink, FTS+semantic search, integration resolver"
+requires-python = ">=3.10"
+license = {text = "PolyForm-Noncommercial-1.0.0"}
+authors = [{name = "Ajay John"}]
+dependencies = [
+  "mcp>=1.0,<2.0",
+  "fastembed>=0.4,<1.0",
+  "sqlite-vec>=0.1.6,<0.2",
+]
+
+[project.scripts]
+tars-vault = "tars_vault.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

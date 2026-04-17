@@ -26,6 +26,9 @@ data/
 .claude/*
 !.claude/skills/
 
+# FastEmbed model cache (vault-side only; kept out of framework repo too)
+_system/embedding-cache/
+
 # Distribution build artifacts (regenerated from source)
 tars-cowork-plugin/
 tars-v*.zip

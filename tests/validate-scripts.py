@@ -120,11 +120,16 @@ def main():
         return 1
 
     script_files = []
+    # Only files with executable extensions are scripts; sibling data files
+    # (e.g., capability-classifier.yaml) live alongside them and are skipped.
+    SCRIPT_EXTS = (".py", ".sh")
     for entry in sorted(os.listdir(SCRIPTS_DIR)):
         full_path = os.path.join(SCRIPTS_DIR, entry)
         if os.path.isfile(full_path) and not entry.startswith("."):
             # Skip __pycache__ and similar
             if entry == "__pycache__" or entry.endswith(".pyc"):
+                continue
+            if not entry.endswith(SCRIPT_EXTS):
                 continue
             script_files.append(entry)
 
