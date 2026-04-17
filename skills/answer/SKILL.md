@@ -23,18 +23,24 @@ Answer questions by searching across TARS information sources in priority order.
 
 ---
 
-## Source priority — with transcript fallback (Issue 6)
+## Source priority — hybrid retrieval (v3.1)
 
-| Priority | Source | Contains | Confidence |
-|----------|--------|----------|------------|
-| 1 (first) | **Memory files** (`memory/`) | Durable facts, relationships, decisions, preferences | High |
-| 2 | **Task notes** (via task integration) | Action items, deadlines, assignments, follow-ups | High |
-| 3 | **Journal entries** (`journal/`) | Meeting summaries, briefings, wisdom extractions | High |
-| 4 | **Transcript archives** (`archive/transcripts/`) | Verbatim meeting records — when summaries lack detail | High (verbatim) |
-| 5 | **Integration sources** (calendar, project tracker) | Schedule, events, project data | High |
-| 6 (last) | **Web search** | External, current information | Medium-Low — flag explicitly |
+| Priority | Source / tool | Contains | Confidence |
+|----------|---------------|----------|------------|
+| 1 | **Memory files** — `mcp__tars_vault__search_by_tag(tag="tars/<type>", …)` + `read_note` | Durable facts, relationships, decisions, preferences | High |
+| 2 | **Tier-A FTS5** — `mcp__tars_vault__fts_search(scope="memory", query=…)` (Phase 4) | Keyword/BM25 over short structured notes | High |
+| 3 | **Task notes** — `mcp__tars_vault__search_by_tag(tag="tars/task", …)` + task integration (`resolve_capability(capability="tasks")`) | Action items, deadlines, assignments | High |
+| 4 | **Journal entries** — `mcp__tars_vault__search_by_tag(tag="tars/journal", …)` + semantic | Meeting summaries, briefings, wisdom | High |
+| 5 | **Tier-B semantic** — `mcp__tars_vault__semantic_search(scope="journal\|transcripts\|contexts", …)` (Phase 4) | Paraphrase/quote recall over prose | Medium-High |
+| 6 | **Transcript archives** — full-read fallback when semantic returned low scores | Verbatim quotes | High (verbatim) |
+| 7 | **Integration sources** — `resolve_capability(capability="calendar\|tasks\|project-tracker\|…")` | Schedule, live data from provider MCPs | High |
+| 8 (last) | **Web search** | External information | Medium-Low — flag explicitly |
 
-**Key rule**: Never answer internal questions from web search alone. Exhaust internal sources first. If answering from LLM knowledge with no source, confidence is **Low** — flag explicitly.
+**Key rules**:
+- Never answer internal questions from web search alone. Exhaust internal sources first.
+- If answering from LLM knowledge with no source, confidence is **Low** — flag explicitly.
+- Cite with wikilinks + chunk indices for Tier-B hits (e.g., `[[2026-03-10 CSI Onsite Day 1]]#chunk-14`).
+- Emit telemetry `answer_delivered` with `source_hit_tier` array covering which priorities contributed.
 
 ---
 
@@ -70,82 +76,85 @@ Analyze the user's question to determine:
 
 Start with the calendar integration FIRST.
 
-1. Check `<mcp_servers>` context for calendar MCP server (preferred)
-2. If found, use MCP tools (`list_events`, `get_event`)
-3. If not found, check `_system/integrations.md` for legacy provider
-4. Resolve target date to `YYYY-MM-DD` format
-5. Execute `list_events` for the target date(s)
+```
+cap = mcp__tars_vault__resolve_capability(capability="calendar")
+```
 
-**TARS has calendar access via configured integration.** Never respond that calendar access is unavailable without checking integration status. If the integration is unreachable, state the specific connection error.
+1. If `cap.status == "connected"`, call `cap.tools[*]` dynamically (never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`).
+2. If `cap.status == "unavailable"` and calendar is marked `required: true` in `_system/integrations.md`, state the specific connection error.
+3. Always resolve the target date to `YYYY-MM-DD` before querying.
 
-After calendar data, enrich with:
-- Memory profiles for meeting attendees
-- Task integration for related tasks due on the same day
+After calendar data, enrich via:
+- Memory profiles for meeting attendees.
+- Task integration via `resolve_capability(capability="tasks")` for items due same day.
 
 ### Person lookup
 
 ```
-obsidian search query="tag:tars/person [name]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)
 ```
 
-If no exact match, check aliases:
+If no exact match, resolve through the alias registry:
 ```
-obsidian read file="alias-registry"
+mcp__tars_vault__resolve_alias(name="<name>")
 ```
-Search for alternate names, nicknames, last names.
 
 Then read the full profile:
 ```
-obsidian read file="[canonical name]"
+mcp__tars_vault__read_note(file="<canonical name>")
 ```
 
-If the person has meeting history, optionally scan recent journal entries:
+If the person has meeting history, scan recent journal entries:
 ```
-obsidian search query="tag:tars/meeting [person name]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<person name>", limit=5)
 ```
 
 ### Meeting history
 
 ```
-obsidian search query="tag:tars/meeting [topic or person]" limit=10
+mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<topic or person>", limit=10)
 ```
 
-Read matching journal entries. If the user asks about a specific detail discussed in a meeting, and the journal summary doesn't contain it, proceed to transcript fallback (Step 3).
+Read matching journal entries. If the user asks about a specific detail discussed in a meeting and the journal summary lacks it, call `mcp__tars_vault__semantic_search(scope="transcripts", query=…)` (Phase 4) or proceed to transcript fallback (Step 3).
 
 ### Task queries
 
-1. Check `<mcp_servers>` context for tasks/reminders MCP server (preferred)
-2. If found, use MCP tools (`list_reminders`)
-3. If not found, check `_system/integrations.md` for legacy provider
-4. Filter by: owner, due date, initiative, keyword, status
-
-For "what's overdue":
 ```
-obsidian search query="tag:tars/task tars-status:open" limit=50
+cap = mcp__tars_vault__resolve_capability(capability="tasks")
+# use cap.tools[*] dynamically for list/filter by owner, due date, status
+```
+
+For "what's overdue" on TARS-managed task notes:
+```
+mcp__tars_vault__search_by_tag(
+  tag="tars/task",
+  frontmatter={"tars-status": "open"},
+  limit=50
+)
 ```
 Filter results where `tars-due` < today.
 
 ### Initiative status
 
 ```
-obsidian search query="tag:tars/initiative [name]" limit=5
-obsidian read file="[initiative name]"
+mcp__tars_vault__search_by_tag(tag="tars/initiative", query="<name>", limit=5)
+mcp__tars_vault__read_note(file="<initiative name>")
 ```
 
 Cross-reference with:
-- Recent journal entries mentioning the initiative
-- Tasks linked to the initiative
-- People involved in the initiative
+- Recent journal entries mentioning the initiative.
+- Tasks linked to the initiative.
+- People involved.
 
 ### Decision recall
 
 ```
-obsidian search query="tag:tars/decision [topic]" limit=10
+mcp__tars_vault__search_by_tag(tag="tars/decision", query="<topic>", limit=10)
 ```
 
 If not found in decisions, search journal entries:
 ```
-obsidian search query="tag:tars/meeting [topic]" limit=10
+mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<topic>", limit=10)
 ```
 
 Look for "Decisions" sections in meeting summaries.
@@ -153,12 +162,12 @@ Look for "Decisions" sections in meeting summaries.
 ### General knowledge
 
 Follow the full hierarchy:
-1. Memory: `obsidian search query="[keywords]" limit=10`
-2. Tasks: check task integration
-3. Journal: `obsidian search query="tag:tars/journal [keywords]" limit=10`
-4. Contexts: `obsidian search query="path:contexts [keywords]" limit=5`
-5. Transcripts: if none of the above has the answer (see Step 3)
-6. Web: only if explicitly external information
+1. Memory: `mcp__tars_vault__fts_search(scope="memory", query="<keywords>", limit=10)` (Phase 4; until then `search_by_tag`).
+2. Tasks: `resolve_capability(capability="tasks")` + `search_by_tag(tag="tars/task", …)`.
+3. Journal: `mcp__tars_vault__semantic_search(scope="journal", query="<keywords>", limit=10)` (Phase 4).
+4. Contexts: `mcp__tars_vault__semantic_search(scope="contexts", query="<keywords>", limit=5)` (Phase 4).
+5. Transcripts: if none of the above has the answer (see Step 3).
+6. Web: only if explicitly external information.
 
 ---
 
@@ -177,18 +186,18 @@ When memory, journal summaries, and other sources do not have enough detail to a
 
 1. **Find relevant journal entries** by date, person, or topic:
    ```
-   obsidian search query="tag:tars/meeting [criteria]" limit=5
+   mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<criteria>", limit=5)
    ```
 
 2. **Read the journal entry** and check for a transcript link:
    ```
-   obsidian read file="[journal entry name]"
+   mcp__tars_vault__read_note(file="<journal entry name>")
    ```
    Look for the `tars-transcript` property in frontmatter.
 
 3. **If transcript exists**, read it:
    ```
-   obsidian read file="[transcript name]"
+   mcp__tars_vault__read_note(file="<transcript name>")
    ```
 
 4. **Search the transcript** for the specific topic, quote, or detail the user is asking about.
@@ -337,23 +346,21 @@ I checked: [list of sources searched]. The [specific detail] was not captured.
 
 ## Index-first pattern (MANDATORY)
 
-For vault searches, always use obsidian search with tags and property filters rather than scanning folders:
+For vault searches, always use `mcp__tars_vault__search_by_tag` (tag + frontmatter filter) or the Phase-4 `fts_search` / `semantic_search` — never scan folders:
 
 ```
-obsidian search query="tag:tars/person [name]" limit=5
-obsidian search query="tag:tars/meeting tars-date:>=2026-03-01" limit=10
-obsidian search query="tag:tars/decision [topic]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/meeting", frontmatter={"tars-date__gte": "2026-03-01"}, limit=10)
+mcp__tars_vault__search_by_tag(tag="tars/decision", query="<topic>", limit=5)
 ```
-
-Never scan all files in a folder. Always use tags and properties to narrow results.
 
 ## Alias resolution
 
 If an entity is not found by its primary name:
 
-1. Check `_system/alias-registry.md` for alternate names
-2. Try partial name matching: `obsidian search query="[last name]" limit=5`
-3. Try related entities: search by initiative or team that person belongs to
+1. Call `mcp__tars_vault__resolve_alias(name="<name>")`.
+2. Try partial name matching: `mcp__tars_vault__search_by_tag(tag="tars/person", query="<last name>", limit=5)`.
+3. Try related entities: search by initiative or team the person belongs to.
 
 ## Date resolution
 
@@ -425,4 +432,4 @@ If any errors occur during lookup:
 - ALWAYS cite sources using `[[wikilinks]]` for vault files
 - ALWAYS attempt transcript fallback (Issue 6) before saying "I don't know" for meeting-related questions
 - ALWAYS handle gaps honestly — say what was searched and what was not found
-- ALWAYS use obsidian search with tags rather than folder scanning
+- ALWAYS use `mcp__tars_vault__search_by_tag` (or Phase-4 fts_search / semantic_search) rather than folder scanning

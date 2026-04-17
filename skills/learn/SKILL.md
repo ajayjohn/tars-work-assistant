@@ -19,6 +19,8 @@ help:
 
 Two complementary modes for building TARS's knowledge base. Memory mode persists durable facts from conversations. Wisdom mode extracts insights from learning content.
 
+All vault writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). The server runs the auto-wikilink pass (§3.3) before every body write — ambiguous names surface for batched review, never silent link insertion.
+
 ---
 
 ## Mode detection
@@ -37,17 +39,13 @@ Persist durable, high-value facts from conversation. Be highly selective. Most i
 
 ---
 
-## Step 1: Load alias registry (MANDATORY)
+## Step 1: Alias resolution (server-cached)
 
-```
-obsidian read file="alias-registry"
-```
+Use `mcp__tars_vault__resolve_alias(name="…")` for canonicalization. The server holds the registry in memory with mtime-based invalidation. Three-layer resolution inside the tool:
 
-Apply canonical names to ALL names in the input. Scan for person names and resolve using the three-layer resolution protocol:
-
-1. **Obsidian aliases**: Check note aliases via obsidian search
-2. **Context-aware registry**: Check `_system/alias-registry.md` for disambiguation
-3. **Search fallback**: `obsidian search query="[name]" limit=5`
+1. **Alias registry**: `_system/alias-registry.md` canonical + aliases map.
+2. **Obsidian aliases**: `mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)`.
+3. **Contextual**: calendar attendees, recent journal entries, role mentions.
 
 If any name is ambiguous (multiple canonical matches) or unknown (no match), ask before proceeding:
 
@@ -79,13 +77,15 @@ Read the input completely. Identify potential delta — new information that:
 For each entity or topic identified:
 
 ```
-obsidian search query="tag:tars/[type] [entity]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<entity>", limit=5)
 ```
+
+Phase 4 adds `mcp__tars_vault__fts_search` for paraphrase/body matching — important for REDUNDANT detection where a different phrasing captures the same fact.
 
 Then read the specific files that match:
 
 ```
-obsidian read file="[entity name]"
+mcp__tars_vault__read_note(file="<entity name>")
 ```
 
 Compare the input against what is already captured.
@@ -219,52 +219,44 @@ For each confirmed update:
 ### New entity
 
 ```
-obsidian create name="Entity Name" path="memory/[category]/entity-slug.md" template="[type]" silent
-obsidian property:set name="tars-summary" value="One-line description" file="Entity Name"
-obsidian append file="Entity Name" content="## Key Facts\n- [insight content]"
+mcp__tars_vault__create_note(
+  name="Entity Name",
+  path="memory/<category>/entity-slug.md",
+  template="<type>",
+  frontmatter={
+    "tags": ["tars/<type>"],
+    "aliases": ["<alternate names>"],
+    "tars-summary": "One-line description for scanning",
+    "tars-related": ["[[linked entities]]"],
+    "tars-created": "YYYY-MM-DD",
+    "tars-updated": "YYYY-MM-DD"
+  },
+  body="## Key Facts\n- <insight content>"
+)
 ```
 
-Frontmatter must include all required fields per `_system/schemas.yaml`:
-
-```yaml
----
-tags: [tars/[type]]
-aliases: [alternate names]
-tars-summary: "One-line description for scanning"
-tars-related: ["[[linked entities]]"]
-tars-created: YYYY-MM-DD
-tars-updated: YYYY-MM-DD
----
-```
+The server enforces all required fields per `_system/schemas.yaml`; missing required fields cause the tool call to return a validation error.
 
 ### Existing entity (update)
 
 ```
-obsidian append file="Entity Name" content="\n- [new insight] (YYYY-MM-DD)"
-obsidian property:set name="tars-updated" value="YYYY-MM-DD" file="Entity Name"
+mcp__tars_vault__append_note(file="Entity Name", content="\n- <new insight> (YYYY-MM-DD)")
+mcp__tars_vault__update_frontmatter(file="Entity Name", property="tars-updated", value="YYYY-MM-DD")
 ```
 
-ALL entity references in content MUST use `[[Entity Name]]` wikilink syntax.
+ALL entity references in content use `[[Entity Name]]` wikilink syntax; the auto-wikilink pass inside the MCP server performs the canonicalization.
 
 ---
 
-## Step 10: Update alias registry (MANDATORY for new entities)
+## Step 10: Alias registry (handled automatically)
 
-If a new entity was created, add it to the alias registry:
-
-```
-obsidian append file="alias-registry" content="| [canonical name] | [aliases] | [type] | [file path] |"
-```
+On `create_note` of a new entity, the server updates the in-process alias registry cache and appends a row to `_system/alias-registry.md` if the canonical+aliases+type+path line isn't present. No explicit append call is required; after N auto-detections the server surfaces a hint suggesting the user add manual aliases.
 
 ---
 
-## Step 11: Log to daily note (MANDATORY)
+## Step 11: Daily-note + changelog (handled by PostToolUse hook)
 
-```
-obsidian daily:append content="- Memory: [action] [[Entity Name]] — [summary]"
-```
-
-Write changelog entry to `_system/changelog/YYYY-MM-DD.md` with batch ID.
+The `PostToolUse` hook appends the memory-action line to the daily note and writes the changelog entry with batch ID. Emit telemetry events `memory_proposed` (count) and `memory_persisted` (count, accepted, rejected).
 
 ---
 
@@ -319,13 +311,9 @@ State the classification in output. If mixed (e.g., a podcast with a professor),
 
 ---
 
-## Step 2: Load references (MANDATORY)
+## Step 2: Resolve references (MANDATORY)
 
-```
-obsidian read file="alias-registry"
-```
-
-Scan source content for person names. Resolve using the three-layer name resolution protocol (same as Memory mode Step 1). Resolve ambiguous or unknown names before extraction begins.
+Scan source content for person names. Resolve each via `mcp__tars_vault__resolve_alias(name="…")` — the server holds the alias registry in memory. Ambiguous or unknown names must be resolved (or explicitly marked unknown) before extraction begins.
 
 ---
 
@@ -381,7 +369,7 @@ Insights that pass all four become candidates for memory persistence (Step 7). I
 For each durable insight:
 
 ```
-obsidian search query="tag:tars/[type] [topic keywords]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<topic keywords>", limit=5)
 ```
 
 Compare against existing vault knowledge. Apply the knowledge check (Issue 7):
@@ -402,23 +390,21 @@ Compare against existing vault knowledge. Apply the knowledge check (Issue 7):
 Note the `wisdom-` prefix to distinguish from meeting reports.
 
 ```
-obsidian create name="YYYY-MM-DD Wisdom: Source Title" \
-  path="journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md" \
-  template="wisdom-journal" silent
-```
-
-Set frontmatter properties:
-
-```yaml
----
-tags: [tars/journal, tars/wisdom]
-tars-date: YYYY-MM-DD
-tars-source-type: podcast | article | video | paper | book | transcript | conversation
-tars-source-title: "Full Source Title"
-tars-author: "Author or Speaker Name"
-tars-topics: [key, topics, extracted]
-tars-created: YYYY-MM-DD
----
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD Wisdom: Source Title",
+  path="journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md",
+  template="wisdom-journal",
+  frontmatter={
+    "tags": ["tars/journal", "tars/wisdom"],
+    "tars-date": "YYYY-MM-DD",
+    "tars-source-type": "podcast | article | video | paper | book | transcript | conversation",
+    "tars-source-title": "Full Source Title",
+    "tars-author": "Author or Speaker Name",
+    "tars-topics": ["key", "topics", "extracted"],
+    "tars-created": "YYYY-MM-DD"
+  },
+  body="<wisdom markdown>"
+)
 ```
 
 ### Journal entry structure
@@ -505,16 +491,9 @@ For each confirmed task, create via the task integration. Verify creation by rea
 
 ---
 
-## Step 9: Log to daily note (MANDATORY)
+## Step 9: Daily-note + changelog (handled by PostToolUse hook)
 
-```
-obsidian daily:append content="- Wisdom: extracted from [Source Title] → [[YYYY-MM-DD Wisdom: Source Title]]
-  - Insights: N extracted, M durable
-  - Memory: N updates proposed, M saved
-  - Tasks: N created"
-```
-
-Write changelog entry with batch ID.
+The `PostToolUse` hook appends the wisdom-extraction line to the daily note and writes the changelog entry after the wisdom journal `create_note` succeeds. Emit telemetry event `wisdom_extracted` with `{insights_extracted, durable_count, memory_proposed, memory_persisted, tasks_created}`.
 
 ---
 
@@ -596,7 +575,7 @@ If any errors occur during processing:
 
 1. Check `_system/backlog/issues/` for existing issue with same error signature
 2. If exists: increment `tars-occurrence-count`, update `tars-last-seen`
-3. If new: create issue note with context via `obsidian create` using the issue template
+3. If new: create issue note with context via `mcp__tars_vault__create_note(path="_system/backlog/issues/…", template="issue", …)`
 
 ---
 

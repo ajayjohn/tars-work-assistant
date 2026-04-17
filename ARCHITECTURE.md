@@ -19,7 +19,7 @@ At a high level:
 - TARS-managed notes use schema-validated `tars-` properties and `tars/` tags
 - Obsidian Bases provide live query surfaces instead of hand-maintained index notes
 
-Only skill metadata loads eagerly at session start. With 12 skills, the lightweight baseline is roughly 48 tokens before deeper instructions are loaded on demand.
+Only skill metadata loads eagerly at session start. With 13 skills, the lightweight baseline is roughly 52 tokens before deeper instructions are loaded on demand.
 
 ## Repository layout
 
@@ -46,7 +46,7 @@ tars/
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 12 skills, 11 commands, and 13 scripts.
+The framework currently ships 13 skills, 12 commands, and 13 scripts.
 
 Some older directories remain in the repository for compatibility, migration context, or packaging history. They should not be treated as the active TARS 3.0 runtime architecture unless a specific document says otherwise.
 

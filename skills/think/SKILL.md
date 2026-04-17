@@ -17,6 +17,8 @@ help:
 
 A comprehensive strategic thinking engine combining five complementary modes for complex decisions, ambiguous problems, and high-stakes recommendations.
 
+Vault reads/writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md`). External data (project tracker, data warehouse, analytics, design) resolves via `mcp__tars_vault__resolve_capability(capability="<project-tracker|data-warehouse|analytics|design>")` — never hard-code provider server names. Parallel sub-agents (Mode D) use native `subagent_type` rather than Task primitives.
+
 ---
 
 ## MODE A: Strategic analysis

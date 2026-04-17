@@ -28,6 +28,14 @@ Interactive first-run setup for TARS v3. Creates the full vault structure, insta
 configures integrations, gathers user context progressively, registers scheduled jobs, and
 initializes git. This skill replaces both `install.sh` and the legacy `/welcome` command.
 
+### v3.1 pre-flight additions
+
+- Verify `tars-vault` MCP server is reachable (`mcp__tars_vault__read_note(file="schemas")` should succeed). If not, guide user through `.mcp.json` entry: `{"tars-vault": {"type": "stdio", "command": "python3", "args": ["-m", "tars_vault"]}}`.
+- Confirm plugin hooks (`session-start.py`, `pre-tool-use.py`, `post-tool-use.py`, `pre-compact.py`, `session-end.py`, `instructions-loaded.py`) are registered.
+- Run `scripts/githooks/install-githooks.sh` to enforce authorship rules locally.
+- Detect availability of Anthropic's first-party skills (`pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder`) for `/create` — if missing, note it so `/create` falls back to markdown-only.
+- Integration discovery: `mcp__tars_vault__refresh_integrations()` writes `_system/tools-registry.yaml` so `resolve_capability` works from the first session.
+
 ---
 
 ## Pipeline overview
@@ -65,7 +73,7 @@ If `_system/config.md` does not exist or has no user profile, proceed to Step 2.
 
 ## Step 2: Create vault structure
 
-Create the complete vault directory tree. Use `obsidian create` for all note creation (never direct file I/O for writes). Use filesystem tools only for creating empty directories.
+Create the complete vault directory tree. Use `mcp__tars_vault__create_note` for all note creation (the server wraps obsidian-cli). Use filesystem tools only for creating empty directories.
 
 ### 2a: Directories
 
@@ -424,12 +432,16 @@ Create `memory/org-context/` note for the organization using the org-context tem
 For each person mentioned:
 1. Create a person note in `memory/people/` using the person template:
    ```
-   obsidian create --template templates/person.md --path memory/people/{slug}.md
-   obsidian property:set --path memory/people/{slug}.md --property tars-role --value "{role}"
+   mcp__tars_vault__create_note(
+     name="{name}",
+     path="memory/people/{slug}.md",
+     template="person",
+     frontmatter={"tags": ["tars/person"], "tars-role": "{role}", "tars-created": "YYYY-MM-DD"}
+   )
    ```
-2. Set basic properties: name, role, relationship to user
-3. Add aliases if nicknames are mentioned
-4. Add to `_system/alias-registry.md`
+2. Set basic properties: name, role, relationship to user (via additional `tars-` fields).
+3. Add aliases if nicknames are mentioned.
+4. The MCP server adds the entry to `_system/alias-registry.md` automatically on `create_note`.
 
 ### Round 4: Active initiatives
 
@@ -438,11 +450,19 @@ For each person mentioned:
 For each initiative mentioned:
 1. Create an initiative note in `memory/initiatives/` using the initiative template:
    ```
-   obsidian create --template templates/initiative.md --path memory/initiatives/{slug}.md
-   obsidian property:set --path memory/initiatives/{slug}.md --property tars-owner --value "[[{user_name}]]"
-   obsidian property:set --path memory/initiatives/{slug}.md --property tars-status --value "active"
+   mcp__tars_vault__create_note(
+     name="{name}",
+     path="memory/initiatives/{slug}.md",
+     template="initiative",
+     frontmatter={
+       "tags": ["tars/initiative"],
+       "tars-owner": "[[{user_name}]]",
+       "tars-status": "active",
+       "tars-created": "YYYY-MM-DD"
+     }
+   )
    ```
-2. Set owner (default: user), status: active
+2. Set owner (default: user), status: active.
 
 After gathering, update `_system/maturity.yaml`:
 ```yaml

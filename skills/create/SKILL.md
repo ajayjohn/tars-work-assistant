@@ -16,6 +16,10 @@ help:
 
 Generate presentation-grade content: decks, narratives, speeches, thought leadership pieces, panel prep, event session content.
 
+**Architecture (v3.1)**: `/create` is an orchestrator. TARS handles content structuring, vault grounding, brand-pointer, companion-note creation, and filing. Office rendering (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to **Anthropic's first-party skills** (`pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder`) — never to a TARS-built office MCP. TARS does not bundle `python-pptx`, `openpyxl`, `python-docx`, `weasyprint`, or similar. See PRD §3.1b, §8.10, §26.4. Phase 6 implements the full delegation flow; Phase 2 rewires the vault-interaction plumbing only.
+
+Vault reads/writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md`). Data-source integrations (KPI, analytics, design, project tracker, documentation) resolve via `mcp__tars_vault__resolve_capability(capability=…)`. Brand guidelines auto-load via `mcp__tars_vault__search_by_tag(tag="tars/brand")` filtered on `tars-brand: true` (Phase 5 finalizes; Phase 2 accepts user prompt for active brand file).
+
 ---
 
 ## Step 1: Intake
@@ -34,13 +38,26 @@ If critical intake info is missing, apply clarification protocol.
 
 ## Step 2: Context gathering
 
-Load relevant context:
-- `memory/initiatives/_index.md` + targeted initiative files
-- `memory/products/_index.md` + targeted product files
-- `memory/decisions/_index.md` + relevant decisions
-- `memory/people/{stakeholder}.md` for audience-specific adaptation
-- `contexts/` for deep reference material
-- Recent `journal/` entries for freshness and recency
+Load relevant context via vault MCP tools (`.base` views replace `_index.md` files in v3):
+
+- Initiatives: `mcp__tars_vault__search_by_tag(tag="tars/initiative", limit=20)` + targeted `read_note` for the ones being referenced.
+- Products:   `mcp__tars_vault__search_by_tag(tag="tars/product", limit=20)` + targeted `read_note`.
+- Decisions:  `mcp__tars_vault__search_by_tag(tag="tars/decision", query="<topic keywords>", limit=10)`.
+- People:     `mcp__tars_vault__read_note(file="<stakeholder name>")` for audience-specific adaptation.
+- Contexts:   Phase 4 adds `mcp__tars_vault__semantic_search(scope="contexts", query=…)`; until then `search_by_tag` + targeted reads.
+- Journal:    recent entries via `search_by_tag(tag="tars/journal", frontmatter={"tars-date__gte": …})`.
+
+### Data sources (if the content references metrics, KPIs, usage, or design)
+
+Resolve integrations before invoking their tools:
+```
+data_wh = mcp__tars_vault__resolve_capability(capability="data-warehouse")   # Snowflake / BigQuery / Databricks
+analytics = mcp__tars_vault__resolve_capability(capability="analytics")       # Pendo / Amplitude / Mixpanel
+tracker  = mcp__tars_vault__resolve_capability(capability="project-tracker") # Jira / Linear / GitHub
+design   = mcp__tars_vault__resolve_capability(capability="design")           # Figma
+docs     = mcp__tars_vault__resolve_capability(capability="documentation")    # Confluence / Notion / Google Docs
+```
+Skill degrades gracefully if any capability is unavailable.
 
 ---
 
@@ -110,18 +127,28 @@ Strategic analysis light:
 
 ## Output
 
-Save to `contexts/artifacts/YYYY-MM-DD-artifact-slug.md`
+Save the content outline (markdown) as the canonical review surface, always:
 
-```yaml
----
-date: YYYY-MM-DD
-title: Artifact Title
-type: deck | narrative | speech
-audience: Board | Conference | Team | Stakeholder Name
-topic: Primary topic
-initiatives: [Related initiatives]
----
 ```
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD Artifact Title",
+  path="contexts/artifacts/YYYY-MM/YYYY-MM-DD-artifact-slug.md",
+  frontmatter={
+    "tars-date": "YYYY-MM-DD",
+    "tars-title": "Artifact Title",
+    "tars-type": "deck | narrative | speech",
+    "tars-audience": "Board | Conference | Team | <Stakeholder Name>",
+    "tars-topic": "Primary topic",
+    "tars-initiatives": ["[[Related Initiative]]"],
+    "tars-created": "YYYY-MM-DD"
+  },
+  body="<content outline markdown>"
+)
+```
+
+### If non-markdown output requested (Phase 6 delegates to Anthropic skills)
+
+Phase 6 implements the full delegation pattern (§8.10): content-first (markdown review), then invoke Anthropic's `pptx` / `docx` / `xlsx` / `pdf` / `web-artifacts-builder` skill with the content outline and brand pointer, then create a companion `.md` via `mcp__tars_vault__create_note` per §26.13. Phase 2 does not ship the office delegation; if the user requests a `.pptx` or similar, inform them the full delegation lands in Phase 6 and produce markdown for now.
 
 Display the artifact to the user and confirm save location.
 

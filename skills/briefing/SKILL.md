@@ -18,6 +18,8 @@ help:
 
 Unified protocol for daily and weekly briefings. Mode is determined by the request signal.
 
+All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list.
+
 | Signal | Mode |
 |--------|------|
 | "daily briefing", "what's my day look like?", "morning briefing" | Daily |
@@ -49,13 +51,11 @@ Spawn **three parallel sub-agents** using the Task tool. **Launch all three in a
 ### Sub-agent A: Fetch calendar
 
 ```
-Check <mcp_servers> context for calendar MCP server (preferred).
-If found, use MCP tools (list_events, get_event).
-If not found, read _system/integrations.md Calendar section for legacy provider.
-If neither configured, return {"status": "not_configured"}.
+cap = mcp__tars_vault__resolve_capability(capability="calendar")
+If cap.status == "unavailable": return {"status": "not_configured"}.
 
-Resolve {target_date} to YYYY-MM-DD format.
-Execute list_events for {target_date} with offset=1.
+Resolve {target_date} to YYYY-MM-DD.
+Call cap.tools[0].name (typically a list_events-style tool) for {target_date} with offset=1.
 For each event extract: time, title, duration, attendee names.
 
 Return JSON:
@@ -69,13 +69,12 @@ Return JSON:
 ### Sub-agent B: Fetch tasks
 
 ```
-Check <mcp_servers> context for tasks/reminders MCP server (preferred).
-If found, use MCP tools (list_reminders).
-If not found, read _system/integrations.md Tasks section for legacy provider.
+cap = mcp__tars_vault__resolve_capability(capability="tasks")
+If cap.status == "unavailable": return {"status": "not_configured"}.
 
-Execute list operation for primary task list (default: Active).
+Use cap.tools[*] to list primary task list (default: Active).
 Identify tasks due {target_date} or highest priority.
-Execute overdue check for tasks past due date.
+Run overdue check for tasks past due date.
 
 Return JSON:
 {
@@ -90,20 +89,21 @@ Return JSON:
 ### Sub-agent C: Query memory and context
 
 ```
-Read memory/people/ via: obsidian search query="tag:tars/person" limit=100
+People:       mcp__tars_vault__search_by_tag(tag="tars/person", limit=100)
   Build a people lookup table: name → summary, open items.
 
-Read memory/initiatives/ via: obsidian search query="tag:tars/initiative tars-status:active" limit=20
+Initiatives:  mcp__tars_vault__search_by_tag(tag="tars/initiative", frontmatter={"tars-status": "active"}, limit=20)
   Extract: initiative name, status, upcoming milestones.
 
 Read _system/schedule.md if it exists:
   Identify [RECURRING] and [ONCE] items due {target_date}.
 
-Count inbox items: obsidian search query="path:inbox/pending" limit=1
+Inbox:        mcp__tars_vault__search_by_tag(tag="tars/inbox", limit=1)
   (Result count indicates pending items.)
 
-Read _system/housekeeping-state.yaml for last housekeeping run date.
-Read _system/maturity.yaml for maturity level.
+Schedule:     mcp__tars_vault__read_note(file="schedule")      (skip if absent)
+Housekeeping: mcp__tars_vault__read_note(file="housekeeping-state")
+Maturity:     mcp__tars_vault__read_note(file="maturity")
 
 Return JSON:
 {
@@ -135,7 +135,7 @@ After all three sub-agents complete:
 1. **Match attendees to memory**: For each person in today's calendar events, find their memory profile. Extract: summary, recent interactions, open items, responses owed.
 2. **Targeted lookups**: For attendees not covered by the initial search, do targeted reads:
    ```
-   obsidian read file="[person name]"
+   mcp__tars_vault__read_note(file="<person name>")
    ```
 3. **Link tasks to meetings**: Match tasks to meetings by initiative, person, or topic overlap.
 4. **Flag unrecognized people**: Calendar attendees with no memory profile get flagged:
@@ -206,23 +206,21 @@ After all three sub-agents complete:
 ## Step 7: Save and display
 
 ```
-obsidian create name="YYYY-MM-DD Daily Briefing" \
-  path="journal/YYYY-MM/YYYY-MM-DD-daily-briefing.md" \
-  template="daily-briefing" silent
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD Daily Briefing",
+  path="journal/YYYY-MM/YYYY-MM-DD-daily-briefing.md",
+  template="daily-briefing",
+  frontmatter={
+    "tags": ["tars/journal", "tars/briefing"],
+    "tars-date": "YYYY-MM-DD",
+    "tars-briefing-type": "daily",
+    "tars-created": "YYYY-MM-DD"
+  },
+  body="<generated briefing markdown>"
+)
 ```
 
-Set frontmatter properties:
-
-```yaml
----
-tags: [tars/journal, tars/briefing]
-tars-date: YYYY-MM-DD
-tars-briefing-type: daily
-tars-created: YYYY-MM-DD
----
-```
-
-Append the generated briefing content. Display the full briefing directly to the user.
+Display the full briefing directly to the user.
 
 ---
 
@@ -242,14 +240,9 @@ After generating the briefing, verify scheduled automation:
 
 ---
 
-## Step 9: Log to daily note
+## Step 9: Daily-note log (handled by PostToolUse hook)
 
-```
-obsidian daily:append content="- Briefing: daily briefing generated → [[YYYY-MM-DD Daily Briefing]]
-  - Meetings: N scheduled
-  - Tasks: N due today, M overdue
-  - Unrecognized: N people"
-```
+The `PostToolUse` hook appends the briefing-generation line to the daily note after `create_note` succeeds. No explicit append call is required. Emit telemetry event `briefing_generated` with `{meetings, tasks_due_today, overdue, unrecognized_people}` counts for the skill-activity view.
 
 ---
 
@@ -275,11 +268,11 @@ Spawn **three parallel sub-agents** using the Task tool. **Launch all three in a
 ### Sub-agent A: Fetch calendar (weekly)
 
 ```
-Check <mcp_servers> context for calendar MCP server (preferred).
-If not found, read _system/integrations.md Calendar section.
+cap = mcp__tars_vault__resolve_capability(capability="calendar")
+If cap.status == "unavailable": return {"status": "not_configured"}.
 
 Resolve {monday_date} to YYYY-MM-DD format.
-Execute list_events with {monday_date} and offset=7.
+Call cap.tools[*] (list_events-style) with {monday_date} and offset=7.
 Identify high-priority meetings (executives, leadership, clients, key stakeholders).
 Identify open time slots of 60+ minutes.
 
@@ -295,10 +288,10 @@ Return JSON:
 ### Sub-agent B: Fetch tasks (weekly)
 
 ```
-Check <mcp_servers> context for tasks/reminders MCP server (preferred).
-If not found, read _system/integrations.md Tasks section.
+cap = mcp__tars_vault__resolve_capability(capability="tasks")
+If cap.status == "unavailable": return {"status": "not_configured"}.
 
-Execute list operation for ALL configured lists (default: Active, Delegated, Backlog).
+Using cap.tools[*], list ALL configured lists (default: Active, Delegated, Backlog).
 Execute overdue check.
 Identify tasks due this week ({monday_date} through {sunday_date}).
 Identify backlog items older than 90 days (flag as stale).
@@ -318,24 +311,21 @@ Return JSON:
 ### Sub-agent C: Query memory and context (weekly)
 
 ```
-Read memory/people/ via: obsidian search query="tag:tars/person" limit=100
+People:       mcp__tars_vault__search_by_tag(tag="tars/person", limit=100)
   For frequent meeting attendees, read full profiles.
   Identify responses owed and follow-ups needed across all people.
 
-Read memory/initiatives/ via: obsidian search query="tag:tars/initiative tars-status:active" limit=20
+Initiatives:  mcp__tars_vault__search_by_tag(tag="tars/initiative", frontmatter={"tars-status": "active"}, limit=20)
   Extract: name, status, milestones due this week, health indicators.
 
-Read journal entries from last week:
-  obsidian search query="tag:tars/journal tars-date:>={last_monday}" limit=50
+Journal:      mcp__tars_vault__search_by_tag(tag="tars/journal",
+                 frontmatter={"tars-date__gte": "{last_monday}"}, limit=50)
   Summarize: meetings held, decisions made, tasks completed.
 
-Read _system/schedule.md:
-  Identify recurring and one-time items due this week.
-
-Count inbox items: obsidian search query="path:inbox/pending" limit=1
-
-Read _system/housekeeping-state.yaml for system dates.
-Read _system/maturity.yaml for maturity level.
+Schedule:     mcp__tars_vault__read_note(file="schedule")         (skip if absent)
+Inbox:        mcp__tars_vault__search_by_tag(tag="tars/inbox", limit=1)
+Housekeeping: mcp__tars_vault__read_note(file="housekeeping-state")
+Maturity:     mcp__tars_vault__read_note(file="maturity")
 
 Return JSON:
 {
@@ -485,25 +475,23 @@ After all three sub-agents complete:
 ## Step 7: Save and display
 
 ```
-obsidian create name="YYYY-MM-DD Weekly Briefing" \
-  path="journal/YYYY-MM/YYYY-MM-DD-weekly-briefing.md" \
-  template="weekly-briefing" silent
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD Weekly Briefing",
+  path="journal/YYYY-MM/YYYY-MM-DD-weekly-briefing.md",
+  template="weekly-briefing",
+  frontmatter={
+    "tags": ["tars/journal", "tars/briefing"],
+    "tars-date": "YYYY-MM-DD",
+    "tars-briefing-type": "weekly",
+    "tars-week-start": "YYYY-MM-DD",
+    "tars-week-end": "YYYY-MM-DD",
+    "tars-created": "YYYY-MM-DD"
+  },
+  body="<generated briefing markdown>"
+)
 ```
 
-Set frontmatter properties:
-
-```yaml
----
-tags: [tars/journal, tars/briefing]
-tars-date: YYYY-MM-DD
-tars-briefing-type: weekly
-tars-week-start: YYYY-MM-DD
-tars-week-end: YYYY-MM-DD
-tars-created: YYYY-MM-DD
----
-```
-
-Append the generated briefing content. Display key highlights to the user (full briefing is saved to journal).
+Display key highlights to the user (full briefing is saved to journal).
 
 ---
 
@@ -513,15 +501,9 @@ Same as daily briefing Step 8. Verify all scheduled cron jobs are active, re-reg
 
 ---
 
-## Step 9: Log to daily note
+## Step 9: Daily-note log (handled by PostToolUse hook)
 
-```
-obsidian daily:append content="- Briefing: weekly briefing generated → [[YYYY-MM-DD Weekly Briefing]]
-  - Meetings this week: N
-  - Tasks due this week: N, overdue: M
-  - Stale backlog items: N flagged
-  - Initiatives tracked: N"
-```
+The `PostToolUse` hook writes the daily-note line after the briefing create_note succeeds. Emit telemetry event `briefing_generated` with `{briefing_type: "weekly", meetings, tasks_due, overdue, stale_backlog, initiatives}` counts.
 
 ---
 
