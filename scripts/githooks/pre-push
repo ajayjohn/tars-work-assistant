@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # TARS v3.1 authorship-enforcement hook (pre-push).
-# Reject pushing any commit that contains Claude attribution. Belt-and-braces with
-# the prepare-commit-msg hook.
+# Reject pushing any NEW commit that contains Claude attribution. Belt-and-braces
+# with the prepare-commit-msg hook. Scope is "commits this push would introduce
+# that aren't already on any remote" — so pushing a tag that points at a commit
+# already on origin/main does not re-scan pre-hook history.
 remote="$1"
 url="$2"
 zero=0000000000000000000000000000000000000000
@@ -9,12 +11,15 @@ while read local_ref local_sha remote_ref remote_sha; do
   if [ "$local_sha" = "$zero" ]; then
     continue
   fi
-  range="${remote_sha}..${local_sha}"
   if [ "$remote_sha" = "$zero" ]; then
-    range="$local_sha"
+    # New ref (branch or tag). Scan only commits reachable from local_sha that
+    # are NOT already reachable from any remote ref — i.e., net-new history.
+    new_commits=$(git log --format='%B' "$local_sha" --not --remotes)
+  else
+    new_commits=$(git log --format='%B' "${remote_sha}..${local_sha}")
   fi
-  if git log --format='%B' "$range" | grep -qiE '(co-authored-by:[[:space:]]*claude|🤖|generated with \[?claude code\]?)'; then
-    echo "ERROR: commits in $range contain Claude attribution. Push rejected." >&2
+  if printf '%s' "$new_commits" | grep -qiE '(co-authored-by:[[:space:]]*claude|🤖|generated with \[?claude code\]?)'; then
+    echo "ERROR: new commits pushed to $local_ref contain Claude attribution. Push rejected." >&2
     exit 1
   fi
 done
