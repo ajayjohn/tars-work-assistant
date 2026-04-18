@@ -1,5 +1,5 @@
 # TARS Guardrails Configuration
-# Used by scan-secrets.py and scan-flagged.py
+# Used by scan-secrets.py and health-check.py (flagged-content sub-check).
 
 # Block patterns: content matching these is NEVER persisted. Redact and notify.
 block_patterns:

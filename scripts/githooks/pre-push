@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# TARS v3.1 authorship-enforcement hook (pre-push).
+# Reject pushing any commit that contains Claude attribution. Belt-and-braces with
+# the prepare-commit-msg hook.
+remote="$1"
+url="$2"
+zero=0000000000000000000000000000000000000000
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" = "$zero" ]; then
+    continue
+  fi
+  range="${remote_sha}..${local_sha}"
+  if [ "$remote_sha" = "$zero" ]; then
+    range="$local_sha"
+  fi
+  if git log --format='%B' "$range" | grep -qiE '(co-authored-by:[[:space:]]*claude|🤖|generated with \[?claude code\]?)'; then
+    echo "ERROR: commits in $range contain Claude attribution. Push rejected." >&2
+    exit 1
+  fi
+done
+exit 0

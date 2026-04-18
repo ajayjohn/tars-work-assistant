@@ -16,6 +16,8 @@ help:
 
 Comprehensive initiative management with three distinct modes: planning new initiatives, tracking status, and generating performance reports with KPI analysis.
 
+Vault reads/writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md`). Ticketing/roadmap data resolves via `mcp__tars_vault__resolve_capability(capability="project-tracker")`; KPI data via `resolve_capability(capability="data-warehouse")`; analytics via `resolve_capability(capability="analytics")` — skills never hard-code provider server names.
+
 ---
 
 ## Explicitly excludes

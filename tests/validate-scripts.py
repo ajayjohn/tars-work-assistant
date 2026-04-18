@@ -74,7 +74,14 @@ def check_shebang(filepath):
 
 
 def get_python_imports(filepath):
-    """Parse Python file and extract all imported module names."""
+    """Parse Python file and extract required imports.
+
+    Imports wrapped in a `try: import X ... except ImportError:` block are
+    treated as OPTIONAL dependencies (PRD §26.2 "graceful degrade path")
+    and are not returned. Required imports are the ones whose absence
+    would crash the script — those must be stdlib or in the approved
+    runtime-deps allowlist.
+    """
     try:
         with open(filepath) as f:
             source = f.read()
@@ -86,23 +93,66 @@ def get_python_imports(filepath):
     except SyntaxError as e:
         return [], f"Syntax error: {e}"
 
+    # Collect every import node that sits inside a try-block where the
+    # except clause catches ImportError / ModuleNotFoundError. Those are
+    # optional, by construction.
+    optional_import_ids = set()
+
+    def _handler_catches_import_error(handlers):
+        for h in handlers:
+            exc = h.type
+            if exc is None:
+                # bare except: — treat as catching ImportError too
+                return True
+            names = []
+            if isinstance(exc, ast.Name):
+                names = [exc.id]
+            elif isinstance(exc, ast.Tuple):
+                names = [e.id for e in exc.elts if isinstance(e, ast.Name)]
+            if any(n in ("ImportError", "ModuleNotFoundError", "Exception", "BaseException")
+                   for n in names):
+                return True
+        return False
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and _handler_catches_import_error(node.handlers):
+            for sub in ast.walk(node):
+                if isinstance(sub, (ast.Import, ast.ImportFrom)):
+                    optional_import_ids.add(id(sub))
+
     imports = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
+            if id(node) in optional_import_ids:
+                continue
             for alias in node.names:
-                # Get top-level module name
                 imports.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
+            if id(node) in optional_import_ids:
+                continue
             if node.module:
                 imports.add(node.module.split(".")[0])
 
     return sorted(imports), None
 
 
+# Approved third-party runtime dependencies (PRD §26.2, as revised 2026-04-18).
+# Scripts that interact with the tars-vault MCP server (e.g., build-search-index.py)
+# may import these; every other script must remain stdlib-only.
+APPROVED_RUNTIME_DEPS = {
+    "mcp",           # Anthropic MCP SDK
+    "fastembed",     # local ONNX embedding model loader
+    "sqlite_vec",    # sqlite-vec SQLite extension
+    "tars_vault",    # in-repo MCP server package (mcp/tars-vault/src/tars_vault)
+}
+
+
 def is_stdlib_module(module_name):
-    """Check if a module name is part of Python standard library."""
-    # Check direct match
+    """Check if a module name is part of Python standard library or an
+    approved runtime dependency per PRD §26.2."""
     if module_name in STDLIB_MODULES:
+        return True
+    if module_name in APPROVED_RUNTIME_DEPS:
         return True
     # Check if it's a private/internal module (starts with _)
     if module_name.startswith("_"):
@@ -120,11 +170,16 @@ def main():
         return 1
 
     script_files = []
+    # Only files with executable extensions are scripts; sibling data files
+    # (e.g., capability-classifier.yaml) live alongside them and are skipped.
+    SCRIPT_EXTS = (".py", ".sh")
     for entry in sorted(os.listdir(SCRIPTS_DIR)):
         full_path = os.path.join(SCRIPTS_DIR, entry)
         if os.path.isfile(full_path) and not entry.startswith("."):
             # Skip __pycache__ and similar
             if entry == "__pycache__" or entry.endswith(".pyc"):
+                continue
+            if not entry.endswith(SCRIPT_EXTS):
                 continue
             script_files.append(entry)
 

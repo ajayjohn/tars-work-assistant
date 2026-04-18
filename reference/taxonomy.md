@@ -4,19 +4,19 @@ This file is a compatibility-oriented overview. The active runtime taxonomy for 
 
 ## Managed entity areas
 
-TARS 3.0 primarily manages these note families:
+TARS primarily manages these note families:
 
-| Area | Folder |
-|------|--------|
-| People | `memory/people/` |
-| Vendors | `memory/vendors/` |
-| Competitors | `memory/competitors/` |
-| Products | `memory/products/` |
-| Initiatives | `memory/initiatives/` |
-| Decisions | `memory/decisions/` |
-| Organizational context | `memory/org-context/` |
-| Meeting journals and briefings | `journal/YYYY-MM/` |
-| Transcript archives | `archive/transcripts/YYYY-MM/` |
+| Area | Entity type | Folder |
+|------|-------------|--------|
+| People | person | `memory/people/` |
+| Vendors | vendor | `memory/vendors/` |
+| Competitors | competitor | `memory/competitors/` |
+| Products | product | `memory/products/` |
+| Initiatives | initiative | `memory/initiatives/` |
+| Decisions | decision | `memory/decisions/` |
+| Organizational context | context | `memory/org-context/` |
+| Meeting journals and briefings | — | `journal/YYYY-MM/` |
+| Transcript archives | — | `archive/transcripts/YYYY-MM/` |
 
 ## Tagging and schema rules
 

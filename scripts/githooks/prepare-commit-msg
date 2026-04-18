@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# TARS v3.1 authorship-enforcement hook (prepare-commit-msg).
+# Per PRD §24.1: every commit must be attributed to the repo owner.
+# Aborts if any Claude attribution pattern is present.
+msg_file="$1"
+if grep -qiE '(co-authored-by:[[:space:]]*claude|🤖|generated with \[?claude code\]?|anthropic claude signed-off)' "$msg_file"; then
+  echo "ERROR: commit message contains Claude attribution pattern — remove before committing." >&2
+  echo "       (see docs/RELEASE-v3.1.0.md §authorship rules)" >&2
+  exit 1
+fi
+exit 0

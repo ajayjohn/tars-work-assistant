@@ -28,6 +28,15 @@ Interactive first-run setup for TARS v3. Creates the full vault structure, insta
 configures integrations, gathers user context progressively, registers scheduled jobs, and
 initializes git. This skill replaces both `install.sh` and the legacy `/welcome` command.
 
+### v3.1 pre-flight additions
+
+- Verify `tars-vault` MCP server is reachable (`mcp__tars_vault__read_note(file="schemas")` should succeed). If not, guide user through `.mcp.json` entry: `{"tars-vault": {"type": "stdio", "command": "python3", "args": ["-m", "tars_vault"]}}`.
+- Confirm plugin hooks (`session-start.py`, `pre-tool-use.py`, `post-tool-use.py`, `pre-compact.py`, `session-end.py`, `instructions-loaded.py`) are registered.
+- Run `scripts/githooks/install-githooks.sh` to enforce authorship rules locally.
+- **Anthropic first-party skills probe (§8.10.1)**: detect which of `pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder` are available in the host Claude Code install. Read the user-invocable skills list surfaced in `<system-reminder>` blocks; do not programmatically load or inspect third-party skill packages. Persist the result in `_system/config.md` frontmatter as `tars-anthropic-skills: [pptx, docx, xlsx, pdf, web-artifacts-builder]` (include only those available). `/create` reads this at session start instead of reprobing.
+- Integration discovery: `mcp__tars_vault__refresh_integrations()` writes `_system/tools-registry.yaml` so `resolve_capability` works from the first session.
+- **Brand-guidelines scaffold (§5.1)**: if the user plans to use `/create` or `/communicate` for branded artifacts, offer to scaffold a brand file from `templates/brand-guidelines.md` → `contexts/brand/<brand-name>-brand-guidelines.md` (tagged `tars/brand`, frontmatter `tars-brand: true`). Cache the active brand as `tars-active-brand: <filename>` in `_system/config.md`.
+
 ---
 
 ## Pipeline overview
@@ -65,7 +74,7 @@ If `_system/config.md` does not exist or has no user profile, proceed to Step 2.
 
 ## Step 2: Create vault structure
 
-Create the complete vault directory tree. Use `obsidian create` for all note creation (never direct file I/O for writes). Use filesystem tools only for creating empty directories.
+Create the complete vault directory tree. Use `mcp__tars_vault__create_note` for all note creation (the server wraps obsidian-cli). Use filesystem tools only for creating empty directories.
 
 ### 2a: Directories
 
@@ -217,13 +226,11 @@ Create Obsidian templates in `templates/`:
 | decision.md | `tars/decision` | tars-status, tars-decision-maker, tars-date |
 | org-context.md | `tars/org-context` | tars-scope, tars-last-validated |
 | meeting-journal.md | `tars/journal, tars/meeting` | tars-date, tars-meeting-datetime, tars-participants, tars-organizer, tars-topics, tars-initiatives, tars-source, tars-transcript |
-| daily-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: daily |
-| weekly-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: weekly |
+| briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: daily\|weekly |
 | wisdom-journal.md | `tars/journal, tars/wisdom` | tars-date, tars-source-title, tars-source-url |
 | companion.md | `tars/companion` | tars-original-file, tars-original-type, tars-file-size, tars-added-date, tars-source, tars-summary |
 | transcript.md | `tars/transcript` | tars-journal-entry, tars-date, tars-meeting-datetime, tars-participants, tars-format |
-| issue.md | `tars/backlog, tars/issue` | tars-issue-type, tars-severity, tars-status |
-| idea.md | `tars/backlog, tars/idea` | tars-requested-by, tars-priority, tars-status |
+| backlog-item.md | `tars/backlog, tars/{issue\|idea}` | tars-backlog-type: issue\|idea, tars-status |
 
 Each template should include the full frontmatter block with placeholder values and a minimal body structure appropriate to the entity type.
 
@@ -259,8 +266,7 @@ Create the following Python scripts in `scripts/`:
 |--------|---------|
 | validate-schema.py | Validates frontmatter against _system/schemas.yaml |
 | scan-secrets.py | Scans for blocked/warned patterns from _system/guardrails.yaml |
-| scan-flagged.py | Finds negative sentiment markers in people notes |
-| health-check.py | Comprehensive: schema + links + aliases + staleness |
+| health-check.py | Comprehensive: schema + links + aliases + staleness + flagged-content sub-check |
 | archive.py | Staleness-based archival with `--auto` and `--dry-run` flags |
 | sync.py | Calendar gap detection + task system drift check |
 
@@ -424,12 +430,16 @@ Create `memory/org-context/` note for the organization using the org-context tem
 For each person mentioned:
 1. Create a person note in `memory/people/` using the person template:
    ```
-   obsidian create --template templates/person.md --path memory/people/{slug}.md
-   obsidian property:set --path memory/people/{slug}.md --property tars-role --value "{role}"
+   mcp__tars_vault__create_note(
+     name="{name}",
+     path="memory/people/{slug}.md",
+     template="person",
+     frontmatter={"tags": ["tars/person"], "tars-role": "{role}", "tars-created": "YYYY-MM-DD"}
+   )
    ```
-2. Set basic properties: name, role, relationship to user
-3. Add aliases if nicknames are mentioned
-4. Add to `_system/alias-registry.md`
+2. Set basic properties: name, role, relationship to user (via additional `tars-` fields).
+3. Add aliases if nicknames are mentioned.
+4. The MCP server adds the entry to `_system/alias-registry.md` automatically on `create_note`.
 
 ### Round 4: Active initiatives
 
@@ -438,11 +448,19 @@ For each person mentioned:
 For each initiative mentioned:
 1. Create an initiative note in `memory/initiatives/` using the initiative template:
    ```
-   obsidian create --template templates/initiative.md --path memory/initiatives/{slug}.md
-   obsidian property:set --path memory/initiatives/{slug}.md --property tars-owner --value "[[{user_name}]]"
-   obsidian property:set --path memory/initiatives/{slug}.md --property tars-status --value "active"
+   mcp__tars_vault__create_note(
+     name="{name}",
+     path="memory/initiatives/{slug}.md",
+     template="initiative",
+     frontmatter={
+       "tags": ["tars/initiative"],
+       "tars-owner": "[[{user_name}]]",
+       "tars-status": "active",
+       "tars-created": "YYYY-MM-DD"
+     }
+   )
    ```
-2. Set owner (default: user), status: active
+2. Set owner (default: user), status: active.
 
 After gathering, update `_system/maturity.yaml`:
 ```yaml

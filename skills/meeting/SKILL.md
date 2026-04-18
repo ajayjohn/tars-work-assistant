@@ -2,13 +2,27 @@
 name: meeting
 description: Process meeting transcripts into journal entries, tasks, and memory updates
 triggers: ["process this meeting", "meeting transcript", "meeting notes"]
+user-invocable: true
+help:
+  purpose: |-
+    Process a meeting transcript through the 14-step TARS pipeline — calendar
+    match, participant resolution, knowledge inventory, secret scan, summary,
+    nuance capture, journal + transcript write, task extraction, memory
+    proposals — all gated on review-before-persist.
+  use_cases:
+    - "Process this meeting transcript"
+    - "I just had a meeting with [person], here's what we said..."
+    - "Turn this transcript into a journal entry"
+  scope: meeting,transcript,journal,followthrough
 ---
 
 # Meeting processing pipeline
 
-The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline with mandatory user review gates.
+The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline (plus a 7b nuance-capture sub-step) with mandatory user review gates.
 
-All vault writes use obsidian-cli. All names use canonical forms from the alias registry. All persistence requires user confirmation.
+All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation.
+
+**Hooks now enforce** `tars-` prefix, content chunking, alias-registry load, changelog writes, and telemetry. The pipeline body below describes intent; the MCP server handles validation and logging. Legacy `obsidian-cli` examples map 1:1 to the `mcp__tars_vault__*` tools in the core skill's write-interface table.
 
 ---
 
@@ -17,6 +31,7 @@ All vault writes use obsidian-cli. All names use canonical forms from the alias 
 ```
 Steps 1-6:   Preparation (load context, detect format, resolve calendar/participants, check knowledge, scan secrets)
 Step 7:      Processing (LLM analysis of transcript)
+Step 7b:     Nuance capture (second Haiku pass over raw transcript — safety net)
 Steps 8-9:   Persistence (journal entry + transcript archive)
 Steps 10-11: Extraction with review (tasks + memory, user confirms each)
 Steps 12-14: Cleanup (unresolved names, daily note, self-evaluation)
@@ -24,13 +39,9 @@ Steps 12-14: Cleanup (unresolved names, daily note, self-evaluation)
 
 ---
 
-## Step 1: Load alias registry (MANDATORY)
+## Step 1: Load alias registry (handled by server)
 
-```bash
-obsidian read file="alias-registry"
-```
-
-Load the full alias registry into context. This is the canonical source for name resolution throughout the pipeline. Every speaker label, attendee name, and entity reference downstream must be checked against this registry.
+The `tars-vault` MCP server holds the alias registry in-process (invalidated on file-mtime change). Name-resolution calls (`mcp__tars_vault__resolve_alias`) use the cache. If the SessionStart hook has run this session, the canonical-names head is already in additionalContext. No explicit load is required — call `mcp__tars_vault__resolve_alias(name="…")` whenever a speaker label, attendee, or entity reference needs canonicalization.
 
 ---
 
@@ -70,15 +81,27 @@ Fill in whatever the transcript provides. Missing fields will be resolved in sub
 
 ALWAYS query the calendar, even when the transcript provides a date. Calendar data is authoritative for meeting title, full attendee list (including silent participants), organizer, and precise time.
 
+### Resolve the calendar provider first
+
+```
+cap = mcp__tars_vault__resolve_capability(capability="calendar")
+# use cap.tools[*].name dynamically — never hard-code mcp__apple_calendar__* or mcp__microsoft_365_*
+```
+
+If `cap.status == "unavailable"` and `calendar.required: true` in `_system/integrations.md`, halt with a clear message. Otherwise degrade to transcript-provided date + user confirmation.
+
+### Step 3b: Meeting-recording check (optional)
+
+If `resolve_capability(capability="meeting-recording")` returns a connected provider and the user did not paste a transcript, propose:
+```
+Import transcript from "<recording title>" (<recording URL>)?
+```
+Uses whichever tool the resolver returns (Minutes.app, Otter, Fireflies, etc.).
+
 ### Query logic
 
 **a. Transcript has a date:**
 Use the transcript date to define a narrow calendar query window (that day, +/- 1 day).
-
-```bash
-# Example: transcript says "March 19"
-# Query calendar for March 18-20
-```
 
 **b. Transcript lacks a date:**
 Query the past 3 business days from today.
@@ -137,8 +160,8 @@ Merge two participant sources into one canonical list:
 Check the alias registry loaded in Step 1 for an exact match or known variation. If found, map to canonical form.
 
 **Pass 2: Vault search**
-```bash
-obsidian search query="tag:tars/person [name]" limit=5
+```
+mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)
 ```
 If the name matches exactly one person note, use it.
 
@@ -189,11 +212,13 @@ Before extracting anything, check what the vault already knows about the entitie
 
 For each person, initiative, decision, or topic identified in the transcript:
 
-```bash
-obsidian search query="tag:tars/person [entity]" limit=5
-obsidian search query="tag:tars/initiative [entity]" limit=5
-obsidian search query="tag:tars/decision [entity]" limit=5
 ```
+mcp__tars_vault__search_by_tag(tag="tars/person",     query="<entity>", limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/initiative", query="<entity>", limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/decision",   query="<entity>", limit=5)
+```
+
+Phase 4 adds `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for paraphrase/prose matching over journal + transcripts + contexts.
 
 ### Classification
 
@@ -227,9 +252,11 @@ This is transcript 2 of 5. Later transcripts will supersede earlier ones on over
 
 Run the secrets scanner against transcript content BEFORE any vault writes.
 
-```bash
-python3 scripts/scan-secrets.py --content "{transcript_content}"
 ```
+mcp__tars_vault__scan_secrets(content="<transcript_content>")
+```
+
+Returns JSON: `{block: [...], warn: [...], negative_sentiment: [...]}`. The MCP server also runs `scan_secrets` internally before every write via `PreToolUse` hook; the pre-write call here is belt-and-braces so redaction happens before the transcript is echoed back to the user.
 
 ### Block patterns (halt and redact)
 - Social Security numbers
@@ -291,17 +318,129 @@ Format: **"Owner"** -- Task description (deadline if stated)
 
 ---
 
+## Step 7b: Nuance capture pass (PRD §6.8)
+
+Directly addresses the top-declared retrieval pain: summaries miss nuance,
+contrarian views, specific phrases, and quantitative claims. Runs AFTER
+Step 7 and BEFORE Step 8 so the nuance section lands in the same journal
+entry as the main summary.
+
+### When to run
+
+- Always, when the raw transcript is available.
+- Skip with a telemetry note (`meeting_nuance_skipped`, reason) only if the
+  transcript was unavailable (e.g., meeting-recording import produced summary
+  only) or was <500 words total. The nuance pass is cheap enough (~1 extra
+  Haiku call) that it should run by default.
+
+### How to run
+
+Spawn a sub-agent with `subagent_type="general-purpose"`, model Haiku,
+`max_turns=1`, temperature `0.2`. Feed it the verbatim prompt from
+`skills/meeting/reference/nuance-pass-prompt.md`, substituting
+`{{TRANSCRIPT_TEXT}}` with the full raw transcript (before any archival
+chunking). The prompt requires a single JSON object back.
+
+### What the JSON contains
+
+Six arrays, any of which may be empty:
+
+| Key | Content |
+|-----|---------|
+| `notable_phrases` | Verbatim phrases the summary dropped. Speaker + quote + nearby text for grep. |
+| `contrarian_views` | Statements contradicting the dominant summary sentiment. |
+| `specific_quotes` | Quotes worth preserving verbatim with rationale. |
+| `unusual_technical_terms` | Jargon worth indexing with speaker + context sentence. |
+| `emotional_strong_statements` | Strong emotional statements with emotion type. |
+| `numbers_and_dates_missed` | Quantitative claims absent from the summary. |
+
+Never apply durability / accountability filtering here — those gates run on
+persistence, not capture. Over-capture is the design intent.
+
+### How it lands in the journal
+
+The nuance JSON is rendered beneath the main summary as a `## Notable phrases & perspectives` section. Suggested layout (omit empty sub-headings):
+
+```markdown
+## Notable phrases & perspectives
+
+### Notable phrases
+- **Jane Smith** (~12:14): "we've been papering over this for six months"
+- **Bob Chen** (~23:02): "that's technically a rewrite, not a refactor"
+
+### Contrarian views
+- **Sarah Lopez**: pushed back on the REST-over-GraphQL decision — "we'll regret this when the mobile team gets here"
+  > Quote: "we'll regret this when the mobile team gets here"
+
+### Specific quotes worth preserving
+- **Jane Smith**: "the whole reason we did the Q1 rewrite was to avoid exactly this conversation" — captures the frustration behind the roadmap reset
+
+### Unusual technical terms
+- **idempotency fences** (Bob Chen): raised in the context of the retry-queue redesign
+
+### Strong emotional statements
+- **Sarah Lopez** (frustration): "I've been asking for this for eight months"
+
+### Numbers & dates missed
+- 2026-06-30 — vendor contract renewal (mentioned once by Jane, absent from summary)
+- $340k — projected savings from consolidation (Bob's estimate)
+```
+
+Nothing in this section is persisted to memory automatically. It lives in the
+journal as a searchable reading of the room. Memory extraction (Step 11) still
+runs its own durability gate on any item the user later promotes.
+
+### Failure handling
+
+Failure here **must not** block the pipeline:
+
+- JSON parse error, non-JSON response, or sub-agent error → skip the nuance
+  section and emit telemetry event `meeting_nuance_failed` with the error
+  string. Proceed to Step 8 as if 7b never ran.
+- Empty JSON (all arrays empty) → still append the section heading with "No
+  nuance flagged." so the user can see the pass ran. Emit
+  `meeting_nuance_captured` with counts (all zero).
+
+### Telemetry
+
+On success emit `meeting_nuance_captured` with counts per category:
+
+```json
+{
+  "event": "meeting_nuance_captured",
+  "counts": {
+    "notable_phrases": 4,
+    "contrarian_views": 1,
+    "specific_quotes": 2,
+    "unusual_technical_terms": 3,
+    "emotional_strong_statements": 1,
+    "numbers_and_dates_missed": 2
+  }
+}
+```
+
+`/lint` can later surface meetings where the nuance pass returned all-zero
+counts — often a symptom of a malformed transcript rather than a thin meeting.
+
+---
+
 ## Step 8: Create journal entry (Issue 6)
 
-```bash
-obsidian create name="YYYY-MM-DD Meeting Title" \
-  path="journal/YYYY-MM/YYYY-MM-DD-meeting-slug.md" \
-  template="meeting-journal" silent
 ```
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD Meeting Title",
+  path="journal/YYYY-MM/YYYY-MM-DD-meeting-slug.md",
+  template="meeting-journal",
+  frontmatter={...},
+  body="..."
+)
+```
+
+If `template=` is not available for the meeting-journal template in the user's vault, the server falls back to `mcp__tars_vault__write_note_from_content` automatically. Auto-chunking applies when body >40KB.
 
 ### Frontmatter properties
 
-Set all of the following via `obsidian property:set`:
+The `create_note` call takes the full frontmatter inline. Values:
 
 ```yaml
 ---
@@ -350,6 +489,9 @@ Append the structured report from Step 7 to the journal entry body:
 ## Key quotes
 [From Step 7]
 
+## Notable phrases & perspectives
+[From Step 7b — omit if the nuance pass was skipped; keep heading if pass ran with zero findings]
+
 ## Associated captures
 [Screenshots and images related to this meeting, if any]
 ```
@@ -376,29 +518,32 @@ Move the original transcript to the archive with a standardized filename and bid
 
 ### Create archived transcript
 
-```bash
-obsidian create name="YYYY-MM-DD-meeting-slug-transcript" \
-  path="archive/transcripts/YYYY-MM/YYYY-MM-DD-meeting-slug-transcript.md" \
-  template="transcript" silent
 ```
-
-### Set transcript frontmatter
-
-```bash
-obsidian property:set name="tags" value="[tars/transcript]" file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-journal-entry" value="[[YYYY-MM-DD Meeting Title]]" file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-date" value="YYYY-MM-DD" file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-meeting-datetime" value="YYYY-MM-DDTHH:MM:SS" file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-participants" value='["[[Jane Smith]]", "[[Bob Chen]]"]' file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-format" value="otter" file="YYYY-MM-DD-meeting-slug-transcript"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="YYYY-MM-DD-meeting-slug-transcript"
+mcp__tars_vault__create_note(
+  name="YYYY-MM-DD-meeting-slug-transcript",
+  path="archive/transcripts/YYYY-MM/YYYY-MM-DD-meeting-slug-transcript.md",
+  template="transcript",
+  frontmatter={
+    "tags": ["tars/transcript"],
+    "tars-journal-entry": "[[YYYY-MM-DD Meeting Title]]",
+    "tars-date": "YYYY-MM-DD",
+    "tars-meeting-datetime": "YYYY-MM-DDTHH:MM:SS",
+    "tars-participants": ["[[Jane Smith]]", "[[Bob Chen]]"],
+    "tars-format": "otter",
+    "tars-created": "YYYY-MM-DD"
+  }
+)
 ```
 
 ### Append raw transcript content
 
-```bash
-obsidian append file="YYYY-MM-DD-meeting-slug-transcript" content="[full raw transcript text]"
 ```
+mcp__tars_vault__append_note(
+  file="YYYY-MM-DD-meeting-slug-transcript",
+  content="<full raw transcript text>"
+)
+```
+The server auto-chunks at 40KB boundaries so arbitrarily large transcripts persist cleanly.
 
 ### Bidirectional links
 
@@ -462,18 +607,21 @@ Which to create?
 
 After the user responds, create ONLY the selected tasks using the tasks skill protocol:
 
-```bash
-obsidian create name="Task Title" \
-  path="tasks/YYYY-MM-DD-task-slug.md" \
-  template="task" silent
-
-obsidian property:set name="tags" value="[tars/task]" file="Task Title"
-obsidian property:set name="tars-status" value="open" file="Task Title"
-obsidian property:set name="tars-owner" value="[[Owner Name]]" file="Task Title"
-obsidian property:set name="tars-due" value="YYYY-MM-DD" file="Task Title"
-obsidian property:set name="tars-priority" value="high" file="Task Title"
-obsidian property:set name="tars-source" value="[[YYYY-MM-DD Meeting Title]]" file="Task Title"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Task Title"
+```
+mcp__tars_vault__create_note(
+  name="Task Title",
+  path="tasks/YYYY-MM-DD-task-slug.md",
+  template="task",
+  frontmatter={
+    "tags": ["tars/task"],
+    "tars-status": "open",
+    "tars-owner": "[[Owner Name]]",
+    "tars-due": "YYYY-MM-DD",
+    "tars-priority": "high",
+    "tars-source": "[[YYYY-MM-DD Meeting Title]]",
+    "tars-created": "YYYY-MM-DD"
+  }
+)
 ```
 
 ### Task placement logic
@@ -574,24 +722,32 @@ Save? [all / 1, 3 / none / edit #2]
 For each confirmed memory update:
 
 **New person/entity notes:**
-```bash
-obsidian create name="Entity Name" path="memory/[type]/entity-name.md" template="[type]" silent
-obsidian property:set name="tags" value="[tars/[type]]" file="Entity Name"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Entity Name"
+```
+mcp__tars_vault__create_note(
+  name="Entity Name",
+  path="memory/<type>/entity-name.md",
+  template="<type>",
+  frontmatter={"tags": ["tars/<type>"], "tars-created": "YYYY-MM-DD"}
+)
 ```
 
 **Updates to existing notes:**
-```bash
-obsidian append file="Entity Name" content="## Update YYYY-MM-DD\n[New information from meeting]\nSource: [[YYYY-MM-DD Meeting Title]]"
-obsidian property:set name="tars-modified" value="YYYY-MM-DD" file="Entity Name"
+```
+mcp__tars_vault__append_note(
+  file="Entity Name",
+  content="## Update YYYY-MM-DD\n[New information from meeting]\nSource: [[YYYY-MM-DD Meeting Title]]"
+)
+mcp__tars_vault__update_frontmatter(file="Entity Name", property="tars-modified", value="YYYY-MM-DD")
 ```
 
 **New decisions:**
-```bash
-obsidian create name="Decision Title" path="memory/decisions/decision-slug.md" template="decision" silent
-obsidian property:set name="tags" value="[tars/decision]" file="Decision Title"
-obsidian property:set name="tars-date" value="YYYY-MM-DD" file="Decision Title"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Decision Title"
+```
+mcp__tars_vault__create_note(
+  name="Decision Title",
+  path="memory/decisions/decision-slug.md",
+  template="decision",
+  frontmatter={"tags": ["tars/decision"], "tars-date": "YYYY-MM-DD", "tars-created": "YYYY-MM-DD"}
+)
 ```
 
 ### Memory folder mapping
@@ -614,43 +770,26 @@ After all writes are complete, scan every wikilink in the journal entry and any 
 
 For any wikilink that does not resolve to an existing note:
 
-```bash
-obsidian append file="alias-registry" content="| [Unresolved Name] | ?? (needs full name) |"
 ```
+mcp__tars_vault__append_note(
+  file="alias-registry",
+  content="| <Unresolved Name> | ?? (needs full name) |"
+)
+```
+
+The `mcp__tars_vault__create_note` / `append_note` tools also run the auto-wikilink pass (§3.3) — ambiguous name candidates are returned for batched user review, never auto-linked silently.
 
 Report all unresolved names in the output summary.
 
 ---
 
-## Step 13: Log to daily note and changelog
+## Step 13: Daily-note + changelog (handled by PostToolUse hook)
 
-### Daily note
+The `PostToolUse` hook appends a structured entry to `_system/changelog/YYYY-MM-DD.md` on every successful vault mutation (skill, tool, file, batch_id, timestamp). Daily-note appends are batched by the same hook.
 
-```bash
-obsidian daily:append content="## Meeting processed: [[YYYY-MM-DD Meeting Title]]
-- Participants: [[Jane Smith]], [[Bob Chen]], [[Sarah Lopez]]
-- Tasks: N created (of M candidates)
-- Memory: N updates (X new, Y updated)
-- Transcript: archived to [[YYYY-MM-DD-meeting-slug-transcript]]
-- Unresolved names: N"
-```
+Skills no longer emit per-workflow changelog entries. If richer batch context is needed (e.g., "this was meeting processing for transcript X"), emit a telemetry event via the MCP server rather than writing to the changelog directly.
 
-### Changelog
-
-Write a changelog entry with a batch ID for potential rollback:
-
-```bash
-obsidian create name="YYYY-MM-DD-batch-[id]" \
-  path="_system/changelog/YYYY-MM-DD.md" silent
-
-obsidian append file="YYYY-MM-DD-batch-[id]" content="## Batch [id]: Meeting processing
-- Source: [transcript format] transcript
-- Journal: [[YYYY-MM-DD Meeting Title]]
-- Transcript: [[YYYY-MM-DD-meeting-slug-transcript]]
-- Tasks created: [list]
-- Memory updated: [list]
-- Timestamp: YYYY-MM-DDTHH:MM:SS"
-```
+Emit at minimum: `meeting_processed`, `tasks_proposed`, `memory_proposed`.
 
 ---
 
@@ -660,34 +799,41 @@ If any errors occurred during the pipeline (failed calendar lookup, obsidian-cli
 
 ### Check for existing issue
 
-```bash
-obsidian search query="tag:tars/issue [error signature keywords]" limit=5
+```
+mcp__tars_vault__search_by_tag(tag="tars/issue", query="<error-signature-keywords>", limit=5)
 ```
 
 ### If existing issue found
 
-```bash
-obsidian property:set name="tars-occurrence-count" value="[incremented]" file="[issue note]"
-obsidian property:set name="tars-last-seen" value="YYYY-MM-DD" file="[issue note]"
-obsidian append file="[issue note]" content="## Occurrence YYYY-MM-DD\n[Error context from this run]"
 ```
+mcp__tars_vault__update_frontmatter(file="<issue-note>", property="tars-occurrence-count", value="<n+1>")
+mcp__tars_vault__update_frontmatter(file="<issue-note>", property="tars-last-seen",       value="YYYY-MM-DD")
+mcp__tars_vault__append_note(file="<issue-note>",
+  content="## Occurrence YYYY-MM-DD\n<Error context from this run>")
+```
+
+Note: the `PostToolUse` hook also auto-dedupes framework-level MCP failures into `_system/backlog/issues/`. This step is for pipeline-level errors (missed calendar match, unresolved attendee, secret-scan block) that the hook wouldn't see.
 
 ### If new issue
 
-```bash
-obsidian create name="Issue: [Brief Description]" \
-  path="_system/backlog/issues/issue-slug.md" \
-  template="issue" silent
-
-obsidian property:set name="tags" value="[tars/backlog, tars/issue]" file="Issue: [Brief Description]"
-obsidian property:set name="tars-issue-type" value="cli-error" file="Issue: [Brief Description]"
-obsidian property:set name="tars-severity" value="warning" file="Issue: [Brief Description]"
-obsidian property:set name="tars-occurrence-count" value="1" file="Issue: [Brief Description]"
-obsidian property:set name="tars-first-seen" value="YYYY-MM-DD" file="Issue: [Brief Description]"
-obsidian property:set name="tars-last-seen" value="YYYY-MM-DD" file="Issue: [Brief Description]"
-obsidian property:set name="tars-status" value="open" file="Issue: [Brief Description]"
-obsidian property:set name="tars-context" value="Meeting processing, [step where error occurred]" file="Issue: [Brief Description]"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Issue: [Brief Description]"
+```
+mcp__tars_vault__create_note(
+  name="Issue: <Brief Description>",
+  path="_system/backlog/issues/issue-slug.md",
+  template="backlog-item",
+  frontmatter={
+    "tags": ["tars/backlog", "tars/issue"],
+    "tars-backlog-type": "issue",
+    "tars-issue-type": "cli-error",
+    "tars-severity": "warning",
+    "tars-occurrence-count": 1,
+    "tars-first-seen": "YYYY-MM-DD",
+    "tars-last-seen": "YYYY-MM-DD",
+    "tars-status": "open",
+    "tars-context": "Meeting processing, <step where error occurred>",
+    "tars-created": "YYYY-MM-DD"
+  }
+)
 ```
 
 ---
@@ -755,3 +901,4 @@ End every meeting processing run with this summary, regardless of whether all st
 12. ALWAYS apply canonical names from the alias registry to all output
 13. ALWAYS save a summary to the daily note and changelog
 14. ALWAYS report errors in the output summary even if processing completed partially
+15. Step 7b failure NEVER blocks the pipeline — skip the nuance section, log `meeting_nuance_failed`, and continue to Step 8

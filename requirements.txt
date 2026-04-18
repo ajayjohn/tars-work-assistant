@@ -1,0 +1,9 @@
+# TARS v3.1 runtime dependencies (PRD §26.2 as revised 2026-04-18).
+# Pin list is intentionally minimal — office rendering delegates to Anthropic's
+# first-party pptx/docx/xlsx/pdf skills, so TARS does not bundle any Office-format
+# library. Scripts under scripts/ remain stdlib-only; these pins drive the MCP
+# servers. Install with:  pip install -r requirements.txt
+
+mcp>=1.0,<2.0
+fastembed>=0.4,<1.0
+sqlite-vec>=0.1.6,<0.2

@@ -2,13 +2,27 @@
 name: tasks
 description: Extract tasks from text or manage existing tasks with accountability testing and duplicate checking
 triggers: ["extract tasks from", "what's on my plate", "show tasks", "mark done", "task review"]
+user-invocable: true
+help:
+  purpose: |-
+    Extract action items from input text into accountable, concrete tasks
+    (Extract mode), or review / prioritize / complete / prune existing tasks
+    (Manage mode). Every new task passes the 3-criterion accountability gate
+    and surfaces to the user for numbered-list confirmation before persist.
+  use_cases:
+    - "Extract tasks from this email"
+    - "What's on my plate today?"
+    - "Show me overdue tasks"
+    - "Mark [task title] done"
+    - "Review and reprioritize my tasks"
+  scope: tasks,extraction,manage,accountability
 ---
 
 # Tasks skill
 
 Extract commitments into actionable, accountable tasks from any input source, or manage existing tasks with review, prioritization, completion, and pruning.
 
-All vault writes use obsidian-cli. All names use canonical forms from the alias registry. Task creation always requires user confirmation via the numbered review list.
+All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). External task-system integration (Apple Reminders, Microsoft 365 Tasks, Todoist, etc.) resolves through `mcp__tars_vault__resolve_capability(capability="tasks")` — never hard-code specific server names. All names use canonical forms from the alias registry. Task creation always requires user confirmation via the numbered review list.
 
 ---
 
@@ -32,13 +46,9 @@ Input can be: meeting transcript excerpt, email, conversation, freeform notes, o
 
 ---
 
-## Step 1: Load alias registry (MANDATORY)
+## Step 1: Alias registry (server-cached)
 
-```bash
-obsidian read file="alias-registry"
-```
-
-Load the full alias registry. Every task owner must be normalized to their canonical name before presentation or creation.
+Alias resolution runs via `mcp__tars_vault__resolve_alias(name="…")`. The server keeps the registry in memory and invalidates on file-mtime change — no explicit load is required. Every task owner is normalized to their canonical name before presentation or creation.
 
 ---
 
@@ -89,7 +99,7 @@ For each task passing the accountability test, resolve all metadata fields:
 
 Map the raw name to canonical form using the alias registry. If ambiguous or unknown, apply the name resolution cascade:
 1. Alias registry exact match
-2. Vault search: `obsidian search query="tag:tars/person [name]" limit=5`
+2. Vault search: `mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)`
 3. Context clues (role references, team mentions)
 4. Ask the user (batch all unresolved names in one question)
 
@@ -120,8 +130,8 @@ NEVER use relative dates in output. Always resolve to YYYY-MM-DD.
 ### Project/initiative
 
 If the task relates to a known initiative, link it:
-```bash
-obsidian search query="tag:tars/initiative [keywords]" limit=3
+```
+mcp__tars_vault__search_by_tag(tag="tars/initiative", query="<keywords>", limit=3)
 ```
 If a match is found, set `tars-initiative` to the initiative wikilink.
 
@@ -131,8 +141,13 @@ If a match is found, set `tars-initiative` to the initiative wikilink.
 
 Search existing open tasks for potential matches:
 
-```bash
-obsidian search query="tag:tars/task tars-status:open [task keywords]" limit=10
+```
+mcp__tars_vault__search_by_tag(
+  tag="tars/task",
+  frontmatter={"tars-status": "open"},
+  query="<task keywords>",
+  limit=10
+)
 ```
 
 Compare by title similarity and owner. For each candidate:
@@ -192,25 +207,34 @@ NEVER create tasks without this review step. NEVER auto-create.
 
 For each task the user selected, create a note in the vault:
 
-```bash
-obsidian create name="Task Title" \
-  path="tasks/YYYY-MM-DD-task-slug.md" \
-  template="task" silent
+```
+mcp__tars_vault__create_note(
+  name="Task Title",
+  path="tasks/YYYY-MM-DD-task-slug.md",
+  template="task",
+  frontmatter={
+    "tags": ["tars/task"],
+    "tars-status": "open",
+    "tars-owner": "[[Owner Name]]",
+    "tars-due": "YYYY-MM-DD",
+    "tars-priority": "high | medium | low",
+    "tars-source": "[[Source]]",
+    "tars-initiative": "[[Initiative Name]]",
+    "tars-category": "active | delegated | backlog",
+    "tars-created": "YYYY-MM-DD"
+  }
+)
 ```
 
-### Set task properties
+### Optional v3.1 fields (backward-compatible, added per §5.3 / §9.1)
 
-```bash
-obsidian property:set name="tags" value="[tars/task]" file="Task Title"
-obsidian property:set name="tars-status" value="open" file="Task Title"
-obsidian property:set name="tars-owner" value="[[Owner Name]]" file="Task Title"
-obsidian property:set name="tars-due" value="YYYY-MM-DD" file="Task Title"
-obsidian property:set name="tars-priority" value="high | medium | low" file="Task Title"
-obsidian property:set name="tars-source" value="[[Source]]" file="Task Title"
-obsidian property:set name="tars-initiative" value="[[Initiative Name]]" file="Task Title"
-obsidian property:set name="tars-category" value="active | delegated | backlog" file="Task Title"
-obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Task Title"
-```
+| Field | Type | Set by | Purpose |
+|-------|------|--------|---------|
+| `tars-blocked-by` | list of wikilinks | User or extract flow | This task cannot progress until the referenced tasks/decisions land |
+| `tars-age-days` | int | `/lint` on touch | Cached for sort + escalation; computed from `tars-created` |
+| `tars-escalation-level` | 0 \| 1 \| 2 \| 3 | `/lint` | 0=normal, 1=overdue >30d, 2=overdue >60d, 3=overdue >90d |
+
+On create, emit these fields unset — `/lint`'s task-age check fills them in and keeps them current. Any task created without them passes schema validation (all three are optional).
 
 ### Task placement logic
 
@@ -232,16 +256,9 @@ obsidian property:set name="tars-created" value="YYYY-MM-DD" file="Task Title"
 
 ---
 
-## Step 8: Log to daily note
+## Step 8: Daily-note log (handled by PostToolUse hook)
 
-```bash
-obsidian daily:append content="## Tasks extracted
-- Source: [source description]
-- Created: [N] tasks ([M] active, [K] delegated, [J] backlog)
-- Filtered: [N] items (failed accountability test)
-- Duplicates: [N] skipped
-- User skipped: [N]"
-```
+The `PostToolUse` hook appends a tasks-extracted summary line to the daily note after the last `create_note` call completes. Emit telemetry events `task_proposed` (count, accountability_pass_count) and `task_persisted` (count).
 
 ---
 
@@ -288,8 +305,12 @@ Review, complete, reprioritize, and prune existing tasks.
 
 Query all open tasks from the vault:
 
-```bash
-obsidian search query="tag:tars/task tars-status:open" limit=100
+```
+mcp__tars_vault__search_by_tag(
+  tag="tars/task",
+  frontmatter={"tars-status": "open"},
+  limit=100
+)
 ```
 
 For each task found, read its properties to build the full task state.
@@ -301,10 +322,26 @@ Group by `tars-category`:
 - **Delegated**: Owner is someone else, has due date
 - **Backlog**: No due date
 
-Within each group, sort by:
-1. Overdue tasks first (due date < today)
-2. Then by due date ascending
-3. Then by priority (high > medium > low)
+Within each group, sort by (v3.1 escalation-aware order per §5.3):
+1. `tars-escalation-level` descending (3 → 2 → 1 → 0) — worst-aged first
+2. Overdue tasks first (due date < today)
+3. Then by due date ascending
+4. Then by priority (high > medium > low)
+
+### Escalation level semantics
+
+| Level | Criterion | Display | Briefing surface |
+|-------|-----------|---------|------------------|
+| 0 | Normal or no due date yet | Plain row | No |
+| 1 | Overdue > 30 days | "⚠ overdue 31d" badge | Yes — in `Priority tasks` block of the next briefing |
+| 2 | Overdue > 60 days | "⚠⚠ overdue 61d" badge | Yes — plus proposes complete / delegate / cancel |
+| 3 | Overdue > 90 days | "⚠⚠⚠ overdue 91d — archive?" badge | Yes — plus proposes archival with reason |
+
+`/lint` recomputes `tars-age-days` and `tars-escalation-level` on its nightly pass. This skill consumes them but never writes them (separation of concerns: `/tasks` owns task content, `/lint` owns lifecycle metadata).
+
+### Blocked-by semantics
+
+When a task has `tars-blocked-by: [...]`, it stays in whatever category (`active` / `delegated` / `backlog`) but the manage-mode display prefixes it with `[blocked on: <refs>]` and demotes it below unblocked peers of the same escalation level.
 
 ---
 
@@ -352,33 +389,22 @@ Mark "Review hiring plan" as done? [Y/N]
 ```
 
 After confirmation:
-```bash
-obsidian property:set name="tars-status" value="done" file="Review hiring plan"
-obsidian property:set name="tars-completed" value="YYYY-MM-DD" file="Review hiring plan"
-obsidian property:set name="tars-completed-by" value="[[User Name]]" file="Review hiring plan"
 ```
-
-Log to daily note:
-```bash
-obsidian daily:append content="- Task completed: [[Review hiring plan]] (was due 2026-03-18, completed 2026-03-21)"
+mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-status",       value="done")
+mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-completed",    value="YYYY-MM-DD")
+mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-completed-by", value="[[User Name]]")
 ```
+The PostToolUse hook writes the daily-note "task completed" line. Emit telemetry `task_completed`.
 
 ### Reprioritize a task
 
 Triggered by: "move 5 to active", "set due date on 6", "make 3 high priority"
 
-```bash
-# Change priority
-obsidian property:set name="tars-priority" value="high" file="Task Title"
-
-# Set or change due date
-obsidian property:set name="tars-due" value="YYYY-MM-DD" file="Task Title"
-
-# Move between categories
-obsidian property:set name="tars-category" value="active" file="Task Title"
-
-# Track modification
-obsidian property:set name="tars-modified" value="YYYY-MM-DD" file="Task Title"
+```
+mcp__tars_vault__update_frontmatter(file="Task Title", property="tars-priority", value="high")
+mcp__tars_vault__update_frontmatter(file="Task Title", property="tars-due",      value="YYYY-MM-DD")
+mcp__tars_vault__update_frontmatter(file="Task Title", property="tars-category", value="active")
+mcp__tars_vault__update_frontmatter(file="Task Title", property="tars-modified", value="YYYY-MM-DD")
 ```
 
 ### Bulk operations
@@ -423,11 +449,10 @@ Actions:
 
 ### Archive a task
 
-```bash
-obsidian property:set name="tars-status" value="archived" file="Task Title"
-obsidian property:set name="tags" value="[tars/task, tars/archived]" file="Task Title"
-obsidian property:set name="tars-modified" value="YYYY-MM-DD" file="Task Title"
 ```
+mcp__tars_vault__archive_note(file="Task Title")
+```
+The server adds `tars/archived` tag, sets `tars-status: archived`, updates `tars-modified`, and moves to `archive/tasks/YYYY-MM/` only if guardrails pass (no backlinks in last 90d, no active-task references). If blocked, surface the reason to the user.
 
 NEVER delete tasks without explicit user instruction. Default to archiving.
 
@@ -437,9 +462,9 @@ NEVER delete tasks without explicit user instruction. Default to archiving.
 
 While displaying tasks in manage mode, scan for potential duplicates:
 
-```bash
+```
 # Look for tasks with similar titles
-obsidian search query="tag:tars/task [keywords from each task]" limit=5
+mcp__tars_vault__search_by_tag(tag="tars/task", query="<keywords from each task>", limit=5)
 ```
 
 Flag when found:
@@ -492,10 +517,10 @@ These apply to both extract and manage modes.
 
 ## Wikilink mandate
 
-All entity references in task properties and body content must use `[[Entity Name]]` wikilink syntax. Before writing a wikilink, verify the entity exists:
+All entity references in task properties and body content must use `[[Entity Name]]` wikilink syntax. The MCP server runs the auto-wikilink pass (§3.3) before write; ambiguous names are returned for batched review. Explicit verification when drafting a wikilink to an entity:
 
-```bash
-obsidian search query="tag:tars/[type] [entity]" limit=1
+```
+mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<entity>", limit=1)
 ```
 
 If the entity does not exist, write the name as plain text and note it as unverified. Do not fabricate wikilinks to nonexistent notes.

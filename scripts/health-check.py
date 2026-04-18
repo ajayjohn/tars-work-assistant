@@ -268,6 +268,102 @@ def check_missing_frontmatter(vault_path):
     return issues
 
 
+def scan_flagged_markers(body):
+    """Find <!-- tars-flag:negative YYYY-MM-DD --> markers and their content.
+
+    Merged in from the retired scripts/scan-flagged.py (PRD §7.4).
+    """
+    findings = []
+    pattern = re.compile(
+        r'<!--\s*tars-flag:negative\s+(\d{4}-\d{2}-\d{2})\s*-->\s*\n?(.*?)(?=\n<!--|\n##|\n\n|\Z)',
+        re.DOTALL,
+    )
+    for match in pattern.finditer(body):
+        flag_date = match.group(1)
+        flagged_text = match.group(2).strip()
+        try:
+            flag_dt = datetime.strptime(flag_date, "%Y-%m-%d").date()
+            age_days = (date.today() - flag_dt).days
+        except ValueError:
+            age_days = -1
+        findings.append({
+            "date": flag_date,
+            "text": flagged_text,
+            "age_days": age_days,
+            "stale": age_days > 90,
+        })
+    return findings
+
+
+def scan_sentiment_patterns(body, patterns):
+    """Scan for negative sentiment patterns without explicit markers."""
+    findings = []
+    for pat_def in patterns or []:
+        try:
+            pattern = re.compile(pat_def["pattern"])
+        except (re.error, KeyError, TypeError):
+            continue
+        for match in pattern.finditer(body):
+            line_num = body[:match.start()].count("\n") + 1
+            line_start = body.rfind("\n", 0, match.start()) + 1
+            line_end = body.find("\n", match.end())
+            if line_end == -1:
+                line_end = len(body)
+            context = body[line_start:line_end].strip()
+            findings.append({
+                "category": pat_def.get("category", "unknown"),
+                "matched_text": match.group(),
+                "context": context,
+                "line": line_num,
+                "has_marker": False,
+            })
+    return findings
+
+
+def check_flagged_content(vault_path):
+    """Scan memory/people/ for negative sentiment markers and patterns.
+
+    Returns a list of per-person finding records. Safe to call when
+    guardrails.yaml is missing — returns [] in that case.
+    """
+    vault = Path(vault_path)
+    guardrails = load_yaml_file(vault / "_system" / "guardrails.yaml") or {}
+    neg_patterns = guardrails.get("negative_sentiment_patterns", []) or []
+
+    people_dir = vault / "memory" / "people"
+    if not people_dir.exists():
+        return []
+
+    results = []
+    for md_file in people_dir.rglob("*.md"):
+        frontmatter, body = parse_frontmatter(md_file)
+        if body is None:
+            continue
+
+        relative = str(md_file.relative_to(vault))
+        person_name = md_file.stem
+        marker_findings = scan_flagged_markers(body)
+        sentiment_findings = scan_sentiment_patterns(body, neg_patterns)
+        has_flag_property = (
+            frontmatter is not None
+            and frontmatter.get("tars-has-flagged-content") is True
+        )
+
+        if marker_findings or sentiment_findings:
+            results.append({
+                "file": relative,
+                "person": person_name,
+                "has_flag_property": has_flag_property,
+                "marked_flags": marker_findings,
+                "unmarked_sentiment": sentiment_findings,
+                "total_flags": len(marker_findings) + len(sentiment_findings),
+                "stale_flags": sum(
+                    1 for f in marker_findings if f.get("stale", False)
+                ),
+            })
+    return results
+
+
 def main():
     vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
 
@@ -275,9 +371,12 @@ def main():
     stale_content = check_staleness(vault_path)
     duplicate_aliases = check_duplicate_aliases(vault_path)
     missing_fm = check_missing_frontmatter(vault_path)
+    flagged = check_flagged_content(vault_path)
 
+    flagged_total = sum(r["total_flags"] for r in flagged)
+    flagged_stale = sum(r["stale_flags"] for r in flagged)
     critical = len(broken_links) + len(missing_fm)
-    warnings = len(stale_content) + len(duplicate_aliases)
+    warnings = len(stale_content) + len(duplicate_aliases) + flagged_stale
 
     output = {
         "timestamp": datetime.now().isoformat(),
@@ -293,6 +392,12 @@ def main():
         "stale_content": stale_content[:30],
         "stale_content_total": len(stale_content),
         "duplicate_aliases": duplicate_aliases,
+        "flagged_content": {
+            "people_with_flags": len(flagged),
+            "total_flags": flagged_total,
+            "stale_flags": flagged_stale,
+            "results": flagged,
+        },
     }
 
     print(json.dumps(output, indent=2))
