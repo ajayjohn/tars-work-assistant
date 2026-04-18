@@ -4,6 +4,15 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "tars-vault": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["-m", "tars_vault"],
+      "env": {
+        "PYTHONPATH": "mcp/tars-vault/src",
+        "TARS_VAULT_PATH": "${TARS_VAULT_PATH}"
+      }
     }
   }
 }

@@ -14,7 +14,7 @@ TARS is built around a few core ideas:
 
 ## What ships in the framework
 
-The framework ships with 13 skills, 12 commands, 17 templates (plus 9 office content outlines), 16 live views, and 13 deterministic scripts.
+The framework ships with 13 skills, 13 commands, 15 templates (plus 9 office content outlines), 16 live views, and 12 deterministic scripts.
 
 Core user-facing capabilities:
 - Daily and weekly briefings with calendar, task, people, and initiative context

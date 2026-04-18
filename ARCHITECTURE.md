@@ -46,7 +46,7 @@ tars/
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 13 skills, 12 commands, and 13 scripts.
+The framework currently ships 13 skills, 13 commands, and 12 scripts.
 
 Some older directories remain in the repository for compatibility, migration context, or packaging history. They should not be treated as the active TARS 3.0 runtime architecture unless a specific document says otherwise.
 

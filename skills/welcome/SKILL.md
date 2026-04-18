@@ -226,13 +226,11 @@ Create Obsidian templates in `templates/`:
 | decision.md | `tars/decision` | tars-status, tars-decision-maker, tars-date |
 | org-context.md | `tars/org-context` | tars-scope, tars-last-validated |
 | meeting-journal.md | `tars/journal, tars/meeting` | tars-date, tars-meeting-datetime, tars-participants, tars-organizer, tars-topics, tars-initiatives, tars-source, tars-transcript |
-| daily-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: daily |
-| weekly-briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: weekly |
+| briefing.md | `tars/journal, tars/briefing` | tars-date, tars-briefing-type: daily\|weekly |
 | wisdom-journal.md | `tars/journal, tars/wisdom` | tars-date, tars-source-title, tars-source-url |
 | companion.md | `tars/companion` | tars-original-file, tars-original-type, tars-file-size, tars-added-date, tars-source, tars-summary |
 | transcript.md | `tars/transcript` | tars-journal-entry, tars-date, tars-meeting-datetime, tars-participants, tars-format |
-| issue.md | `tars/backlog, tars/issue` | tars-issue-type, tars-severity, tars-status |
-| idea.md | `tars/backlog, tars/idea` | tars-requested-by, tars-priority, tars-status |
+| backlog-item.md | `tars/backlog, tars/{issue\|idea}` | tars-backlog-type: issue\|idea, tars-status |
 
 Each template should include the full frontmatter block with placeholder values and a minimal body structure appropriate to the entity type.
 
@@ -268,8 +266,7 @@ Create the following Python scripts in `scripts/`:
 |--------|---------|
 | validate-schema.py | Validates frontmatter against _system/schemas.yaml |
 | scan-secrets.py | Scans for blocked/warned patterns from _system/guardrails.yaml |
-| scan-flagged.py | Finds negative sentiment markers in people notes |
-| health-check.py | Comprehensive: schema + links + aliases + staleness |
+| health-check.py | Comprehensive: schema + links + aliases + staleness + flagged-content sub-check |
 | archive.py | Staleness-based archival with `--auto` and `--dry-run` flags |
 | sync.py | Calendar gap detection + task system drift check |
 

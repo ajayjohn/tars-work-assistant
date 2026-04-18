@@ -213,7 +213,7 @@ def check_scripts(vault_path):
     """Verify all required scripts exist."""
     vault = Path(vault_path)
     required = [
-        "validate-schema.py", "scan-secrets.py", "scan-flagged.py", "health-check.py",
+        "validate-schema.py", "scan-secrets.py", "health-check.py",
     ]
 
     missing = [s for s in required if not (vault / "scripts" / s).exists()]

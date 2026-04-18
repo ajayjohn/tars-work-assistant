@@ -2,6 +2,16 @@
 
 ## v3.1.0-dev — WIP
 
+### Phase 7 — Consolidation and cleanup (§7)
+- **Repo cleanup (§7.1)**: 6 legacy rebuild docs (`TARS_REBUILD_FOUNDATION.md`, `TARS_V2_REBUILD_PLAN.md`, `TARS_V3_REBUILD_PLAN.md`, `TARS_V3_INSTANCE_MIGRATION_PLAN.md`, `MIGRATION_HANDOFF.md`, `REBUILD_HANDOFF.md` — ~197 KB) moved from the repo root into `archive/historical/`. They were already untracked via `.git/info/exclude`, so no git history was rewritten.
+- **Template consolidation (§7.2)**: `templates/daily-briefing.md` + `templates/weekly-briefing.md` → single `templates/briefing.md` with `tars-briefing-type: daily|weekly`. `templates/issue.md` + `templates/idea.md` → single `templates/backlog-item.md` with `tars-backlog-type: issue|idea`. Skills (`briefing`, `learn`, `meeting`) and `_system/taxonomy.md` updated to reference the merged templates. Net: 17 templates → 15.
+- **Script consolidation (§7.4)**: `scripts/scan-flagged.py` merged into `scripts/health-check.py` as a `flagged_content` sub-block (markers, unmarked sentiment, stale-flag count). `_system/guardrails.yaml` header, `tests/smoke-tests.py` required-scripts list, `skills/lint/SKILL.md`, and `skills/welcome/SKILL.md` updated to point at the consolidated script. Net: 13 scripts → 12.
+- **Validator hardening**: `tests/validate-scripts.py` now treats imports wrapped in `try/except ImportError|ModuleNotFoundError` as optional (§26.2 "graceful degrade path"), which unblocks the 6 pre-existing YAML-fallback scripts without loosening the pinned-deps allowlist.
+- **Commands readme (§7.5)**: new `commands/README.md` documents the 12 command-to-skill mappings; the thin wrappers remain in place pending end-to-end verification of Claude Code skill auto-registration (narrow-path per §26.18 — retirement deferred).
+- **`.mcp.json` project defaults (§7.6)**: repo-root `.mcp.json` now declares the `tars-vault` MCP server entry (stdio transport, `python3 -m tars_vault`, `PYTHONPATH=mcp/tars-vault/src`), alongside the existing `filesystem` server.
+- **Doc counts synced**: `README.md` and `ARCHITECTURE.md` framework-inventory summary sentences updated to reflect 13 commands / 12 scripts / 15 templates.
+- **Deferred (documented in `docs/HANDOFF-NOTES.md`)**: deep skill-body trimming to the ≤300-line target (meeting, welcome, think, learn, briefing), retirement of the 12 thin command wrappers, shared-validator extraction into `scripts/lib/validators.py`.
+
 ### Phase 5 — Backlog fixes + state self-healing (§5)
 - **Brand auto-load (§5.1)**: new `templates/brand-guidelines.md` with `tars-brand: true` flag. `/communicate` gains a mandatory Step 0 that resolves the active brand (via `_system/config.md`.`tars-active-brand` or a `search_by_tag(tag="tars/brand")` filtered on the frontmatter flag) and caches the chosen file for future sessions. `/create` Step 2 performs the same resolution and forwards the brand-file path to the render skill.
 - **Framework self-state (§5.2)**: `scripts/sync.py` grows a `compute_hydration()` helper and a `--hydration` flag that returns live counts of people / initiatives / decisions / journal / task notes. `/briefing` (daily + weekly) now sources its System-status line from the live count rather than the drifting `_system/maturity.yaml`. The "Level 2 (15 people, 42 meetings)" artifact is gone; `/lint` owns the `maturity.yaml` repair per the updated check-table row.

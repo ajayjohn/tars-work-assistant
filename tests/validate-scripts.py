@@ -74,7 +74,14 @@ def check_shebang(filepath):
 
 
 def get_python_imports(filepath):
-    """Parse Python file and extract all imported module names."""
+    """Parse Python file and extract required imports.
+
+    Imports wrapped in a `try: import X ... except ImportError:` block are
+    treated as OPTIONAL dependencies (PRD §26.2 "graceful degrade path")
+    and are not returned. Required imports are the ones whose absence
+    would crash the script — those must be stdlib or in the approved
+    runtime-deps allowlist.
+    """
     try:
         with open(filepath) as f:
             source = f.read()
@@ -86,13 +93,43 @@ def get_python_imports(filepath):
     except SyntaxError as e:
         return [], f"Syntax error: {e}"
 
+    # Collect every import node that sits inside a try-block where the
+    # except clause catches ImportError / ModuleNotFoundError. Those are
+    # optional, by construction.
+    optional_import_ids = set()
+
+    def _handler_catches_import_error(handlers):
+        for h in handlers:
+            exc = h.type
+            if exc is None:
+                # bare except: — treat as catching ImportError too
+                return True
+            names = []
+            if isinstance(exc, ast.Name):
+                names = [exc.id]
+            elif isinstance(exc, ast.Tuple):
+                names = [e.id for e in exc.elts if isinstance(e, ast.Name)]
+            if any(n in ("ImportError", "ModuleNotFoundError", "Exception", "BaseException")
+                   for n in names):
+                return True
+        return False
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and _handler_catches_import_error(node.handlers):
+            for sub in ast.walk(node):
+                if isinstance(sub, (ast.Import, ast.ImportFrom)):
+                    optional_import_ids.add(id(sub))
+
     imports = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
+            if id(node) in optional_import_ids:
+                continue
             for alias in node.names:
-                # Get top-level module name
                 imports.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
+            if id(node) in optional_import_ids:
+                continue
             if node.module:
                 imports.add(node.module.split(".")[0])
 

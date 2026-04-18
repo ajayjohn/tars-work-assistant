@@ -808,9 +808,10 @@ Note: the `PostToolUse` hook also auto-dedupes framework-level MCP failures into
 mcp__tars_vault__create_note(
   name="Issue: <Brief Description>",
   path="_system/backlog/issues/issue-slug.md",
-  template="issue",
+  template="backlog-item",
   frontmatter={
     "tags": ["tars/backlog", "tars/issue"],
+    "tars-backlog-type": "issue",
     "tars-issue-type": "cli-error",
     "tars-severity": "warning",
     "tars-occurrence-count": 1,

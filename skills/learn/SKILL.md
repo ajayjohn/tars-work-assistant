@@ -575,7 +575,7 @@ If any errors occur during processing:
 
 1. Check `_system/backlog/issues/` for existing issue with same error signature
 2. If exists: increment `tars-occurrence-count`, update `tars-last-seen`
-3. If new: create issue note with context via `mcp__tars_vault__create_note(path="_system/backlog/issues/…", template="issue", …)`
+3. If new: create issue note with context via `mcp__tars_vault__create_note(path="_system/backlog/issues/…", template="backlog-item", frontmatter={"tars-backlog-type": "issue", …}, …)`
 
 ---
 

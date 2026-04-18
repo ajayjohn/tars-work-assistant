@@ -62,7 +62,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Sparse articles (<150 words on memory note) | word count | No | Suggest consolidation, retirement, or `tars-archive-exempt` |
 | Schema violations | `scripts/validate-schema.py --json` | Partial (defaults / missing-required with computable values) | Batch auto-fix; others need user |
 | Sensitive content leaks | `mcp__tars_vault__scan_secrets` (wraps `scripts/scan-secrets.py`) | No | Block writes upstream; surface unresolved flags |
-| Negative-sentiment review queue | `scripts/scan-flagged.py --json` | No | Present count; route to `/maintain inbox` flagged-review flow |
+| Negative-sentiment review queue | `scripts/health-check.py --json` → `flagged_content` block | No | Present count; route to `/maintain inbox` flagged-review flow |
 | Contradictions across related notes | LLM pass over entities co-linked in last 90d | No | Flag; do NOT auto-resolve |
 | Unfiled journal entries (loose `journal/YYYY-MM-DD.md` at journal root) | path check | Yes | Propose `mcp__tars_vault__move_note` into `journal/YYYY-MM/` |
 | Framework self-state drift (`_system/maturity.yaml` vs actual counts; `housekeeping-state.yaml` last_run vs telemetry) | vault scan + telemetry | Yes | Propose update via `update_frontmatter` |
@@ -87,8 +87,7 @@ Call Python scripts in parallel where independent, collect JSON results:
 ```
 scripts/validate-schema.py --vault <TARS_VAULT_PATH> --json
 scripts/scan-secrets.py    --vault <TARS_VAULT_PATH> --json
-scripts/scan-flagged.py    --vault <TARS_VAULT_PATH> --json   (may be merged into health-check.py per §7.4)
-scripts/health-check.py    --vault <TARS_VAULT_PATH> --json
+scripts/health-check.py    --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
 scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
 ```
 

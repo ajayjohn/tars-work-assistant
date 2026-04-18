@@ -23,8 +23,8 @@ tars-created: 2026-03-21
 | Type | Tags | Storage | Template |
 |------|------|---------|----------|
 | Meeting | `tars/journal`, `tars/meeting` | `journal/YYYY-MM/` | `meeting-journal` |
-| Daily Briefing | `tars/journal`, `tars/briefing` | `journal/YYYY-MM/` | `daily-briefing` |
-| Weekly Briefing | `tars/journal`, `tars/briefing` | `journal/YYYY-MM/` | `weekly-briefing` |
+| Daily Briefing | `tars/journal`, `tars/briefing` | `journal/YYYY-MM/` | `briefing` (tars-briefing-type: daily) |
+| Weekly Briefing | `tars/journal`, `tars/briefing` | `journal/YYYY-MM/` | `briefing` (tars-briefing-type: weekly) |
 | Wisdom | `tars/journal`, `tars/wisdom` | `journal/YYYY-MM/` | `wisdom-journal` |
 | Analysis | `tars/journal`, `tars/analysis` | `journal/YYYY-MM/` | — |
 
@@ -35,8 +35,8 @@ tars-created: 2026-03-21
 | Task | `tars/task` | `memory/tasks/` or inline | — |
 | Transcript | `tars/transcript` | `archive/transcripts/YYYY-MM/` | `transcript` |
 | Companion | `tars/companion` | alongside original file | `companion` |
-| Issue | `tars/backlog`, `tars/issue` | `_system/backlog/issues/` | `issue` |
-| Idea | `tars/backlog`, `tars/idea` | `_system/backlog/ideas/` | `idea` |
+| Issue | `tars/backlog`, `tars/issue` | `_system/backlog/issues/` | `backlog-item` (tars-backlog-type: issue) |
+| Idea | `tars/backlog`, `tars/idea` | `_system/backlog/ideas/` | `backlog-item` (tars-backlog-type: idea) |
 | Inbox Item | `tars/inbox` | `inbox/pending/` | — |
 
 ## Staleness Tiers

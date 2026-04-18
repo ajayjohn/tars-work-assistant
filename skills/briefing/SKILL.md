@@ -221,7 +221,7 @@ are illustrative; the skill always pulls actual counts at briefing generation ti
 mcp__tars_vault__create_note(
   name="YYYY-MM-DD Daily Briefing",
   path="journal/YYYY-MM/YYYY-MM-DD-daily-briefing.md",
-  template="daily-briefing",
+  template="briefing",
   frontmatter={
     "tags": ["tars/journal", "tars/briefing"],
     "tars-date": "YYYY-MM-DD",
@@ -496,7 +496,7 @@ After all three sub-agents complete:
 mcp__tars_vault__create_note(
   name="YYYY-MM-DD Weekly Briefing",
   path="journal/YYYY-MM/YYYY-MM-DD-weekly-briefing.md",
-  template="weekly-briefing",
+  template="briefing",
   frontmatter={
     "tags": ["tars/journal", "tars/briefing"],
     "tars-date": "YYYY-MM-DD",
