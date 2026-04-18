@@ -609,3 +609,170 @@ Tracked (added):
 - `mcp/tars-vault/tests/test_search_index.py` — 19 unit tests.
 - `skills/meeting/reference/nuance-pass-prompt.md` — verbatim §26.8 prompt.
 
+---
+
+## 2026-04-17 — Session 4 — Phase 5 + Phase 6 — Backlog fixes + `/create` office delegation
+
+### What was done
+
+**Pre-flight confirmations**
+
+- `mcp/tars-office/` already gone (deleted pre-commit in Session 1). `requirements.txt` is pinned to `mcp`, `fastembed`, `sqlite-vec` only. Grep across `*.py`, `*.toml`, `*.md` for `python-pptx|openpyxl|python-docx|weasyprint|markdown-it-py` found only guardrail references (docs, this skill body explicitly stating TARS does not bundle them, and the validator that asserts the absence).
+- Git hooks already installed from prior sessions; no reinstall this session.
+
+**Phase 5.1 — Brand auto-load (§5.1)**
+
+- New `templates/brand-guidelines.md` with `tars-brand: true`, `tars-brand-name`, and prose-clear sections (colors, typography, logo usage, voice, layout, accessibility). Designed to be read by an Anthropic render skill via an LLM pass — not parsed programmatically.
+- `skills/communicate/SKILL.md`: new **Step 0 (mandatory)**. Reads `_system/config.md.tars-active-brand`; if absent, falls back to `search_by_tag(tag="tars/brand")` filtered on frontmatter `tars-brand: true`; offers to cache the chosen file back to config. Multiple-hit path lists the candidates and asks. Zero-hit path proceeds without brand and notes "no brand file loaded".
+- `skills/create/SKILL.md`: **Step 2** mirrors the /communicate Step 0 logic. The brand-file **path** (vault-relative) flows forward to Step 7 and is passed as `Brand guidelines: <path>` in the render-skill instruction prompt. TARS never theme-renders programmatically — the render skill reads the brand file and applies it (LLM-driven, per §8.10.5).
+
+**Phase 5.2 — Framework self-state fixes (§5.2)**
+
+- `scripts/sync.py`:
+  - New `count_tagged_notes()` helper — tag-scoped vault walker that skips `_system`, `archive`, `templates`, `_views`.
+  - New `compute_hydration()` — returns `{people_count, initiative_count, decision_count, journal_count, task_count, last_checked}`. Addresses the "decision counter at 0 despite 50 on disk" bug directly.
+  - New `--hydration` flag — fast path, returns only the hydration block as JSON. Exit 0.
+  - Full-run output now includes a `hydration` key next to `summary`.
+- `skills/briefing/SKILL.md` (both daily and weekly):
+  - Replaced `Maturity: mcp__tars_vault__read_note(file="maturity")` with a Bash call to `scripts/sync.py --hydration` inside the memory/context sub-agent.
+  - Sub-agent return schema updated: `"maturity": {...}` → `"hydration": {people_count, initiative_count, decision_count, journal_count, task_count}`.
+  - Sample output "System status" line: the hardcoded `TARS maturity: Level 2 (15 people, 42 meetings)` artifact is gone. Replaced with `Vault hydration: 106 people, 7 initiatives, 50 decisions, 195 tasks, 123 journal entries (live)`, with a note that numbers are illustrative and pulled live at briefing time.
+  - Data-freshness-source table row `System | maturity.yaml` → `System | housekeeping-state.yaml + live hydration (via sync.py --hydration)`.
+  - Absolute constraint updated to require live counts and forbid "Level N" labels.
+- `/lint` check-table gains a concrete row for "Decision / initiative / people count drift vs `_system/maturity.yaml` hydration block" — auto-fixable by comparing `scripts/sync.py --hydration` to the yaml block and writing back via `update_frontmatter`.
+
+**Phase 5.3 — Task lifecycle upgrades (§5.3, §9.1–9.2)**
+
+- `_system/schemas.yaml`:
+  - Schema version recorded as a top-level comment (the simple YAML parser in `validate-schema.py` treats any top-level key as an entity type, so the version can't be a scalar — documented inline instead).
+  - `task.optional_properties`: added `tars-blocked-by`, `tars-age-days`, `tars-escalation-level`, `tars-initiative`, `tars-category`, `tars-completed`, `tars-completed-by`.
+  - `task.property_rules`: `tars-escalation-level` enum `[0,1,2,3]`, `tars-category` enum `[active, delegated, backlog]`, `tars-status` gains `archived`.
+  - `companion.optional_properties`: full §26.13 super-set added (`tars-companion-of`, `tars-generated-by`, `tars-orchestrated-by`, `tars-generated-at`, `tars-brand-applied`, `tars-source-initiative`, `tars-source-data`, `tars-sha256`, `tars-modified`). `tars-original-type` enum gains `html`.
+  - New `context-artifact` schema with `tars-brand` (checkbox), `tars-brand-name`, `tars-draft-status` (enum active|sent|expired), `tars-topics`, `tars-owner`.
+- `skills/tasks/SKILL.md`: the prior Phase-2 stub line about optional fields expanded into a proper reference table + "Escalation level semantics" subsection (0..3 thresholds + briefing-surfacing behavior) + "Blocked-by semantics" paragraph. Manage-mode sort order now reads: escalation-level desc → overdue-first → due-date asc → priority.
+- `/lint` Step 6 gains a deterministic computer for `tars-age-days` (= `today - tars-created`) and `tars-escalation-level` (30/60/90d thresholds). No user prompt — pure derivation. Separation of concerns: `/tasks` owns task content, `/lint` owns lifecycle metadata.
+
+**Phase 5.4 — Telemetry + reflection (§5.4, §26.11)**
+
+- `hooks/_common.py`: new `append_telemetry(vault, event)` — stdlib-only jsonl helper, respects `TARS_DISABLE_TELEMETRY`, silently no-ops on IO failure so telemetry can never take the session down. Mirrors `tars_vault.telemetry.append_event` but is importable from hook scripts without the MCP package.
+- `hooks/post-tool-use.py`: now a real implementation. Allowlist of mutating `mcp__tars_vault__*` tools; on successful call, appends a `vault_write` event (tool + extracted file path). Skips on `TARS_IN_HOOK` recursion, missing vault path, or tool errors.
+- `hooks/instructions-loaded.py`: emits `skill_loaded` when the event carries a skill name (checks `skill`, `skill_name`, `name`, and a nested `instructions.skill`/`instructions.name`). Never exits non-zero.
+- `_views/skill-activity.base`: new base filtered on `tars/telemetry-rollup`. Columns: window, per-skill invocations, vault writes, memory accepted, tasks persisted, answer hit-tiers, lint findings, modified. Rolls up the 14-day window.
+- `skills/maintain/SKILL.md` sync mode: new **Step 4 — Telemetry rollup**. Reads the prior 14 days of `_system/telemetry/*.jsonl`, writes `journal/YYYY-MM/skill-activity-rollup.md` tagged `tars/telemetry-rollup`, and the base picks it up. Mentions the 90-day jsonl retention policy and Friday 17:00 archival to `_system/telemetry/archive/YYYY-MM.jsonl.gz`.
+- `/lint` check-table: two new rows — memories-saved-90d-never-reread (durability miss) and tasks-created-60d-still-open (accountability miss) — both informational, routed via `_system/telemetry/*.jsonl`.
+
+**Phase 6 — `/create` office-productivity upgrade (§8.10)**
+
+- `skills/create/SKILL.md` fully rewritten as a 9-step orchestrator (see pipeline table at the top of the file). Each step is spelled out with the exact `mcp__tars_vault__*` calls, sub-agent invocation pattern, and telemetry event. Absolute constraints updated:
+  1. NEVER office output without understanding the audience.
+  2. NEVER skip content-first / review-before-render.
+  3. NEVER apply brand programmatically — always pass brand as a file pointer.
+  4. NEVER build or reintroduce a TARS office MCP (§3.1b, §26.4).
+  5. NEVER skip the companion-note (§26.13).
+  6. NEVER use banned phrases from `/communicate`.
+  7. ALWAYS save outline first under `journal/YYYY-MM/`.
+  8. ALWAYS save rendered artifacts under `contexts/artifacts/YYYY-MM/`.
+  9. ALWAYS emit `artifact_generated` telemetry per rendered output.
+- `templates/office/` — new structural content-outline templates (markdown + `{{placeholder}}` fields). 9 files: `README.md` (delegation split doc), `deck-executive.md`, `deck-narrative.md`, `deck-technical-review.md`, `spreadsheet-kpi-dashboard.md`, `spreadsheet-roadmap.md`, `doc-decision-memo.md`, `doc-project-status.md`, `html-board-update.md`. Each template passes render hints to the chosen Anthropic skill but imports nothing.
+- `skills/welcome/SKILL.md` pre-flight expansion:
+  - New bullet on the Anthropic first-party skills probe — reads the skill roster surfaced in `<system-reminder>` blocks (does NOT programmatically load third-party skill packages); persists `tars-anthropic-skills: [pptx, docx, xlsx, pdf, web-artifacts-builder]` into `_system/config.md`. `/create` reads this at session start instead of reprobing.
+  - New bullet on optional brand-guidelines scaffold from `templates/brand-guidelines.md` → `contexts/brand/<brand-name>-brand-guidelines.md`, cached as `tars-active-brand`.
+
+**Tests**
+
+- New `tests/validate-phase5-6.py` — stdlib-only structural validator with 7 check groups (brand auto-load, framework self-state, task lifecycle, telemetry plumbing, office templates, /create delegation markers, /welcome probe). Exit 0 on green.
+
+### Tests passing (exit 0)
+
+- `tests/validate-structure.py` — PASS
+- `tests/validate-routing.py` — PASS
+- `tests/validate-references.py` — PASS
+- `tests/validate-docs.py` — PASS (after README templates/views bump)
+- `tests/validate-phase1-skeleton.py` — PASS
+- `tests/validate-phase5-6.py` — PASS (new, 7 check groups)
+- `mcp/tars-vault/tests/test_search_index.py` — PASS (19/19, unchanged)
+
+### Tests still failing (all pre-existing, confirmed via git-stash A/B)
+
+- `tests/smoke-tests.py` — exit 1 (daily-note / obsidian-cli not reachable from the repo working dir — same as Phase 4 baseline; confirmed identical pre- and post-change).
+- `tests/validate-scripts.py` — 6 yaml-import violations in pre-v3.1 scripts (unchanged from Phase 4 baseline). Phase 7 consolidation target.
+- `tests/validate-frontmatter.py` — 2 errors + 36 warnings (baseline). Exit 0 still.
+- `tests/validate-templates.py` — 1 error + 6 warnings (baseline).
+
+Prior sessions' HANDOFF-NOTES claimed `smoke-tests.py` exits 0; a git-stash A/B today shows it exits 1 in both the pre-change and post-change working trees. The `daily note accessible` sub-test is the failing one in both. Session-4 change did not introduce this. Noting here rather than silently treating "exit 0" as load-bearing.
+
+### Design choices made (narrow defaults per §26.18)
+
+1. **Schema version as a comment, not a scalar.** `_system/schemas.yaml`'s minimal YAML parser in `validate-schema.py` walks top-level keys as entity types. A top-level `tars-schema-version: "3.1.0"` scalar caused `AttributeError: 'str' object has no attribute 'get'` because the parser (via PyYAML fallback) then passed the version value into `detect_schema_type()`. Narrow fix: keep the version in a prominent comment block at the top of the file. Phase 7 can teach the parser to skip non-mapping top-level keys if a scalar version field becomes load-bearing.
+2. **Brand-file cache lives in `_system/config.md`, not `_system/maturity.yaml`.** PRD §5.1 says "cache choice in `_system/config.md` as `tars-active-brand`". Kept exactly that.
+3. **Telemetry hook shape flexibility.** `instructions-loaded.py` checks multiple keys (`skill`, `skill_name`, `name`, nested `instructions.skill`) because the Claude Code hook input format for this event isn't fully pinned in the PRD. Silently no-ops when the skill name can't be extracted — safer than guessing.
+4. **`vault_write` event fields.** §26.11 says `vault_write` requires `tool` and `file`; the hook pulls `file` from whichever of `file | path | name | src | dst` is a non-empty string in the tool's input. Keeps the event body consistent across `create_note` (uses `path`), `append_note`/`update_frontmatter`/`archive_note`/`read_note` (use `file`), and `move_note` (uses `src` + `dst` — picks the first non-empty).
+5. **`/lint` task-escalation computer documented, not yet scripted.** The formula lives in skill prose (Step 6) because the actual computation belongs in `scripts/health-check.py` (Phase 7 consolidation) — duplicating it into a one-off Phase 5 script creates a drift risk at Phase 7 consolidation. The skill's call-site pattern is correct; the script body lands Phase 7.
+6. **Skill-activity rollup is produced by `/maintain sync`, consumed by `_views/skill-activity.base`.** Bases only query markdown notes, not jsonl. So the rollup is a generated markdown note. Overwrite-in-place once per day is correct semantics — no new note per day, otherwise the base grows unbounded.
+7. **Office templates are prose, not code.** Every `templates/office/*.md` is plain markdown with `{{placeholder}}` fields. The rendering skill reads the populated outline and produces the office file. TARS does not substitute via a template engine — the LLM populating the outline does substitution during Step 5 of `/create`.
+8. **Anthropic-skills probe is passive.** Session-4 doesn't add any filesystem probe or shell-out. The probe reads the skill roster that Claude Code already surfaces in `<system-reminder>` tags. This avoids any coupling to the internal path layout of `~/.claude/skills/` or the plugin packaging mechanism.
+9. **`validate-phase5-6.py` is structural only.** It asserts strings and file presence — never invokes MCP tools, never spawns sub-agents, never runs sync.py. Stdlib-only. Can run on any machine without the MCP server reachable.
+
+### Open ambiguities / needs user input
+
+1. **Anthropic first-party skills detection mechanism.** The PRD (§3.1b) is silent on *how* TARS detects whether `pptx` / `docx` / `xlsx` / `pdf` / `web-artifacts-builder` are available. Phase 6 `/create` reads `_system/config.md.tars-anthropic-skills` which `/welcome` populates by inspecting the `<system-reminder>` skill roster. This works but relies on the host Claude Code exposing that list in a stable format. If a later session finds a first-class MCP introspection path, swap that in and leave the config-cache as fallback.
+2. **Parallel vs sequential render invocations.** `/create` Step 7 defaults to sequential per-format render invocations. The PRD doesn't specify; a user with multiple formats might want parallel. Narrow default is sequential — parallelism complicates the companion-note ordering and doubles the chance of mid-render state corruption. If the user wants parallel, Phase 7 can add an opt-in flag.
+3. **Telemetry jsonl → `_system/telemetry/YYYY-MM-DD.jsonl` may grow large.** The 90d retention + Friday-archival policy is documented in `/maintain` but not yet enforced by a script. Phase 7 should wire `/maintain` archive mode to actually sweep old jsonl files into `.gz` monthly bundles.
+4. **Render verification API.** `/create` Step 8 says "verify the output file exists — render skill should report." Anthropic's first-party skills' exact output contract isn't in the TARS PRD. The prose is deliberately loose so that whatever signal those skills return can feed the companion-note without prescribing a shape TARS can't control.
+5. **Brand-file path convention.** Scaffolding goes to `contexts/brand/<brand-name>-brand-guidelines.md`; existing users may have brand files elsewhere (e.g., `contexts/artifacts/csi-brand-guidelines.md` as the legacy pointer used to reference). The Phase-5 auto-load happily finds them via tag + frontmatter search regardless of path — no forced migration. `/welcome` only scaffolds when the vault has zero `tars-brand: true` notes.
+6. **Schema version surfacing.** Captured in a comment for parser-compat reasons (see design choice #1). If a later consumer wants the version accessible programmatically, the fix is a parser enhancement, not a schema change.
+
+### What the next session should pick up
+
+**Phase 7 — Consolidation and noise reduction (§7)**. See PRD §7 in full. Headline items:
+
+1. **Retire historical rebuild docs** — move `TARS_REBUILD_FOUNDATION.md`, `TARS_V2_REBUILD_PLAN.md`, `TARS_V3_REBUILD_PLAN.md`, `TARS_V3_INSTANCE_MIGRATION_PLAN.md`, `MIGRATION_HANDOFF.md`, `REBUILD_HANDOFF.md` into `archive/historical/`. ~197 KB.
+2. **Template consolidation** — merge `daily-briefing.md` + `weekly-briefing.md` → `briefing.md` with `tars-briefing-type` mode; merge `issue.md` + `idea.md` → `backlog-item.md` with `tars-backlog-type`.
+3. **Skill body trimming** — `skills/meeting/SKILL.md` (891 lines) and `skills/think/SKILL.md` (622 lines) are the top offenders. Target: ≤300 lines per skill body; overflow to `skills/<name>/reference.md`.
+4. **Script consolidation** — `scan-flagged.py` → `health-check.py` sub-check; shared validators into `scripts/lib/validators.py`. This also unblocks the 6 yaml-import validator errors.
+5. **`commands/*.md` thin-wrapper retirement** — replace with a single `commands/README.md` explaining the auto-registration mechanism.
+6. **`.mcp.json` project defaults** — ship tars-vault stdio config in repo root `.mcp.json` as per §7.6.
+7. **Wire the `/lint` task-age computer body** — the formula is in the skill; a real script under `scripts/health-check.py` (post-consolidation) needs to execute it.
+8. **Wire the `/maintain` telemetry rollup body** — the skill says what to produce; a stub under `scripts/sync.py` or a new `scripts/telemetry-rollup.py` should drive it.
+
+Before starting, the next session should:
+1. Read PRD §7 in full.
+2. Run `scripts/githooks/install-githooks.sh` (idempotent — harmless if already installed).
+3. Run `tests/validate-phase5-6.py` and `mcp/tars-vault/tests/test_search_index.py` to confirm Phase 5/6 hasn't drifted.
+4. `git log --oneline -20` — the Phase 5+6 commit should be the head at that point.
+
+### Files touched this session
+
+Tracked (modified):
+- `_system/schemas.yaml` — schema version comment; task field additions; companion expansion; new context-artifact schema.
+- `hooks/_common.py` — `append_telemetry()` helper.
+- `hooks/instructions-loaded.py` — `skill_loaded` emission.
+- `hooks/post-tool-use.py` — `vault_write` emission with mutating-tools allowlist.
+- `scripts/sync.py` — `count_tagged_notes()` + `compute_hydration()` + `--hydration` flag + `hydration` key in full output.
+- `skills/briefing/SKILL.md` — live hydration sourcing; "Level 2" artifact removed.
+- `skills/communicate/SKILL.md` — Step 0 brand auto-load.
+- `skills/create/SKILL.md` — full orchestrator rewrite (9-step pipeline, delegation to Anthropic skills, companion-note contract, absolute constraints).
+- `skills/lint/SKILL.md` — task-age + telemetry-lint + maturity-drift check rows; Step 6 escalation formula.
+- `skills/maintain/SKILL.md` — sync-mode Step 4 telemetry rollup; retention policy.
+- `skills/tasks/SKILL.md` — v3.1 optional fields reference table; escalation-aware sort; escalation-level semantics; blocked-by semantics.
+- `skills/welcome/SKILL.md` — Anthropic-skills probe bullet; brand-guidelines scaffold bullet.
+- `README.md` — template/view counts bumped.
+- `CHANGELOG.md` — Phase 5 + Phase 6 entries.
+- `docs/HANDOFF-NOTES.md` (this entry).
+
+Tracked (added):
+- `templates/brand-guidelines.md` — brand-guidelines starter.
+- `templates/office/README.md` — delegation-split documentation.
+- `templates/office/deck-executive.md`
+- `templates/office/deck-narrative.md`
+- `templates/office/deck-technical-review.md`
+- `templates/office/spreadsheet-kpi-dashboard.md`
+- `templates/office/spreadsheet-roadmap.md`
+- `templates/office/doc-decision-memo.md`
+- `templates/office/doc-project-status.md`
+- `templates/office/html-board-update.md`
+- `_views/skill-activity.base`
+- `tests/validate-phase5-6.py`
+
+Deleted: none.
+

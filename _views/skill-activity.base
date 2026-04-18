@@ -1,0 +1,31 @@
+# Skill-activity rollup view (§5.4)
+#
+# This base surfaces the most recent per-skill activity summary. The underlying
+# data lives in `_system/telemetry/YYYY-MM-DD.jsonl` (one JSONL file per day,
+# appended by `hooks/instructions-loaded.py` and `hooks/post-tool-use.py`).
+#
+# Obsidian Bases only queries markdown notes, so the jsonl data is rolled up
+# into a single markdown note `journal/YYYY-MM/skill-activity-rollup.md` by
+# `/maintain sync` (or `/lint`) and tagged `tars/telemetry-rollup`. This base
+# then displays the latest rollup.
+
+filters:
+  file.hasTag("tars/telemetry-rollup")
+
+views:
+  - type: table
+    name: "Recent skill activity"
+    order:
+      - file.name
+      - tars-rollup-window
+      - tars-skill-invocations
+      - tars-vault-writes
+      - tars-memory-accepted
+      - tars-tasks-persisted
+      - tars-answer-hit-tiers
+      - tars-lint-findings
+      - tars-modified
+    sort:
+      - column: tars-modified
+        direction: desc
+    limit: 14

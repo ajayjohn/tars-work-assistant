@@ -33,8 +33,9 @@ initializes git. This skill replaces both `install.sh` and the legacy `/welcome`
 - Verify `tars-vault` MCP server is reachable (`mcp__tars_vault__read_note(file="schemas")` should succeed). If not, guide user through `.mcp.json` entry: `{"tars-vault": {"type": "stdio", "command": "python3", "args": ["-m", "tars_vault"]}}`.
 - Confirm plugin hooks (`session-start.py`, `pre-tool-use.py`, `post-tool-use.py`, `pre-compact.py`, `session-end.py`, `instructions-loaded.py`) are registered.
 - Run `scripts/githooks/install-githooks.sh` to enforce authorship rules locally.
-- Detect availability of Anthropic's first-party skills (`pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder`) for `/create` — if missing, note it so `/create` falls back to markdown-only.
+- **Anthropic first-party skills probe (§8.10.1)**: detect which of `pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder` are available in the host Claude Code install. Read the user-invocable skills list surfaced in `<system-reminder>` blocks; do not programmatically load or inspect third-party skill packages. Persist the result in `_system/config.md` frontmatter as `tars-anthropic-skills: [pptx, docx, xlsx, pdf, web-artifacts-builder]` (include only those available). `/create` reads this at session start instead of reprobing.
 - Integration discovery: `mcp__tars_vault__refresh_integrations()` writes `_system/tools-registry.yaml` so `resolve_capability` works from the first session.
+- **Brand-guidelines scaffold (§5.1)**: if the user plans to use `/create` or `/communicate` for branded artifacts, offer to scaffold a brand file from `templates/brand-guidelines.md` → `contexts/brand/<brand-name>-brand-guidelines.md` (tagged `tars/brand`, frontmatter `tars-brand: true`). Cache the active brand as `tars-active-brand: <filename>` in `_system/config.md`.
 
 ---
 

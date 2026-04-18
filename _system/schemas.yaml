@@ -1,6 +1,9 @@
 # TARS Frontmatter Schema Definitions
 # Used by scripts/validate-schema.py to enforce data quality
 # All TARS properties use the tars- prefix
+# Schema version: 3.1.0 (tracked in this comment — the validator treats any
+# top-level key as an entity type, so the version lives in a comment rather
+# than a top-level scalar).
 
 person:
   required_tags: [tars/person]
@@ -85,11 +88,23 @@ task:
     - tars-due
     - tars-project
     - tars-modified
+    # v3.1 additions (§5.3, §9.1) — backward-compatible.
+    - tars-blocked-by          # list of wikilinks or relative paths
+    - tars-age-days            # int, computed by /lint on touch
+    - tars-escalation-level    # 0..3, set by /lint age rules
+    - tars-initiative
+    - tars-category            # active | delegated | backlog
+    - tars-completed
+    - tars-completed-by
   property_rules:
     tars-status:
-      enum: [open, in-progress, done, cancelled]
+      enum: [open, in-progress, done, cancelled, archived]
     tars-priority:
       enum: [critical, high, medium, low]
+    tars-escalation-level:
+      enum: [0, 1, 2, 3]
+    tars-category:
+      enum: [active, delegated, backlog]
 
 briefing:
   required_tags: [tars/journal, tars/briefing]
@@ -190,16 +205,46 @@ companion:
   required_properties:
     - tars-original-file
     - tars-original-type
-    - tars-added-date
     - tars-created
   optional_properties:
+    - tars-added-date
     - tars-file-size
     - tars-source
     - tars-summary
     - tars-topics
+    # v3.1 companion additions for office artifacts (§26.13).
+    - tars-companion-of
+    - tars-generated-by
+    - tars-orchestrated-by
+    - tars-generated-at
+    - tars-brand-applied
+    - tars-source-initiative
+    - tars-source-data
+    - tars-sha256
+    - tars-modified
   property_rules:
     tars-original-type:
-      enum: [pdf, docx, png, jpg, xlsx, pptx, other]
+      enum: [pdf, docx, png, jpg, xlsx, pptx, html, other]
+
+# Context artifact (for brand guidelines and other persistent reference material
+# that lives under contexts/). Schema addition per §9.2.
+context-artifact:
+  required_tags: [tars/context]
+  required_properties:
+    - tars-summary
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - tars-brand          # boolean — flags this note as a brand-guidelines source
+    - tars-brand-name
+    - tars-draft-status   # enum: active | sent | expired — draft lifecycle
+    - tars-topics
+    - tars-owner
+  property_rules:
+    tars-brand:
+      type: checkbox
+    tars-draft-status:
+      enum: [active, sent, expired]
 
 issue:
   required_tags: [tars/backlog, tars/issue]

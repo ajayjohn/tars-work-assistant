@@ -39,3 +39,26 @@ def in_recursion() -> bool:
 
 def log_stderr(message: str) -> None:
     sys.stderr.write(message.rstrip() + "\n")
+
+
+def append_telemetry(vault: Path, event: dict[str, Any]) -> None:
+    """Append one JSONL event to ``_system/telemetry/YYYY-MM-DD.jsonl``.
+
+    Mirrors ``tars_vault.telemetry.append_event`` so hook scripts (which can't
+    always import the MCP package) have a stdlib-only path. Silently no-ops if
+    ``TARS_DISABLE_TELEMETRY`` is set, or on any IO failure — telemetry must
+    never take the session down.
+    """
+    if os.environ.get("TARS_DISABLE_TELEMETRY"):
+        return
+    try:
+        from datetime import datetime
+        day = datetime.now().astimezone().strftime("%Y-%m-%d")
+        target = Path(vault) / "_system" / "telemetry" / f"{day}.jsonl"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = dict(event)
+        payload.setdefault("ts", datetime.now().astimezone().isoformat(timespec="seconds"))
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except Exception:
+        return

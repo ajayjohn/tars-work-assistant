@@ -103,7 +103,13 @@ Inbox:        mcp__tars_vault__search_by_tag(tag="tars/inbox", limit=1)
 
 Schedule:     mcp__tars_vault__read_note(file="schedule")      (skip if absent)
 Housekeeping: mcp__tars_vault__read_note(file="housekeeping-state")
-Maturity:     mcp__tars_vault__read_note(file="maturity")
+
+Live hydration counts (replaces the old "Level 1" artifact — read from disk,
+don't trust `_system/maturity.yaml` which drifts):
+  Bash: python3 scripts/sync.py --hydration <TARS_VAULT_PATH>
+  → JSON: {"hydration": {"people_count": N, "initiative_count": N,
+                         "decision_count": N, "journal_count": N,
+                         "task_count": N, "last_checked": "YYYY-MM-DD"}}
 
 Return JSON:
 {
@@ -112,7 +118,8 @@ Return JSON:
   "scheduled_items": [{"type": "recurring|once", "description": "...", "due": "..."}],
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
-  "maturity": {"level": 1, "people": 0, "meetings_processed": 0}
+  "hydration": {"people_count": N, "initiative_count": N, "decision_count": N,
+                "journal_count": N, "task_count": N}
 }
 ```
 
@@ -192,7 +199,7 @@ After all three sub-agents complete:
 - john.doe@external.com (in Q1 Planning) — not in memory
 
 ## System status
-- TARS maturity: Level 2 (15 people, 42 meetings). Next: 50 meetings for Level 3
+- Vault hydration: 106 people, 7 initiatives, 50 decisions, 195 tasks, 123 journal entries
 - Inbox: 3 items pending
 - Last housekeeping: 2026-03-18
 
@@ -200,6 +207,11 @@ After all three sub-agents complete:
 *Data freshness: 4 meetings, 8 tasks, 12 memory files queried.*
 *Stale: [[Tom Richards]] not updated in 65 days.*
 ```
+
+**Note on hydration**: the System status line reports **live** counts from the latest
+`scripts/sync.py --hydration` run, not from `_system/maturity.yaml` (which drifts
+and is repaired by `/lint`'s framework-self-state check — §5.2). The numbers above
+are illustrative; the skill always pulls actual counts at briefing generation time.
 
 ---
 
@@ -325,7 +337,12 @@ Journal:      mcp__tars_vault__search_by_tag(tag="tars/journal",
 Schedule:     mcp__tars_vault__read_note(file="schedule")         (skip if absent)
 Inbox:        mcp__tars_vault__search_by_tag(tag="tars/inbox", limit=1)
 Housekeeping: mcp__tars_vault__read_note(file="housekeeping-state")
-Maturity:     mcp__tars_vault__read_note(file="maturity")
+
+Live hydration counts:
+  Bash: python3 scripts/sync.py --hydration <TARS_VAULT_PATH>
+  → JSON: {"hydration": {"people_count": N, "initiative_count": N,
+                         "decision_count": N, "journal_count": N,
+                         "task_count": N, "last_checked": "YYYY-MM-DD"}}
 
 Return JSON:
 {
@@ -336,7 +353,8 @@ Return JSON:
   "inbox_count": 0,
   "housekeeping_last_run": "YYYY-MM-DD",
   "last_index_rebuild": "YYYY-MM-DD",
-  "maturity": {"level": 1, "people": 0, "meetings_processed": 0}
+  "hydration": {"people_count": N, "initiative_count": N, "decision_count": N,
+                "journal_count": N, "task_count": N}
 }
 ```
 
@@ -459,7 +477,7 @@ After all three sub-agents complete:
 ---
 
 ## System status
-- TARS maturity: Level 2 (15 people, 42 meetings). Next: 50 meetings for Level 3
+- Vault hydration: 106 people, 7 initiatives, 50 decisions, 195 tasks, 123 journal entries (live)
 - Inbox: 3 items pending
 - Last housekeeping: 2026-03-18
 - Last schema validation: 2026-03-20
@@ -567,7 +585,7 @@ tars-week-end: YYYY-MM-DD
 | Journal | — | Last week's entries via search |
 | Schedule | `_system/schedule.md` | `_system/schedule.md` |
 | Inbox | Count only | Count only |
-| System | housekeeping-state.yaml, maturity.yaml | housekeeping-state.yaml, maturity.yaml |
+| System | housekeeping-state.yaml + live hydration (via `sync.py --hydration`) | same |
 
 ---
 
@@ -594,4 +612,4 @@ If any errors occur during briefing generation:
 - ALWAYS verify cron jobs during the self-check step (Issue 10)
 - NEVER fabricate meetings, tasks, or people context — only report what is found
 - NEVER skip the cross-reference step — attendees must be matched to memory
-- ALWAYS include system status section with maturity, inbox count, and last housekeeping date
+- ALWAYS include system status section with live vault hydration counts (from `sync.py --hydration`), inbox count, and last housekeeping date — never hardcoded "Level N" labels

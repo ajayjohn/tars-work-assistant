@@ -171,6 +171,46 @@ def check_memory_freshness(vault_path, recent_people, days_stale=60):
     return stale, missing
 
 
+def count_tagged_notes(vault_path, tag, subdir=None):
+    """Count markdown files whose frontmatter `tags` include the given tag.
+
+    Scans the whole vault when ``subdir`` is None; otherwise confined to that
+    subdirectory. Used to rebuild hydration counters in `_system/maturity.yaml`
+    so the "Level 1" briefing artifact goes away (§5.2).
+    """
+    vault = Path(vault_path)
+    root = vault / subdir if subdir else vault
+    if not root.exists():
+        return 0
+    count = 0
+    for md_file in root.rglob("*.md"):
+        # Skip system / archive / template files; they aren't content.
+        rel = md_file.relative_to(vault).parts
+        if rel and rel[0] in ("_system", "archive", "templates", "_views"):
+            continue
+        fm = parse_frontmatter(md_file)
+        if not fm:
+            continue
+        tags = fm.get("tags", [])
+        if not isinstance(tags, list):
+            tags = [tags] if tags else []
+        if tag in tags:
+            count += 1
+    return count
+
+
+def compute_hydration(vault_path):
+    """Return current hydration counts for _system/maturity.yaml."""
+    return {
+        "people_count":     count_tagged_notes(vault_path, "tars/person",     "memory/people"),
+        "initiative_count": count_tagged_notes(vault_path, "tars/initiative", "memory/initiatives"),
+        "decision_count":   count_tagged_notes(vault_path, "tars/decision",   "memory/decisions"),
+        "journal_count":    count_tagged_notes(vault_path, "tars/journal",    "journal"),
+        "task_count":       count_tagged_notes(vault_path, "tars/task"),
+        "last_checked":     date.today().isoformat(),
+    }
+
+
 def check_task_freshness(vault_path):
     """Find tasks that may need attention."""
     vault = Path(vault_path)
@@ -225,7 +265,16 @@ def check_task_freshness(vault_path):
 
 
 def main():
-    vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
+    args = [a for a in sys.argv[1:] if a]
+    hydration_only = "--hydration" in args
+    vault_args = [a for a in args if not a.startswith("--")]
+    vault_path = vault_args[0] if vault_args else "."
+
+    if hydration_only:
+        # Fast path for the briefing skill: only compute live counts, skip
+        # the meeting / task / freshness scans.
+        print(json.dumps({"hydration": compute_hydration(vault_path)}, indent=2))
+        sys.exit(0)
 
     # Check for meeting-journal gaps
     recent_meetings = find_meeting_journals(vault_path, days_back=7)
@@ -237,6 +286,10 @@ def main():
     # Check task freshness
     overdue_tasks = check_task_freshness(vault_path)
 
+    # Hydration counts for _system/maturity.yaml (closes the "Level 1" artifact
+    # bug where briefings parroted zeros despite hundreds of notes on disk).
+    hydration = compute_hydration(vault_path)
+
     output = {
         "timestamp": datetime.now().isoformat(),
         "summary": {
@@ -245,6 +298,7 @@ def main():
             "missing_people": len(missing_people),
             "overdue_tasks": len(overdue_tasks),
         },
+        "hydration": hydration,
         "recent_meetings": recent_meetings,
         "stale_people": stale_people,
         "missing_people": missing_people,

@@ -163,9 +163,35 @@ recent_journals = mcp__tars_vault__search_by_tag(
 
 Surface for user decision: update profile with recent insights (routes to `/learn`) or accept staleness.
 
-### Step 4: Report + telemetry
+### Step 4: Telemetry rollup
 
-Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. PostToolUse hook writes the daily-note summary.
+Read today's and the prior 13 days' `_system/telemetry/YYYY-MM-DD.jsonl` files and compute a 14-day per-skill rollup. Persist as a markdown note for `_views/skill-activity.base`:
+
+```
+mcp__tars_vault__create_note(
+  path="journal/YYYY-MM/skill-activity-rollup.md",
+  name="skill-activity-rollup",
+  frontmatter={
+    "tags": ["tars/telemetry-rollup"],
+    "tars-rollup-window": "14d",
+    "tars-skill-invocations": {"meeting": N, "answer": N, …},
+    "tars-vault-writes": N,
+    "tars-memory-accepted": N,
+    "tars-tasks-persisted": N,
+    "tars-answer-hit-tiers": {"tier1": N, "tier2": N, "tier3": N},
+    "tars-lint-findings": {"critical": N, "warnings": N, "auto_fixable": N},
+    "tars-created": "YYYY-MM-DD",
+    "tars-modified": "YYYY-MM-DD"
+  },
+  body="<narrative summary of trends>"
+)
+```
+
+One rollup per month; overwrite in place on each sync. Retention of the source `.jsonl` files is 90 days rolling — older files move to `_system/telemetry/archive/YYYY-MM.jsonl.gz` on the Friday 17:00 maintenance run.
+
+### Step 5: Report + telemetry
+
+Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles, rollup_written}` counts. PostToolUse hook writes the daily-note summary.
 
 ---
 

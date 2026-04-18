@@ -67,7 +67,10 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Unfiled journal entries (loose `journal/YYYY-MM-DD.md` at journal root) | path check | Yes | Propose `mcp__tars_vault__move_note` into `journal/YYYY-MM/` |
 | Framework self-state drift (`_system/maturity.yaml` vs actual counts; `housekeeping-state.yaml` last_run vs telemetry) | vault scan + telemetry | Yes | Propose update via `update_frontmatter` |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
-| Telemetry lint — memories unread for 90d / tasks never transitioned past threshold | `_system/telemetry/*.jsonl` | No | Surface candidates (§5.4) |
+| Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
+| Telemetry lint — memories saved 90d ago never re-read (durability miss) | `_system/telemetry/*.jsonl` → `memory_persisted` vs subsequent `vault_write`/`answer_delivered` hits | No | Surface for user review |
+| Telemetry lint — tasks created >60d ago still `open` (accountability miss) | `_system/telemetry/*.jsonl` + `memory/tasks/` frontmatter | No | Surface candidates (§5.4); route to `/tasks` |
+| Decision / initiative / people count drift vs `_system/maturity.yaml` hydration block | `scripts/sync.py --hydration` | Yes | Auto-update yaml via `update_frontmatter` equivalent |
 
 ---
 
@@ -142,8 +145,22 @@ For each approved auto-fix:
 ```
 # Wikilink artifacts
 mcp__tars_vault__append_note(file=…, content=…)   # only when needed; mostly edits via dedicated tool
-# Framework state (e.g., maturity drift)
+
+# Framework state — hydration counters (§5.2). Source of truth is
+# `scripts/sync.py --hydration`, then update the yaml block.
 mcp__tars_vault__update_frontmatter(file="maturity", property="decision_count", value="<actual>")
+
+# Task age / escalation (§5.3). Per open task: compute age, classify level,
+# write both. No user prompt needed — pure derivation.
+#   tars-age-days        = (today - tars-created).days
+#   tars-escalation-level:
+#     tars-due < today - 90d  → 3
+#     tars-due < today - 60d  → 2
+#     tars-due < today - 30d  → 1
+#     else                    → 0
+mcp__tars_vault__update_frontmatter(file=<task>, property="tars-age-days", value=<n>)
+mcp__tars_vault__update_frontmatter(file=<task>, property="tars-escalation-level", value=<0-3>)
+
 # Unfiled journal entry
 mcp__tars_vault__move_note(src="journal/YYYY-MM-DD.md", dst="journal/YYYY-MM/YYYY-MM-DD.md")
 ```

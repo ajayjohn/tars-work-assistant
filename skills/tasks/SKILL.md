@@ -212,7 +212,15 @@ mcp__tars_vault__create_note(
 )
 ```
 
-Phase 5 adds optional fields `tars-blocked-by`, `tars-age-days`, `tars-escalation-level` per §9.1 — backward-compatible; the server's schema validator accepts notes without them.
+### Optional v3.1 fields (backward-compatible, added per §5.3 / §9.1)
+
+| Field | Type | Set by | Purpose |
+|-------|------|--------|---------|
+| `tars-blocked-by` | list of wikilinks | User or extract flow | This task cannot progress until the referenced tasks/decisions land |
+| `tars-age-days` | int | `/lint` on touch | Cached for sort + escalation; computed from `tars-created` |
+| `tars-escalation-level` | 0 \| 1 \| 2 \| 3 | `/lint` | 0=normal, 1=overdue >30d, 2=overdue >60d, 3=overdue >90d |
+
+On create, emit these fields unset — `/lint`'s task-age check fills them in and keeps them current. Any task created without them passes schema validation (all three are optional).
 
 ### Task placement logic
 
@@ -300,10 +308,26 @@ Group by `tars-category`:
 - **Delegated**: Owner is someone else, has due date
 - **Backlog**: No due date
 
-Within each group, sort by:
-1. Overdue tasks first (due date < today)
-2. Then by due date ascending
-3. Then by priority (high > medium > low)
+Within each group, sort by (v3.1 escalation-aware order per §5.3):
+1. `tars-escalation-level` descending (3 → 2 → 1 → 0) — worst-aged first
+2. Overdue tasks first (due date < today)
+3. Then by due date ascending
+4. Then by priority (high > medium > low)
+
+### Escalation level semantics
+
+| Level | Criterion | Display | Briefing surface |
+|-------|-----------|---------|------------------|
+| 0 | Normal or no due date yet | Plain row | No |
+| 1 | Overdue > 30 days | "⚠ overdue 31d" badge | Yes — in `Priority tasks` block of the next briefing |
+| 2 | Overdue > 60 days | "⚠⚠ overdue 61d" badge | Yes — plus proposes complete / delegate / cancel |
+| 3 | Overdue > 90 days | "⚠⚠⚠ overdue 91d — archive?" badge | Yes — plus proposes archival with reason |
+
+`/lint` recomputes `tars-age-days` and `tars-escalation-level` on its nightly pass. This skill consumes them but never writes them (separation of concerns: `/tasks` owns task content, `/lint` owns lifecycle metadata).
+
+### Blocked-by semantics
+
+When a task has `tars-blocked-by: [...]`, it stays in whatever category (`active` / `delegated` / `backlog`) but the manage-mode display prefixes it with `[blocked on: <refs>]` and demotes it below unblocked peers of the same escalation level.
 
 ---
 
