@@ -1,10 +1,5 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-    },
     "tars-vault": {
       "type": "stdio",
       "command": "python3",

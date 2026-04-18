@@ -26,8 +26,8 @@ rsync -a --exclude '__pycache__' --exclude 'tests' mcp/tars-vault/ tars-cowork-p
 # Copy hooks (plugin auto-registers them via hooks/hooks.json).
 rsync -a --exclude '__pycache__' hooks/ tars-cowork-plugin/hooks/
 
-# Copy .mcp.json if it exists
-[ -f .mcp.json ] && cp .mcp.json tars-cowork-plugin/
+# .mcp.json is dev-only (tars repo working context); fresh installs use
+# .claude-plugin/mcp-servers.json which resolves ${CLAUDE_PLUGIN_ROOT} correctly.
 
 # Create minimal plugin.json and sync marketplace.json using Python
 python3 << 'PYTHON_SCRIPT'
