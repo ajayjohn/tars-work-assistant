@@ -99,10 +99,23 @@ def get_python_imports(filepath):
     return sorted(imports), None
 
 
+# Approved third-party runtime dependencies (PRD §26.2, as revised 2026-04-18).
+# Scripts that interact with the tars-vault MCP server (e.g., build-search-index.py)
+# may import these; every other script must remain stdlib-only.
+APPROVED_RUNTIME_DEPS = {
+    "mcp",           # Anthropic MCP SDK
+    "fastembed",     # local ONNX embedding model loader
+    "sqlite_vec",    # sqlite-vec SQLite extension
+    "tars_vault",    # in-repo MCP server package (mcp/tars-vault/src/tars_vault)
+}
+
+
 def is_stdlib_module(module_name):
-    """Check if a module name is part of Python standard library."""
-    # Check direct match
+    """Check if a module name is part of Python standard library or an
+    approved runtime dependency per PRD §26.2."""
     if module_name in STDLIB_MODULES:
+        return True
+    if module_name in APPROVED_RUNTIME_DEPS:
         return True
     # Check if it's a private/internal module (starts with _)
     if module_name.startswith("_"):

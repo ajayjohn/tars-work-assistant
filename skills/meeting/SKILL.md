@@ -6,7 +6,7 @@ triggers: ["process this meeting", "meeting transcript", "meeting notes"]
 
 # Meeting processing pipeline
 
-The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 13-step pipeline with mandatory user review gates.
+The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline (plus a 7b nuance-capture sub-step) with mandatory user review gates.
 
 All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation.
 
@@ -19,6 +19,7 @@ All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.m
 ```
 Steps 1-6:   Preparation (load context, detect format, resolve calendar/participants, check knowledge, scan secrets)
 Step 7:      Processing (LLM analysis of transcript)
+Step 7b:     Nuance capture (second Haiku pass over raw transcript — safety net)
 Steps 8-9:   Persistence (journal entry + transcript archive)
 Steps 10-11: Extraction with review (tasks + memory, user confirms each)
 Steps 12-14: Cleanup (unresolved names, daily note, self-evaluation)
@@ -305,6 +306,112 @@ Format: **"Owner"** -- Task description (deadline if stated)
 
 ---
 
+## Step 7b: Nuance capture pass (PRD §6.8)
+
+Directly addresses the top-declared retrieval pain: summaries miss nuance,
+contrarian views, specific phrases, and quantitative claims. Runs AFTER
+Step 7 and BEFORE Step 8 so the nuance section lands in the same journal
+entry as the main summary.
+
+### When to run
+
+- Always, when the raw transcript is available.
+- Skip with a telemetry note (`meeting_nuance_skipped`, reason) only if the
+  transcript was unavailable (e.g., meeting-recording import produced summary
+  only) or was <500 words total. The nuance pass is cheap enough (~1 extra
+  Haiku call) that it should run by default.
+
+### How to run
+
+Spawn a sub-agent with `subagent_type="general-purpose"`, model Haiku,
+`max_turns=1`, temperature `0.2`. Feed it the verbatim prompt from
+`skills/meeting/reference/nuance-pass-prompt.md`, substituting
+`{{TRANSCRIPT_TEXT}}` with the full raw transcript (before any archival
+chunking). The prompt requires a single JSON object back.
+
+### What the JSON contains
+
+Six arrays, any of which may be empty:
+
+| Key | Content |
+|-----|---------|
+| `notable_phrases` | Verbatim phrases the summary dropped. Speaker + quote + nearby text for grep. |
+| `contrarian_views` | Statements contradicting the dominant summary sentiment. |
+| `specific_quotes` | Quotes worth preserving verbatim with rationale. |
+| `unusual_technical_terms` | Jargon worth indexing with speaker + context sentence. |
+| `emotional_strong_statements` | Strong emotional statements with emotion type. |
+| `numbers_and_dates_missed` | Quantitative claims absent from the summary. |
+
+Never apply durability / accountability filtering here — those gates run on
+persistence, not capture. Over-capture is the design intent.
+
+### How it lands in the journal
+
+The nuance JSON is rendered beneath the main summary as a `## Notable phrases & perspectives` section. Suggested layout (omit empty sub-headings):
+
+```markdown
+## Notable phrases & perspectives
+
+### Notable phrases
+- **Jane Smith** (~12:14): "we've been papering over this for six months"
+- **Bob Chen** (~23:02): "that's technically a rewrite, not a refactor"
+
+### Contrarian views
+- **Sarah Lopez**: pushed back on the REST-over-GraphQL decision — "we'll regret this when the mobile team gets here"
+  > Quote: "we'll regret this when the mobile team gets here"
+
+### Specific quotes worth preserving
+- **Jane Smith**: "the whole reason we did the Q1 rewrite was to avoid exactly this conversation" — captures the frustration behind the roadmap reset
+
+### Unusual technical terms
+- **idempotency fences** (Bob Chen): raised in the context of the retry-queue redesign
+
+### Strong emotional statements
+- **Sarah Lopez** (frustration): "I've been asking for this for eight months"
+
+### Numbers & dates missed
+- 2026-06-30 — vendor contract renewal (mentioned once by Jane, absent from summary)
+- $340k — projected savings from consolidation (Bob's estimate)
+```
+
+Nothing in this section is persisted to memory automatically. It lives in the
+journal as a searchable reading of the room. Memory extraction (Step 11) still
+runs its own durability gate on any item the user later promotes.
+
+### Failure handling
+
+Failure here **must not** block the pipeline:
+
+- JSON parse error, non-JSON response, or sub-agent error → skip the nuance
+  section and emit telemetry event `meeting_nuance_failed` with the error
+  string. Proceed to Step 8 as if 7b never ran.
+- Empty JSON (all arrays empty) → still append the section heading with "No
+  nuance flagged." so the user can see the pass ran. Emit
+  `meeting_nuance_captured` with counts (all zero).
+
+### Telemetry
+
+On success emit `meeting_nuance_captured` with counts per category:
+
+```json
+{
+  "event": "meeting_nuance_captured",
+  "counts": {
+    "notable_phrases": 4,
+    "contrarian_views": 1,
+    "specific_quotes": 2,
+    "unusual_technical_terms": 3,
+    "emotional_strong_statements": 1,
+    "numbers_and_dates_missed": 2
+  }
+}
+```
+
+`/lint` can later surface meetings where the nuance pass returned all-zero
+counts — often a symptom of a malformed transcript rather than a thin meeting.
+
+---
+
 ## Step 8: Create journal entry (Issue 6)
 
 ```
@@ -369,6 +476,9 @@ Append the structured report from Step 7 to the journal entry body:
 
 ## Key quotes
 [From Step 7]
+
+## Notable phrases & perspectives
+[From Step 7b — omit if the nuance pass was skipped; keep heading if pass ran with zero findings]
 
 ## Associated captures
 [Screenshots and images related to this meeting, if any]
@@ -778,3 +888,4 @@ End every meeting processing run with this summary, regardless of whether all st
 12. ALWAYS apply canonical names from the alias registry to all output
 13. ALWAYS save a summary to the daily note and changelog
 14. ALWAYS report errors in the output summary even if processing completed partially
+15. Step 7b failure NEVER blocks the pipeline — skip the nuance section, log `meeting_nuance_failed`, and continue to Step 8

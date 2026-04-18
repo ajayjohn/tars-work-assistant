@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.1.0-dev — WIP
+
+### Phase 4 — Hybrid retrieval + meeting nuance pass (§6)
+- **Hybrid retrieval index**: `scripts/build-search-index.py` now builds FTS5 (Tier A: `memory/**`; Tier B: `journal/**`, `archive/transcripts/**`, `contexts/**`) plus a `sqlite-vec` vector layer over Tier B with `BAAI/bge-small-en-v1.5` (384-dim) embeddings via FastEmbed. Incremental SHA-256 state at `_system/search-index-state.json`; bounded 10-minute runs; graceful FTS-only fallback when FastEmbed or sqlite-vec is unavailable.
+- **MCP search tools implemented**: `mcp__tars_vault__fts_search` (keyword, tier+source filters), `mcp__tars_vault__semantic_search` (hybrid 0.7 semantic + 0.3 FTS, scope by journal/transcripts/contexts/all, optional date filter), `mcp__tars_vault__rerank` (deterministic score-based rerank with recency + source boosts).
+- **Meeting nuance pass (Step 7b)**: new sub-step inserted in `skills/meeting/SKILL.md` between summary and persistence. Spawns a Haiku sub-agent with the verbatim PRD §26.8 prompt to capture notable phrases, contrarian views, specific quotes, unusual terms, strong emotional statements, and missed numbers/dates. Rendered as `## Notable phrases & perspectives` in the journal entry. Telemetry: `meeting_nuance_captured` or `meeting_nuance_failed`. Never blocks the pipeline.
+- **Test surface**: `mcp/tars-vault/tests/test_search_index.py` — 18 stdlib-only unit tests covering tier classification, chunking, FTS round-trip, tool contracts (no-index / missing args / fallback), and rerank ordering + boosts.
+- **Dependency guard**: `tests/validate-scripts.py` now recognizes the PRD §26.2 approved deps (`mcp`, `fastembed`, `sqlite_vec`, `tars_vault`) alongside stdlib.
+
 ## v3.0.0 (2026-03-22)
 
 **TARS 3.0: Obsidian-native rebuild — complete architecture redesign**

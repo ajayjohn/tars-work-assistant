@@ -390,3 +390,222 @@ Tracked (modified):
 - `ARCHITECTURE.md` — skill/command counts bumped; baseline tokens adjusted.
 - `docs/HANDOFF-NOTES.md` (this entry).
 
+---
+
+## 2026-04-17 — Session 3 — Phase 4 — Hybrid retrieval + meeting nuance pass
+
+### What was done
+
+**Search index library** (`mcp/tars-vault/src/tars_vault/search_index.py`) —
+replaced the Phase 1a stub with the real access layer:
+- Tier classification (A = `memory/**`; B = `journal/**`,
+  `archive/transcripts/**`, `contexts/**`; everything else is skipped).
+- FTS5 virtual table `fts_notes(path, title, tags, body, tier UNINDEXED,
+  source_type UNINDEXED, date UNINDEXED)` with porter+unicode61 tokenizer.
+- `chunks` table (id, path, chunk_index, text, source_type, date) plus a
+  sqlite-vec `vec_chunks(embedding float[384])` virtual table whose rowid
+  matches `chunks.id` one-to-one.
+- Pure helpers for frontmatter split, title extraction, tag parsing (YAML
+  block + inline form), chunk-body (~300 words w/ 60-word overlap ≈ 400/80
+  token budget from §6.2), SHA-256 file hashing, and search-index state
+  persistence (`_system/search-index-state.json`).
+- FTS query (bm25 + snippet) and vector KNN (sqlite-vec `embedding MATCH ?
+  ORDER BY distance LIMIT k`, with post-filter by source_type since vec0
+  doesn't allow mixed WHERE clauses on non-indexed columns).
+- Graceful degradation: `load_sqlite_vec` returns False on missing extension;
+  callers treat False as "FTS-only".
+
+**`scripts/build-search-index.py`** — promoted from stub to full incremental
+builder:
+- Walks the vault, SHA-256 per file gates re-chunking + re-embedding.
+- Loads FastEmbed (`BAAI/bge-small-en-v1.5`, fallback
+  `sentence-transformers/all-MiniLM-L6-v2`) with cache at
+  `<vault>/_system/embedding-cache/`.
+- Graceful fallback: if fastembed or sqlite-vec unavailable, builds FTS-only.
+- 10-minute budget per run (resumable via state file).
+- Honors §26.15 migration-script contract: `--vault`, `--dry-run`, `--apply`,
+  `--json`; exits 3 on dirty git worktree; 1 on SIGINT; 2 on embed error.
+
+**Three MCP tool bodies** (promoted from NotImplementedError stubs):
+- `fts_search` — BM25 keyword over the built index. Supports `tier`, explicit
+  `source_types`, and a `scope` convenience alias (`memory` | `journal` |
+  `transcripts` | `contexts` | `all`) that expands to tier + source_types.
+  Returns `{status: ok | no_index | error, results, count, reason?}`.
+- `semantic_search` — hybrid Tier-B search. Lazy-loads FastEmbed, runs vector
+  KNN via `search_index.semantic_query`, merges with FTS5 results using
+  `0.7 × semantic + 0.3 × FTS` (min-max normalized), applies optional
+  `date_range` post-filter. Returns `{status: ok | no_index | fts_only |
+  error, results, fallback, count, reason?}`. `fts_only` signals the caller
+  (answer skill, nuance pass) to flag the gap to the user.
+- `rerank` — deterministic score-based rerank with recency boosts (same-day
+  1.15×, ≤7d 1.10×, ≤30d 1.05×) and source-type boost (transcript/journal
+  1.10×). Returns `{status: ok, results, count, mode: "deterministic"}`.
+  LLM-backed rerank explicitly deferred (see Deferred decisions below).
+
+**Meeting nuance pass (Step 7b)** inserted into `skills/meeting/SKILL.md`
+between Step 7 (LLM summary) and Step 8 (persist journal). Contract:
+- Spawn a sub-agent with Haiku, `max_turns=1`, temperature 0.2.
+- Feed the verbatim prompt from `skills/meeting/reference/nuance-pass-prompt.md`
+  (new file; §26.8 verbatim).
+- Parse six-key JSON response (notable_phrases, contrarian_views,
+  specific_quotes, unusual_technical_terms, emotional_strong_statements,
+  numbers_and_dates_missed); render under `## Notable phrases & perspectives`
+  in the journal entry. Empty JSON still emits the heading with "No nuance
+  flagged." Failures emit `meeting_nuance_failed` telemetry and **never**
+  block the pipeline.
+- Skill body also updated: preamble ("14-step pipeline (plus a 7b nuance-
+  capture sub-step)"), pipeline overview adds Step 7b, Step 8 frontmatter
+  body adds `## Notable phrases & perspectives` placeholder, new absolute
+  constraint #15 says 7b failure never blocks.
+
+**Unit tests** — `mcp/tars-vault/tests/test_search_index.py` (19 tests,
+stdlib-only):
+- Tier classification, source-type mapping, frontmatter/title/tag/date
+  extraction, short + long + empty chunking with overlap invariant.
+- FTS round-trip + delete + re-query on an in-memory-ish tmp vault.
+- Tool contracts: no_index, missing args, invalid scope, fts_only fallback
+  when vec is unavailable, scope-alias end-to-end.
+- rerank: hybrid-score ordering, recency boost crossover, source boost
+  crossover, invalid-input rejection.
+
+**Validator tweak** — `tests/validate-scripts.py` now recognizes the §26.2
+approved runtime deps (`mcp`, `fastembed`, `sqlite_vec`, `tars_vault`)
+alongside stdlib, so `build-search-index.py` no longer trips the check.
+
+**Changelog** — first v3.1.0-dev entry added (covers Phase 4 only; prior
+phases never landed their CHANGELOG entries and I left those gaps for the
+next consolidation phase rather than retroactively writing them).
+
+### Tests passing (exit 0)
+
+- `tests/validate-structure.py` — PASS
+- `tests/validate-routing.py` — PASS
+- `tests/validate-references.py` — PASS
+- `tests/validate-docs.py` — PASS
+- `tests/validate-phase1-skeleton.py` — PASS
+- `mcp/tars-vault/tests/test_search_index.py` — PASS (19/19)
+- `tests/smoke-tests.py` — exits 0 (same daily-note warning as prior phases)
+- End-to-end smoke of `build-search-index.py` against a two-note fixture
+  vault under `/tmp`: first run indexed 2 files (1 chunk for the journal
+  body), re-run skipped both as unchanged.
+
+### Tests still failing (all pre-existing, confirmed via `git stash` baseline)
+
+- `tests/validate-scripts.py` — 6 `yaml` imports in `archive.py`,
+  `health-check.py`, `scan-flagged.py`, `scan-secrets.py`, `sync.py`,
+  `validate-schema.py`. Unchanged from Phase 1a baseline; Phase 7 cleanup.
+- `tests/validate-frontmatter.py` — 2 errors (meeting/tasks SKILL.md missing
+  `user-invocable`), 36 warnings. Baseline; Phase 7 frontmatter sweep.
+- `tests/validate-templates.py` — 1 error (`taxonomy.md` missing memory type
+  def `person`), 6 warnings. Baseline.
+
+### Design choices made (narrow defaults per §26.18)
+
+1. **sqlite-vec KNN pattern** — used the two-step form: first query
+   `vec_chunks WHERE embedding MATCH ? ORDER BY distance LIMIT k`, then look
+   up metadata from `chunks` by rowid. This is the pattern sqlite-vec docs
+   explicitly support; a direct JOIN with a `source_type` filter mixes
+   indexed and non-indexed WHERE clauses in vec0 which is unreliable. To keep
+   `limit` respected after source_type filtering, over-fetch 4× when a
+   filter is present and slice after.
+2. **Chunk budget approximation** — PRD §6.2 specifies 400 tokens / 80-token
+   overlap but TARS scripts are stdlib-only (no tokenizer dep). Used ~300
+   words / 60-word overlap which approximates the budget at bge-small's
+   ~1.33 tokens/word. Deterministic and stable across runs.
+3. **Rerank is deterministic, not LLM-backed** — PRD §6.5 says "Haiku,
+   max_turns=1" for rerank. Invoking the Anthropic API from inside the MCP
+   server requires (a) an API key provisioned to the server process and (b)
+   a tight cost/latency budget we haven't agreed on. Shipped a deterministic
+   score-based reranker with recency + source boosts that is correct in
+   isolation; orchestrating skills (`/answer`, `/meeting`) can layer an LLM
+   rerank via a sub-agent whenever they want, unchanged. See Deferred
+   decisions.
+4. **Scope alias on `fts_search`** — skill prose already uses
+   `fts_search(scope="memory", …)` (from Phase 2 answer-skill rewrite) but
+   the PRD's tool signature uses `tier` + `source_types`. Added `scope` as a
+   convenience that expands to both; explicit `tier`/`source_types` still
+   win. Keeps skill prose correct without forcing a re-edit.
+5. **`tars_vault` path injection in build script** — the script imports
+   `tars_vault.search_index` to reuse chunking / schema helpers. Because
+   `mcp/tars-vault/src/tars_vault` isn't on the default PYTHONPATH when the
+   script runs from `scripts/`, the script prepends `mcp/tars-vault/src` to
+   `sys.path` itself. Alternative was to duplicate ~250 LOC into the script;
+   avoided. Validator allowlist updated accordingly.
+6. **Chunk rows without embeddings** — when vec_enabled=False (vec extension
+   missing) or embedder unavailable, chunk rows still land in the `chunks`
+   table so future re-indexes pick up only changed files via SHA diff, and
+   so a later `--apply` with vec available can backfill. The skip-behavior
+   is: `upsert_chunks(..., embeddings=None, vec_enabled=False)` inserts rows
+   but no vectors; `semantic_search` returns fts_only in that state.
+7. **Nuance-pass sub-agent type** — the PRD doesn't specify one. Used
+   `general-purpose` which is universally available. Running Haiku is a
+   model-selection decision the caller makes when spawning; the prompt file
+   documents the intended config.
+8. **`date` in Tier-A notes** — for memory notes without `tars-date`, fall
+   back to a date found in the vault-relative path (e.g.
+   `memory/YYYY-MM/...`). Most memory notes don't carry a date, which is
+   fine — the rerank recency boost simply evaluates to 1.0× for them.
+
+### Open ambiguities / needs user input
+
+1. **LLM rerank wiring** — if/when the user wants the actual Haiku-backed
+   rerank from §6.5, two things need to land:
+   a. Anthropic API key flow for the MCP server process (`ANTHROPIC_API_KEY`
+      env var? keychain? sibling MCP tool?).
+   b. A per-invocation cost / latency cap so rerank doesn't accidentally
+      dominate a budget on long result lists.
+   For now the deterministic rerank covers the use case and the orchestrating
+   skill can still spawn a sub-agent for LLM rerank when needed.
+2. **Nuance-pass model selection in the sub-agent** — Claude Code's Agent
+   tool accepts `model: "haiku"` but the skill prose leaves model selection
+   implicit. If the user wants strict Haiku enforcement in the skill, add a
+   line `model: haiku` to the Step 7b sub-agent invocation. Left loose per
+   §26.18.
+3. **`_system/embedding-cache/` provisioning** — cache dir is created on
+   first apply; the ~80MB first-download is not pre-fetched in this phase.
+   Phase 8 onboarding should surface a first-run message. Already gitignored
+   from Session 1.
+4. **Index rebuild cadence** — PRD §6.4 says rebuild via `/maintain` and a
+   PostToolUse hook debounced 30s on prose-heavy mutations. The debounce
+   logic is NOT wired in this phase; `scripts/build-search-index.py` just
+   needs to be run manually or via `/lint`. Hook wiring is Phase 5/7.
+5. **Tier-A chunking** — PRD says Tier-A is FTS-only but we still store
+   chunks for Tier-B even when embeddings are unavailable. Tier-A always
+   skips chunking. If the user later wants hybrid on memory notes
+   (v3.2-deferred per §6.9), the schema already supports it — just expand
+   `index_file` to produce chunks + embeddings for Tier A.
+
+### What the next session should pick up
+
+**Phase 5 — Consolidation and noise reduction (§7)**:
+- Retire historical rebuild docs (6 files, ~197KB) to `archive/historical/`.
+- Template consolidation, skill-body trimming (§7.3), script consolidation
+  (§7.4 — scan-flagged into health-check, etc. — this also unblocks the
+  yaml-import validator errors).
+- `.mcp.json` project defaults (§7.6).
+
+Before starting, the next session should:
+1. Read PRD §7 in full.
+2. Run `scripts/githooks/install-githooks.sh` (idempotent).
+3. Run `python3 mcp/tars-vault/tests/test_search_index.py` to confirm Phase 4
+   hasn't drifted.
+4. Run `python3 tests/validate-phase1-skeleton.py`.
+
+### Files touched this session
+
+Tracked (modified):
+- `mcp/tars-vault/src/tars_vault/search_index.py` — full implementation.
+- `mcp/tars-vault/src/tars_vault/tools/fts_search.py` — real body.
+- `mcp/tars-vault/src/tars_vault/tools/semantic_search.py` — real body.
+- `mcp/tars-vault/src/tars_vault/tools/rerank.py` — real body (deterministic).
+- `scripts/build-search-index.py` — full incremental builder.
+- `skills/meeting/SKILL.md` — preamble, pipeline overview, Step 7b insertion,
+  Step 8 body placeholder, constraint #15.
+- `tests/validate-scripts.py` — approved-runtime-deps allowlist.
+- `CHANGELOG.md` — new `v3.1.0-dev — WIP` section with Phase 4 entry.
+- `docs/HANDOFF-NOTES.md` (this entry).
+
+Tracked (added):
+- `mcp/tars-vault/tests/test_search_index.py` — 19 unit tests.
+- `skills/meeting/reference/nuance-pass-prompt.md` — verbatim §26.8 prompt.
+
