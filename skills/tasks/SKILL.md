@@ -2,6 +2,20 @@
 name: tasks
 description: Extract tasks from text or manage existing tasks with accountability testing and duplicate checking
 triggers: ["extract tasks from", "what's on my plate", "show tasks", "mark done", "task review"]
+user-invocable: true
+help:
+  purpose: |-
+    Extract action items from input text into accountable, concrete tasks
+    (Extract mode), or review / prioritize / complete / prune existing tasks
+    (Manage mode). Every new task passes the 3-criterion accountability gate
+    and surfaces to the user for numbered-list confirmation before persist.
+  use_cases:
+    - "Extract tasks from this email"
+    - "What's on my plate today?"
+    - "Show me overdue tasks"
+    - "Mark [task title] done"
+    - "Review and reprioritize my tasks"
+  scope: tasks,extraction,manage,accountability
 ---
 
 # Tasks skill

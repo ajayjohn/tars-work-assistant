@@ -1,6 +1,8 @@
 # Changelog
 
-## v3.1.0-dev — WIP
+## v3.1.0 (2026-04-17)
+
+**TARS 3.1: Harden, simplify, and extend — hooks, MCP wrappers, hybrid retrieval, office productivity**
 
 ### Phase 8 — Docs (§8)
 - **CLAUDE.md**: version bump to v3.1. New "Write interface: `tars-vault` MCP tools" section documents all `mcp__tars_vault__*` tools. Skill roster adds `/lint`. Startup checks re-ordered around the SessionStart hook + integration-registry refresh + Anthropic-skills probe. Key constraints expanded: `mcp__tars_vault__*` mandate, provider-agnostic resolve_capability rule, office-delegation rule, nuance-capture rule. Vault structure block updated (telemetry, search-index, embedding-cache, tools-registry, search.db). Template + script blocks reflect the Phase 7 consolidation.
@@ -40,6 +42,14 @@
 - **Meeting nuance pass (Step 7b)**: new sub-step inserted in `skills/meeting/SKILL.md` between summary and persistence. Spawns a Haiku sub-agent with the verbatim PRD §26.8 prompt to capture notable phrases, contrarian views, specific quotes, unusual terms, strong emotional statements, and missed numbers/dates. Rendered as `## Notable phrases & perspectives` in the journal entry. Telemetry: `meeting_nuance_captured` or `meeting_nuance_failed`. Never blocks the pipeline.
 - **Test surface**: `mcp/tars-vault/tests/test_search_index.py` — 18 stdlib-only unit tests covering tier classification, chunking, FTS round-trip, tool contracts (no-index / missing args / fallback), and rerank ordering + boosts.
 - **Dependency guard**: `tests/validate-scripts.py` now recognizes the PRD §26.2 approved deps (`mcp`, `fastembed`, `sqlite_vec`, `tars_vault`) alongside stdlib.
+
+### Migration
+
+Existing v3.0 vaults migrate via the user-executed runbook at [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) — snapshot → integrations-v2 → wikilink cleanup → search-index build → git-hooks install → `/welcome` refresh → `/lint` pass → cron registration → verification. Schema additions are backward-compatible; no v3.0 frontmatter shapes break.
+
+### Release runbook
+
+User-executed release steps are documented at [docs/RELEASE-v3.1.0.md](docs/RELEASE-v3.1.0.md). Mobile access via Claude Remote Control is documented at [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md).
 
 ## v3.0.0 (2026-03-22)
 

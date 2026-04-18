@@ -2,6 +2,18 @@
 name: meeting
 description: Process meeting transcripts into journal entries, tasks, and memory updates
 triggers: ["process this meeting", "meeting transcript", "meeting notes"]
+user-invocable: true
+help:
+  purpose: |-
+    Process a meeting transcript through the 14-step TARS pipeline — calendar
+    match, participant resolution, knowledge inventory, secret scan, summary,
+    nuance capture, journal + transcript write, task extraction, memory
+    proposals — all gated on review-before-persist.
+  use_cases:
+    - "Process this meeting transcript"
+    - "I just had a meeting with [person], here's what we said..."
+    - "Turn this transcript into a journal entry"
+  scope: meeting,transcript,journal,followthrough
 ---
 
 # Meeting processing pipeline
