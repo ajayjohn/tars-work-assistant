@@ -177,8 +177,8 @@ def check_templates(vault_path):
     vault = Path(vault_path)
     required = [
         "person", "vendor", "competitor", "product", "initiative", "decision",
-        "org-context", "meeting-journal", "daily-briefing", "weekly-briefing",
-        "wisdom-journal", "companion", "transcript", "issue", "idea",
+        "org-context", "meeting-journal", "briefing",
+        "wisdom-journal", "companion", "transcript", "backlog-item",
     ]
 
     missing = [t for t in required if not (vault / "templates" / f"{t}.md").exists()]

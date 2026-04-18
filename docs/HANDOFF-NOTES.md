@@ -776,3 +776,126 @@ Tracked (added):
 
 Deleted: none.
 
+
+---
+
+## 2026-04-17 — Session 5 — Phase 7 + Phase 8 — Consolidation and docs
+
+### What was done
+
+**Pre-flight confirmations**
+
+- `mcp/tars-office/` still absent. Grep across `*.py`, `*.toml`, `*.md` for `python-pptx|openpyxl|python-docx|weasyprint|markdown-it-py` still only turns up guardrail / doc / validator references, not actual imports. `requirements.txt` remains pinned to `mcp`, `fastembed`, `sqlite-vec`.
+- Git hooks (`scripts/githooks/*`) confirmed installed from prior sessions.
+- Starting branch head was Session 4 commit `1fc284f` on `tars-3.1.0-dev`.
+
+**Phase 7 — Consolidation and noise reduction (§7)**
+
+- **Repo cleanup (§7.1)**: six legacy rebuild docs (`TARS_REBUILD_FOUNDATION.md` 39 KB, `TARS_V2_REBUILD_PLAN.md` 59 KB, `TARS_V3_REBUILD_PLAN.md` 50 KB, `TARS_V3_INSTANCE_MIGRATION_PLAN.md` 28 KB, `MIGRATION_HANDOFF.md` 9 KB, `REBUILD_HANDOFF.md` 12 KB — total 197 KB) moved from the repo root into `archive/historical/`. They were already untracked via `.git/info/exclude` (bare-filename patterns that match anywhere in the tree), so the move is purely working-tree cleanup — the files remain untracked at their new path too. No git history was rewritten.
+- **Template consolidation (§7.2)**: 17 templates → 15. `templates/daily-briefing.md` + `templates/weekly-briefing.md` → single `templates/briefing.md` with mode switched by `tars-briefing-type: daily|weekly`. `templates/issue.md` + `templates/idea.md` → single `templates/backlog-item.md` with mode switched by `tars-backlog-type: issue|idea`. Callers updated: `skills/briefing/SKILL.md` (Step 7: both daily and weekly now pass `template="briefing"`), `skills/learn/SKILL.md` (issue creation uses `template="backlog-item"` + `tars-backlog-type: issue`), `skills/meeting/SKILL.md` (issue creation same), `skills/welcome/SKILL.md` (template list), `_system/taxonomy.md` (journal + operational type rows).
+- **Script consolidation (§7.4)**: 13 scripts → 12. `scripts/scan-flagged.py` merged into `scripts/health-check.py` as a `flagged_content` sub-block (markers, unmarked sentiment, stale-flag count). Output JSON gains the block alongside existing keys; stale-flag count contributes to the `warnings` counter. `_system/guardrails.yaml` header updated. `tests/smoke-tests.py` `required` list updated. `skills/lint/SKILL.md` check-table and pipeline Step 2 redirected to the merged script. `skills/welcome/SKILL.md` scripts table updated.
+- **Validator hardening**: `tests/validate-scripts.py` — `get_python_imports` now walks the AST and treats imports inside a `try:` whose `except` clause catches `ImportError | ModuleNotFoundError | Exception | BaseException` as OPTIONAL. The six pre-existing YAML-fallback scripts (`archive.py`, `health-check.py`, `scan-secrets.py`, `sync.py`, `validate-schema.py`, and previously `scan-flagged.py` before merge) all pass. PRD §26.2 "graceful degrade" contract is now machine-verified. No change to the approved-runtime-deps allowlist (`mcp`, `fastembed`, `sqlite_vec`, `tars_vault`).
+- **Commands readme (§7.5)**: new `commands/README.md` documents the command→skill mapping and explains why the 12 thin wrappers remain in place. Per `§26.18` narrow-defaults, the wrappers stay until Claude Code skill auto-registration (`user-invocable: true` → slash-command) is verified end-to-end on a clean install. The validator's broad `skills/NAME/` regex rejected several worded placeholders in the README; resolved by phrasing the instructions without that path pattern.
+- **`.mcp.json` project defaults (§7.6)**: repo-root `.mcp.json` gains a second entry alongside `filesystem`. `tars-vault` uses stdio transport, `python3 -m tars_vault`, with `PYTHONPATH=mcp/tars-vault/src` and `TARS_VAULT_PATH` forwarded from the user env.
+- **Doc counts synced**: `README.md` line 17 now claims `13 skills, 13 commands, 15 templates (plus 9 office content outlines), 16 live views, and 12 deterministic scripts`. `ARCHITECTURE.md` line 49 matches. `tests/validate-docs.py` passes.
+
+**Phase 8 — Docs**
+
+- **CLAUDE.md** rewritten for v3.1: version bump in the title; new "Write interface: `tars-vault` MCP tools" table covering all 17 exposed tools; skill roster adds `/lint`; supporting-files list adds `nuance-pass-prompt.md`; vault-structure block adds `_system/tools-registry.yaml`, `capability-overrides.yaml`, `telemetry/*.jsonl`, `embedding-cache/`, `search-index-state.json`, `search.db`; templates block lists the consolidated `briefing.md` and `backlog-item.md` plus `brand-guidelines.md`, `integrations-v2.md`, and the `office/` subfolder; script block reflects stdlib-only + the new v3.1 scripts; startup-checks block re-ordered around SessionStart hook + tools-registry TTL + anthropic-skills probe; key-constraints list expanded from 12 to 15 items covering `mcp__tars_vault__*`-only-writes, provider-agnostic resolve_capability, office delegation, meeting nuance; routing table updated to include `/lint` as its own row.
+- **README.md** updated: intro-bullet list replaced the obsidian-cli mention with the `tars-vault` MCP + hooks mention; added retrieval, integrations, office-delegation, and nuance-capture bullets; "What ships" list updated to flag the v3.1 additions; architecture-at-a-glance block adds `hooks/` and `mcp/tars-vault/`; documentation map links to the three new `docs/` files.
+- **ARCHITECTURE.md** re-authored: title bumped to "TARS 3.1 Architecture"; new "Three operations" Karpathy framing paragraph; new "What's new in v3.1" section listing all 10 strategic bets; interface-layer list adds `/lint`; protocol-layer count moves from 1+11 to 1+12; new "Write interface", "Hooks", "Retrieval", "Integration (provider-agnostic)", and "Office output" sub-sections under runtime layers; state/schema layer documents `tools-registry.yaml`, `telemetry/*.jsonl`, `search-index-state.json`, `search.db`; template layer lists `briefing.md`, `backlog-item.md`, `brand-guidelines.md`, `integrations-v2.md`, `office/`; script layer documents the stdlib-only + try/except contract and adds `scripts/githooks/`; answer-and-retrieval section rewritten with the 7-tier hybrid priority.
+- **GETTING-STARTED.md** updated: prereqs add Python 3.10+ and `tars-vault`; installation section adds `pip install -r requirements.txt` and the zero-office-libs expectation; integration section rewritten around capability-preference map and `resolve_capability`; new "First semantic search — FastEmbed model download" and "Office output prerequisites" subsections explain the 80 MB one-time download and the Anthropic-skills gate; "Your first workflows" adds `/lint`; "Where to go next" links to the new migration / mobile docs.
+- **New `docs/MIGRATION-v3.0-to-v3.1.md`**: user-executed runbook mirroring PRD §10 Phase 9. Nine steps — snapshot, migrate-integrations-v2, fix-wikilinks, build-search-index, install-githooks, `/welcome`, `/lint`, register-crons, verify. Rollback, duration (45–90 min), known-issues sections.
+- **New `docs/RELEASE-v3.1.0.md`**: user-executed release runbook mirroring PRD §24. Authorship rules, pre-release verification, retroactive tag backfill (v2.2.0 + v3.0.0), version bump, CHANGELOG finalization, commit, build, tag, merge, push, marketplace watch, rollback.
+- **New `docs/MOBILE-USAGE.md`**: per §26.14 outline. Prereqs (Pro/Max + Claude Code 2.1.51+ + awake Mac); one-time desktop setup via `scripts/tars-keepalive.plist` + launchctl; mobile sign-in; daily-use examples; troubleshooting (sleep, crash, latency, vault staleness); security considerations; what-doesn't-work list.
+- **Test fix**: `tests/smoke-tests.py` `required` list updated for the consolidated template names. `validate-docs.py`, `validate-references.py`, `validate-structure.py`, `validate-routing.py`, `validate-scripts.py`, `validate-phase1-skeleton.py`, `validate-phase5-6.py` all green after the doc rewrites.
+- **CHANGELOG.md** gets two new sections under `v3.1.0-dev — WIP`: Phase 7 (consolidation) and Phase 8 (docs). Entries follow the Phase 4 / Phase 5+6 prose style.
+
+### Tests passing (exit 0)
+
+- `tests/validate-structure.py` — PASS
+- `tests/validate-routing.py` — PASS
+- `tests/validate-references.py` — PASS (after `commands/README.md` phrasing fix)
+- `tests/validate-docs.py` — PASS (after README + ARCHITECTURE inventory bumps)
+- `tests/validate-scripts.py` — PASS (12 scripts, all stdlib-only or approved deps; try/except optional deps now recognized)
+- `tests/validate-phase1-skeleton.py` — PASS
+- `tests/validate-phase5-6.py` — PASS (7 check groups)
+- `mcp/tars-vault/tests/test_search_index.py` — PASS (19/19)
+- `tests/smoke-tests.py` templates sub-check — PASS (`All 13 templates present`); the three environmental sub-check failures (`obsidian-cli available`, `vault accessible`, `daily note accessible`) remain pre-existing and are not a Session-5 regression.
+
+### Tests still failing (all pre-existing, confirmed via prior handoff entries)
+
+- `tests/validate-frontmatter.py` — 2 errors + 36 warnings (baseline; carried since Phase 4). Exit 0 in the statuswise sense but FAIL by aggregate.
+- `tests/validate-templates.py` — 1 error ("taxonomy.md: Missing memory type definition for 'person'") + 6 warnings (baseline). Not introduced this session.
+
+### Design choices made (narrow defaults per §26.18)
+
+1. **Legacy rebuild docs retained as working-tree files under `archive/historical/`** rather than deleted. They're already git-excluded via `.git/info/exclude`, so deletion or move is observationally identical. Move preserves local availability if the user ever wants to grep them, which is the safer default.
+2. **Command wrappers kept in place**. PRD §7.5 proposes retiring them. Narrow path: without a reproducible verification that skill auto-registration produces identical slash-command behavior (particularly for `meeting` and `tasks`, which lack `user-invocable: true` frontmatter today), retirement is a regression risk. Added `commands/README.md` with the mapping and a paragraph explaining the deferral.
+3. **No deep skill-body surgery this phase**. Several skill bodies still exceed the ≤300-line target: `meeting` 891, `welcome` 718, `think` 622, `learn` 615, `briefing` 615, `tasks` 534, `core` 524, `answer` 435, `create` 333, `initiative` 306. Aggressive trimming risks behavioral regressions because the skill bodies encode the pipelines, review-gate language, and prompt scaffolding — all load-bearing. Deferred to a dedicated Phase 7-follow-up session with a per-skill extraction plan.
+4. **`validate-scripts.py` changed to recognize optional-deps via AST, not to grow the allowlist**. The PRD §26.2 approved-deps list must stay at `mcp`, `fastembed`, `sqlite_vec`. Adding `yaml` there would have been a one-line fix but would violate the pinned allowlist. The AST-aware approach keeps the allowlist honest while giving PRD-compliant try/except fallbacks a clean pass.
+5. **`_system/tools-registry.yaml` documented but not scaffolded in templates/**. The SessionStart hook writes the file at runtime; shipping an empty skeleton in `templates/` would invite hand-editing (forbidden — "Auto-generated. Do not edit." comment at the top of the real file). Same logic as the telemetry jsonl — runtime state, not template content.
+6. **Doc counts bumped in place rather than driven from a live inventory**. `validate-docs.py` counts `commands/*.md` and `scripts/*.py` but checks hardcoded prose in README and ARCHITECTURE. The long-run fix is a template that these docs render from; the narrow fix is keeping the two claim-lines in sync. Acceptable trade-off for v3.1; revisit in v3.2 if doc drift becomes a recurring lint finding.
+
+### Open ambiguities / needs user input
+
+1. **commands/ auto-registration verification**. To retire the 12 thin wrappers per PRD §7.5, someone needs to confirm that Claude Code auto-registers `/meeting` and `/tasks` from `skills/meeting/SKILL.md` and `skills/tasks/SKILL.md` when those skills add `user-invocable: true` frontmatter. The other 11 skills already declare it. A future session can add the flag, delete the wrappers, and confirm behavior on a clean Claude Code install.
+2. **Deep skill-body trimming plan**. The PRD targets ≤300 lines per skill body with overflow to `skills/<name>/reference.md`. A per-skill trim plan should decide which sub-sections of each skill body are true pipeline prose (must stay in `SKILL.md`) and which are reference material (moves to `reference.md`). Without that plan, trimming risks pipeline fragmentation. Best executed as a dedicated session with a line-budget target and a diff review per skill.
+3. **Shared validator extraction into `scripts/lib/validators.py`**. PRD §7.4 mentions this as a future consolidation. Current scripts each inline their own `parse_frontmatter` and `load_yaml_file` helpers. Consolidation would be a mechanical refactor but changes the import surface of five scripts — needs a dedicated diff review.
+4. **`pre-v3.1-backup` retention**. The migration runbook writes `<file>.pre-v3.1-backup` for every modified file. PRD §26.15 says "Backups never overwrite an existing `.pre-v3.1-backup` file" but doesn't specify a cleanup policy. Ran narrow: document the backup, defer cleanup. User can delete via `find "$TARS_VAULT_PATH" -name '*.pre-v3.1-backup' -delete` once the migration is verified stable.
+5. **`scripts/tars-keepalive.plist` referenced in MOBILE-USAGE.md does not exist in the repo today**. PRD §3.8 and §26.14 both refer to it as a shipped sample. A future session (or Phase 1a retro) should add the plist with a reasonable default (Claude Code auto-restart on exit, logging to `~/Library/Logs/tars-keepalive.log`). Until then, the MOBILE-USAGE.md steps that `cp` the file will not work; users will need to author their own plist or wait for the plist ship.
+6. **Release date in CHANGELOG v3.1.0 heading**. Runbook says `## v3.1.0 (YYYY-MM-DD)` using the release date. The release date is the user's call at tag time.
+
+### What the next session should pick up
+
+This phase set closes the intended agent-driven scope. Remaining work splits into:
+
+- **User-executed**: migration (Phase 9 per PRD §10) then the release runbook (`docs/RELEASE-v3.1.0.md`).
+- **Optional follow-up sessions** (if the user wants to drive the open ambiguities above to closure before tagging):
+  1. Ship `scripts/tars-keepalive.plist` and link-verify `docs/MOBILE-USAGE.md`.
+  2. Deep skill-body trim to hit the ≤300-line target.
+  3. Retire `commands/*.md` wrappers after verifying auto-registration.
+  4. Extract shared validators into `scripts/lib/validators.py`.
+
+### Files touched this session
+
+Tracked (modified):
+- `.mcp.json` — add `tars-vault` entry.
+- `ARCHITECTURE.md` — full v3.1 rewrite (runtime layers, three operations, what's new, retrieval priority).
+- `CHANGELOG.md` — Phase 7 + Phase 8 entries under `v3.1.0-dev — WIP`.
+- `CLAUDE.md` — v3.1 rewrite (MCP tool table, constraints, vault structure, startup checks, routing).
+- `GETTING-STARTED.md` — Python prereq, `tars-vault`, integrations v2, FastEmbed note, office-output prereqs, `/lint`.
+- `README.md` — v3.1 bullet list, architecture-at-a-glance, inventory counts, doc-map links.
+- `_system/guardrails.yaml` — header refers to `health-check.py` (consolidated).
+- `_system/taxonomy.md` — journal + operational type rows updated for consolidated templates.
+- `scripts/health-check.py` — `scan_flagged_markers`, `scan_sentiment_patterns`, `check_flagged_content` merged in; `main` emits `flagged_content` block and adds stale-flag count to `warnings`.
+- `skills/briefing/SKILL.md` — both create_note calls use `template="briefing"`.
+- `skills/learn/SKILL.md` — issue-creation prose uses `template="backlog-item"` + `tars-backlog-type: issue`.
+- `skills/lint/SKILL.md` — check-table + pipeline Step 2 redirected to the merged script.
+- `skills/meeting/SKILL.md` — issue-creation `template="backlog-item"` + `tars-backlog-type: issue`.
+- `skills/welcome/SKILL.md` — template list consolidated; scripts table consolidated.
+- `tests/smoke-tests.py` — `required` scripts list drops `scan-flagged.py`; `required` templates list uses `briefing` + `backlog-item`.
+- `tests/validate-scripts.py` — AST-walking `get_python_imports` recognizes try/except optional deps.
+
+Tracked (added):
+- `commands/README.md` — command→skill mapping; wrapper-retention rationale.
+- `docs/MIGRATION-v3.0-to-v3.1.md` — 9-step user migration runbook.
+- `docs/RELEASE-v3.1.0.md` — user release runbook, authorship guards, tag backfill.
+- `docs/MOBILE-USAGE.md` — Claude Remote Control setup + daily use + security.
+- `templates/backlog-item.md` — unified issue/idea template.
+- `templates/briefing.md` — unified daily/weekly briefing template.
+
+Tracked (deleted):
+- `scripts/scan-flagged.py` (merged into `health-check.py`).
+- `templates/daily-briefing.md` (merged into `briefing.md`).
+- `templates/weekly-briefing.md` (merged into `briefing.md`).
+- `templates/issue.md` (merged into `backlog-item.md`).
+- `templates/idea.md` (merged into `backlog-item.md`).
+
+Untracked (moved via `mv`, not `git mv`, because the files were never in git's index — they were always excluded by `.git/info/exclude`):
+- `TARS_REBUILD_FOUNDATION.md` → `archive/historical/`.
+- `TARS_V2_REBUILD_PLAN.md` → `archive/historical/`.
+- `TARS_V3_REBUILD_PLAN.md` → `archive/historical/`.
+- `TARS_V3_INSTANCE_MIGRATION_PLAN.md` → `archive/historical/`.
+- `MIGRATION_HANDOFF.md` → `archive/historical/`.
+- `REBUILD_HANDOFF.md` → `archive/historical/`.

@@ -6,10 +6,13 @@ TARS is an Obsidian-native persistent executive assistant for senior knowledge w
 
 TARS is built around a few core ideas:
 - Obsidian is the runtime workspace, not an export target.
-- `obsidian-cli` is the write interface for vault content.
+- A `tars-vault` MCP server is the write interface; skills call `mcp__tars_vault__*` tools and hooks enforce write discipline.
 - TARS-managed notes use schema-validated `tars-` frontmatter properties.
 - Live Obsidian Bases replace hand-maintained `_index.md` files.
-- Meeting answers can fall back to archived raw transcripts when summaries are not enough.
+- Retrieval combines SQLite FTS5 over structured memory with a local FastEmbed + sqlite-vec semantic layer over prose (journal, transcripts, contexts).
+- Meetings run a nuance-capture pass after summarization — contrarian views, quotes, numbers, unusual terms are preserved verbatim.
+- Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
+- Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and vault filing.
 - Tasks and durable memory always go through review before persistence.
 
 ## What ships in the framework
@@ -18,23 +21,27 @@ The framework ships with 13 skills, 13 commands, 15 templates (plus 9 office con
 
 Core user-facing capabilities:
 - Daily and weekly briefings with calendar, task, people, and initiative context
-- Meeting processing that links transcripts, journal notes, decisions, and follow-through
-- Task extraction with accountability testing and duplicate checks
+- Meeting processing that links transcripts, journal notes, decisions, and follow-through — with nuance-capture pass
+- Task extraction with accountability testing, duplicate checks, age / escalation tracking
 - Durable memory capture for people, initiatives, decisions, products, vendors, competitors, and organizational context
-- Fast lookup across memory, journal, transcripts, and configured integrations
-- Strategic analysis, communications drafting, initiative planning, and maintenance workflows
+- Hybrid fast lookup — FTS5 over memory, semantic over journal + transcripts + contexts, plus integrations
+- Strategic analysis (five modes), communications drafting (RASCI + brand-aware), initiative planning
+- `/lint` vault health pass + `/maintain` inbox / sync / archive sweep
+- `/create` office output orchestration via Anthropic's first-party skills
 
 ## Architecture at a glance
 
 The framework uses this high-level structure:
 
 ```text
-skills/           Behavioral and workflow protocols
+skills/           Behavioral and workflow protocols (13 skills)
 commands/         Thin slash-command wrappers into the skills
-_system/          Runtime configuration, schemas, guardrails, alias registry, state
+hooks/            SessionStart / PreToolUse / PostToolUse / PreCompact / SessionEnd
+mcp/tars-vault/   Write-interface MCP server + retrieval + organization tools
+_system/          Runtime configuration, schemas, guardrails, telemetry, registries
 _views/           Obsidian `.base` files for live queries
-templates/        Canonical TARS note templates
-scripts/          Deterministic validators and maintenance utilities
+templates/        Canonical TARS note templates (+ office content outlines)
+scripts/          Deterministic stdlib-only validators and maintenance utilities
 .claude/skills/   Obsidian-specific helper skills used by the agent
 ```
 
@@ -89,6 +96,9 @@ Start here depending on what you need:
 - [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](CHANGELOG.md) for release history
 - [CATALOG.md](CATALOG.md) for the product and adoption overview
+- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration
+- [docs/RELEASE-v3.1.0.md](docs/RELEASE-v3.1.0.md) for the v3.1.0 release runbook
+- [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) for Claude Remote Control on mobile
 
 ## License
 

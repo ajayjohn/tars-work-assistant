@@ -2,17 +2,18 @@
 
 # Getting Started with TARS
 
-TARS is an Obsidian-native executive assistant framework. The setup goal is straightforward: connect TARS to a real Obsidian vault, give it a dependable write path through `obsidian-cli`, and let `/welcome` scaffold the runtime so daily work can begin immediately.
+TARS is an Obsidian-native executive assistant framework. The setup goal is straightforward: connect TARS to a real Obsidian vault, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately.
 
 ## Before you install
 
 You need:
 - Obsidian Desktop running on the same machine
-- `obsidian-cli` installed and able to reach your target vault
+- `obsidian-cli` installed and able to reach your target vault (used as the transport below the `tars-vault` MCP server)
+- Python 3.10+ available on the path
 - Claude Code or Claude Cowork with the TARS framework installed
 - a vault location dedicated to your TARS workspace
 
-If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide.
+If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 to v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md).
 
 ## Installation
 
@@ -24,6 +25,16 @@ Install from your preferred path:
 2. Local install:
    - clone the repository
    - install the plugin from the local checkout
+
+After installing the plugin, install the Python runtime dependencies for the `tars-vault` MCP server from the repo root:
+
+```text
+pip install -r requirements.txt
+```
+
+The pinned deps are minimal: `mcp`, `fastembed`, `sqlite-vec`. Nothing else. In particular TARS does NOT bundle any office-rendering libraries — office output in `/create` delegates to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills.
+
+The repository root ships an `.mcp.json` declaring the `tars-vault` server. Set `TARS_VAULT_PATH` in your shell or IDE environment to point at your vault before starting Claude Code, so the MCP server knows where to operate.
 
 The repository contains the framework source. The vault you point TARS at is the live runtime workspace.
 
@@ -56,14 +67,25 @@ scripts/
 
 ## Integrations
 
-TARS is strongest when it has calendar and task access, but the framework treats integrations generically. Skills look for configured calendar and task providers through MCP or through metadata stored in `_system/integrations.md`.
+TARS is strongest when it has calendar and task access, but the framework treats integrations generically. Skills look for configured providers through `_system/integrations.md` (capability-preference map, v3.1 format) and `_system/tools-registry.yaml` (auto-discovered by the SessionStart hook, 24-hour TTL). All skill calls resolve via `mcp__tars_vault__resolve_capability(capability=…)` — no hardcoded server names.
+
+Capabilities TARS understands out of the box: `calendar`, `tasks`, `email`, `meeting-recording`, `office-docs`, `file-storage`, `design`, `data-warehouse`, `analytics`, `project-tracker`, `documentation`, `monitoring`, `communication`.
 
 Recommended setup rules:
 - connect calendar access so briefings and meeting matching can use real events
 - connect task access so reviewed tasks can sync into your external system
+- connect a meeting-recording provider (Minutes.app, Microsoft 365 with recordings, etc.) so `/meeting` can import transcripts directly instead of requiring paste
 - keep `.mcp.json` or equivalent integration configuration beside the vault or repository as appropriate for your environment
 
 If integrations are not configured, TARS still works for local memory, journal, transcripts, strategic analysis, and communication drafting. Briefings and meeting processing simply lose some automation.
+
+### First semantic search — FastEmbed model download
+
+The first time `/answer` or any skill triggers a semantic search, FastEmbed downloads the `BAAI/bge-small-en-v1.5` model (~80 MB). The cache lives at `_system/embedding-cache/` and is gitignored. If the download fails, TARS falls back to FTS-only retrieval and surfaces the gap in the answer.
+
+### Office output prerequisites
+
+`/create` delegates `.pptx`, `.docx`, `.xlsx`, `.pdf`, and HTML rendering to Anthropic's first-party skills. `/welcome` probes which are available in your Claude Code install and stores the list in `_system/config.md.tars-anthropic-skills`. If a format is missing, `/create` informs you with a one-line install hint and falls back to markdown-only for that session.
 
 ## Your first workflows
 
@@ -102,7 +124,15 @@ Use this for extraction, review, reprioritization, and completion. TARS does not
 /answer What do I know about the platform rewrite?
 ```
 
-TARS answers from memory first, then tasks, then journal, then transcript archives, then integrations. Internal questions should not depend on web search.
+TARS answers from memory first (FTS5 over `memory/**`), then tasks, then journal + transcripts via hybrid semantic-plus-FTS retrieval, then transcript-archive fallback, then integrations. Internal questions should not depend on web search.
+
+### Vault lint
+
+```text
+/lint
+```
+
+Runs deterministic checks (schema, broken links, stale memory, task escalation, telemetry signals) and surfaces proposed fixes for review. Runs nightly as a scheduled cron job once `/maintain register-crons` has been executed.
 
 ### Strategic work
 
@@ -154,3 +184,5 @@ If you want to understand the system in more depth:
 - read [README.md](README.md) for the product overview
 - read [ARCHITECTURE.md](ARCHITECTURE.md) for the full framework model
 - read [CLAUDE.md](CLAUDE.md) for the live agent operating rules
+- read [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) if you are upgrading a v3.0 vault
+- read [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) to use TARS from a phone via Claude Remote Control
