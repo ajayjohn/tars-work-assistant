@@ -50,14 +50,11 @@ tars/
 ├── scripts/githooks/         prepare-commit-msg + pre-push authorship guards
 ├── tests/                    Validators, fixtures, and smoke tests
 ├── archive/historical/       Retired legacy rebuild docs (pre-v3.0)
-├── docs/                     HANDOFF notes + v3.1 migration/release/mobile guides
+├── docs/                     User and developer guides (architecture, build, migration, mobile)
 ├── build-plugin.sh           Supported packaging entrypoint
 ├── requirements.txt          Pinned runtime deps: mcp, fastembed, sqlite-vec
 ├── CLAUDE.md                 Live agent operating rules
 ├── README.md
-├── GETTING-STARTED.md
-├── ARCHITECTURE.md
-├── BUILD.md
 ├── CHANGELOG.md
 └── CONTRIBUTING.md
 ```

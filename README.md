@@ -90,14 +90,13 @@ TARS is designed to preserve signal and avoid silent drift:
 ## Documentation map
 
 Start here depending on what you need:
-- [GETTING-STARTED.md](GETTING-STARTED.md) for setup and first workflows
-- [ARCHITECTURE.md](ARCHITECTURE.md) for the current system model
-- [BUILD.md](BUILD.md) for packaging and release mechanics
+- [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) for setup and first workflows
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current system model
+- [docs/BUILD.md](docs/BUILD.md) for packaging and release mechanics
 - [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](CHANGELOG.md) for release history
-- [CATALOG.md](CATALOG.md) for the product and adoption overview
+- [docs/CATALOG.md](docs/CATALOG.md) for the product and adoption overview
 - [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration
-- [docs/RELEASE-v3.1.0.md](docs/RELEASE-v3.1.0.md) for the v3.1.0 release runbook
 - [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) for Claude Remote Control on mobile
 
 ## License

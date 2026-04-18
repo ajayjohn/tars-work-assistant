@@ -146,6 +146,5 @@ Expect 45–90 minutes end-to-end for the migration of a vault in the 3× scale 
 
 ## Related docs
 
-- [docs/RELEASE-v3.1.0.md](RELEASE-v3.1.0.md) — the user-run build, tag, and publish runbook (after migration validates).
 - [docs/MOBILE-USAGE.md](MOBILE-USAGE.md) — using TARS from iOS / Android via Claude Remote Control.
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — full v3.1 system model.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — full v3.1 system model.
