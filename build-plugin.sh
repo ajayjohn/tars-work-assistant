@@ -7,7 +7,8 @@ echo "Building TARS v3 plugin..."
 rm -rf tars-cowork-plugin
 
 # Create v3 distribution structure
-mkdir -p tars-cowork-plugin/{skills,scripts,templates,_system,_views,.claude-plugin,.claude/skills}
+mkdir -p tars-cowork-plugin/{skills,scripts,templates,_system,_views,hooks,.claude-plugin,.claude/skills}
+mkdir -p tars-cowork-plugin/mcp/tars-vault
 
 # Copy v3 content from source
 cp -r skills/* tars-cowork-plugin/skills/
@@ -16,7 +17,14 @@ cp -r templates/* tars-cowork-plugin/templates/
 cp -r _system/* tars-cowork-plugin/_system/
 cp -r _views/* tars-cowork-plugin/_views/
 cp -r .claude/skills/* tars-cowork-plugin/.claude/skills/
-cp LICENSE CLAUDE.md tars-cowork-plugin/
+cp LICENSE CLAUDE.md requirements.txt tars-cowork-plugin/
+
+# Copy the tars-vault MCP server (required for all /tars:* skill writes).
+# Excludes __pycache__ and tests/ — tests/ ships separately in the repo checkout.
+rsync -a --exclude '__pycache__' --exclude 'tests' mcp/tars-vault/ tars-cowork-plugin/mcp/tars-vault/
+
+# Copy hooks (plugin auto-registers them via hooks/hooks.json).
+rsync -a --exclude '__pycache__' hooks/ tars-cowork-plugin/hooks/
 
 # Copy .mcp.json if it exists
 [ -f .mcp.json ] && cp .mcp.json tars-cowork-plugin/
