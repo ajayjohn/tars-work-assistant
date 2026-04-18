@@ -4,8 +4,8 @@
 
 This document describes the current framework architecture after the v3.1 "harden, simplify, and extend" release.
 
-**Version**: 3.1.0  
-**Release**: (v3.1.0-dev, see `CHANGELOG.md`)  
+**Version**: 3.1.1  
+**Release**: 2026-04-18 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Obsidian vault runtime
 
 ## Three operations (Karpathy framing)

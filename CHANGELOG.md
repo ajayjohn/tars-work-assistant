@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.1.1 (2026-04-18)
+
+**Patch — make the `tars-vault` MCP server actually work.**
+
+The v3.1.0 release shipped the Python MCP harness as a Phase-1a skeleton: `run_stdio()` instantiated a `Server` object but never entered the request loop, so the process exited immediately on launch and Claude Code reported the server as failed to connect. 13 of 17 tool handlers raised `NotImplementedError`. This release lands real, minimal-but-correct implementations so `/tars:*` skills can function end-to-end.
+
+### Changed — `mcp/tars-vault/`
+
+- **`server.py` — real request loop.** `run_stdio()` now wires `list_tools` and `call_tool` handlers against the MCP Python SDK's `Server` + `stdio_server`, returns `InitializationOptions(server_name="tars-vault", server_version="3.1.1", ...)`, and blocks on `server.run(read, write, init_opts)`. Tool dispatch runs synchronous handlers via `asyncio.to_thread` and wraps all exceptions so a bad handler can't kill the server.
+- **`_common.py` (new).** Stdlib-only frontmatter parser + serializer supporting scalars, flow/block lists, and one-level nested mappings — the subset TARS frontmatter actually uses. No PyYAML runtime dependency.
+- **`tools/read_note.py`** — reads a note, returns parsed frontmatter + body + path.
+- **`tools/create_note.py`** — writes a new note with schema-light validation; rejects non-tars-prefixed keys unless `allow_user_properties=true`; refuses to overwrite unless `overwrite=true`.
+- **`tools/write_note_from_content.py`** — alias of `create_note` (template-free path, resolves issue-obsidian-template-not-configured).
+- **`tools/append_note.py`** — appends with automatic 40KB chunking (resolves issue-obsidian-append-large-content).
+- **`tools/update_frontmatter.py`** — upserts or deletes frontmatter keys; same prefix-enforcement as `create_note`.
+- **`tools/search_by_tag.py`** — walks the vault, parses frontmatter, matches exact tag or (with `prefix_match=true`) tag prefix.
+- **`tools/archive_note.py`** — archives into `archive/YYYY-MM/` with guardrails: refuses if note carries a durable tag (`tars/decision`, `tars/org-context`) or `tars-archive-exempt: true`, unless `force=true`. Uses `move_note` internally so wikilink refs follow.
+- **`tools/move_note.py`** — moves a note and rewrites path-qualified wikilinks (`[[folder/old]]` and `[[folder/old|alias]]`) across the vault.
+- **`tools/classify_file.py`** — path-based classifier for the Organization Engine. Rule set covers resumes, walkthroughs, meeting prep, DBI/data-hub, research/strategy/roadmap, and screening-interview-CV docs; falls through to `contexts/misc/` at low confidence.
+- **`tools/detect_near_duplicates.py`** — three similarity signals (content SHA-256, normalized filename, body-prefix hash) with cluster reporting.
+- **`tools/resolve_capability.py`** — reads `_system/integrations.md` preferences + `_system/tools-registry.yaml` discovered state; prefers connected servers, falls back to declared, returns `unresolved` with reason when nothing covers a capability.
+- **`tools/refresh_integrations.py`** — shells out to `scripts/discover-mcp-tools.py` and returns the updated registry path.
+- **`tools/scan_secrets.py`** — stdlib-only guardrail loader + matcher; classifies content as `clean`/`warn`/`block` against `_system/guardrails.yaml`.
+
+### Changed — `scripts/`
+
+- **`fix-wikilinks.py` — real implementation.** Applies the four regex transforms documented in the v3.0 → v3.1 migration runbook (`[[[[X]]|X]]` → `[[X]]`, `[[[[X]]|Y]]` → `[[X|Y]]`, `[[[X|Y]]` → `[[X|Y]]`, defensive `[[[[X]]` → `[[X]]`). Writes per-file `.pre-v3.1-wiki-backup`. `--skip-dirs` defaults to `.git,.claude,.obsidian,archive`. Honors the PRD §26.15 migration-script contract (clean-worktree check before `--apply`).
+- **`discover-mcp-tools.py` — real implementation.** Reads `.mcp.json`, classifies servers via a short-name hint table + command/URL regex, probes `claude mcp list` status when available, and emits a `_system/tools-registry.yaml` with capability coverage, transport, and ttl.
+
+### Added — tests
+
+- **`mcp/tars-vault/tests/test_tools.py`** — 14 stdlib-only unit tests covering the write path (create/read/append/update), search, classify, dedupe, move+wikilink-rewrite, archive guardrails, capability resolution, and secret classification. All pass.
+
+### Known remaining gaps (v3.2 candidates)
+
+- No dedicated `resolve_alias` tool; alias lookups still route through `search_by_tag` + direct read of the alias-registry markdown. Adequate for v3.1.1 skill prose, but a single-call tool would tighten the read path.
+- `discover-mcp-tools.py` only probes `claude mcp list` for connection status — it does not invoke each server's `tools/list` to enumerate tool names. The `tools:` arrays in the generated registry are empty; capability coverage comes from the short-name hint table alone.
+- `fix-wikilinks.py` is regex-only; it does not consult the alias registry to propose canonical targets for unresolved links. The ~247 broken links surfaced after the v3.0 → v3.1 wikilink repair remain broken until v3.2 adds auto-stub creation.
+
 ## v3.1.0 (2026-04-17)
 
 **TARS 3.1: Harden, simplify, and extend — hooks, MCP wrappers, hybrid retrieval, office productivity**
