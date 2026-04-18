@@ -1,23 +1,48 @@
 #!/usr/bin/env bash
 # TARS v3.1 authorship-enforcement hook (pre-push).
 # Reject pushing any NEW commit that contains Claude attribution. Belt-and-braces
-# with the prepare-commit-msg hook. Scope is "commits this push would introduce
-# that aren't already on any remote" — so pushing a tag that points at a commit
-# already on origin/main does not re-scan pre-hook history.
+# with the prepare-commit-msg hook.
+#
+# Scope: "commits this push would introduce that aren't already published on any
+# remote-tracking ref." Use `--not --remotes` so we:
+#   * never re-scan history already on origin (pre-hook legacy commits pass)
+#   * handle tag updates where remote_sha is an annotated-tag-object we don't have
+#     fetched locally (the range remote_sha..local_sha would otherwise blow up)
+#   * handle tag creation and branch creation uniformly
+#
+# For branch updates (known remote_sha), we still compute the range as a fast
+# path — it's semantically equivalent when the remote-tracking refs are current.
 remote="$1"
 url="$2"
 zero=0000000000000000000000000000000000000000
+
+# Returns 0 if the given commit-ish is resolvable in this repo, 1 otherwise.
+resolvable() {
+  git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
+}
+
 while read local_ref local_sha remote_ref remote_sha; do
+  # Branch/tag deletion push — nothing to scan.
   if [ "$local_sha" = "$zero" ]; then
     continue
   fi
-  if [ "$remote_sha" = "$zero" ]; then
-    # New ref (branch or tag). Scan only commits reachable from local_sha that
-    # are NOT already reachable from any remote ref — i.e., net-new history.
-    new_commits=$(git log --format='%B' "$local_sha" --not --remotes)
-  else
-    new_commits=$(git log --format='%B' "${remote_sha}..${local_sha}")
-  fi
+
+  case "$local_ref" in
+    refs/tags/*)
+      # Tag push (create or update). remote_sha (when non-zero) is the remote
+      # tag-object sha which may not be in our object store. Always scope via
+      # `--not --remotes` for tags.
+      new_commits=$(git log --format='%B' "$local_sha" --not --remotes)
+      ;;
+    *)
+      if [ "$remote_sha" = "$zero" ] || ! resolvable "$remote_sha"; then
+        new_commits=$(git log --format='%B' "$local_sha" --not --remotes)
+      else
+        new_commits=$(git log --format='%B' "${remote_sha}..${local_sha}")
+      fi
+      ;;
+  esac
+
   if printf '%s' "$new_commits" | grep -qiE '(co-authored-by:[[:space:]]*claude|🤖|generated with \[?claude code\]?)'; then
     echo "ERROR: new commits pushed to $local_ref contain Claude attribution. Push rejected." >&2
     exit 1
