@@ -115,7 +115,11 @@ def parse_simple_yaml(src: str) -> dict[str, Any]:
         block_text = "\n".join(block)
         if re.search(r"^\s*-\s", block_text, re.MULTILINE):
             result[key] = _parse_block_list(block_text)
-        elif re.search(r"^\s*[^:\s-]+:\s", block_text, re.MULTILINE):
+        elif re.search(r"^\s+[^-\s][^:]*:\s", block_text, re.MULTILINE):
+            # Indented `key: value` line whose key starts with a non-dash char.
+            # The leading `\s+` ensures we're inside a nested block; `[^-\s]`
+            # rejects list-item dashes; subsequent `[^:]*` allows hyphens
+            # inside identifiers like `tars-bluf-level`.
             result[key] = _parse_nested_mapping(block_text)
         else:
             # Folded/literal scalar — take trimmed content.

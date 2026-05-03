@@ -70,6 +70,18 @@ Populated during onboarding (`/welcome`). Read from `_system/config.md`.
 - **Company**: {company}
 - **Industry**: {industry}
 
+### Persona + engagement mode
+
+`_system/install.yaml` carries two fields that subtly shape every other skill:
+
+- `persona`: one of `product-leader`, `sales-customer-facing`, `delivery-pm`, `data-science-lead`, `architect-staff-eng`, `support-ops-lead`, `engineering-manager`, or empty. Seeds `tars-bluf-level`, `tars-default-analysis-mode`, `tars-review-gate-strictness`, `tars-briefing-style`, and `tars-briefing-sections` in `_system/config.md` during onboarding. Skills should read those derived `tars-*` keys from `config.md` rather than re-deriving from the persona — the persona is the seed, not the running config.
+- `mode`: `standard` (default) or `casual`. In casual mode the router and write-side skills should:
+  - Skip review gates for low-stakes byproducts of `/create`, `/communicate`, `/think` (entity mentions, draft auto-files). High-stakes writes (people, decisions, performance, tasks) still confirm.
+  - Suppress staleness/drift/curator proposals on session start. The user opted out of the weekly cron; surfacing the same noise on every session would defeat the point.
+  - Auto-file `/create` outputs to `contexts/artifacts/YYYY-MM/` and `/communicate` drafts to `journal/YYYY-MM/` without companion files or schema review.
+
+Both fields are loaded at session start by hooks; skills can read via `mcp__tars_vault__read_note(file="install")` and consult `frontmatter.mode`.
+
 ### Integrations — provider-agnostic resolver
 
 TARS is provider-agnostic. Skills NEVER hard-code MCP server names (no `mcp__apple_calendar__list_events`, no `mcp__microsoft_365_*`). Instead, resolve the appropriate tool via capability:
