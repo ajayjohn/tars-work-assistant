@@ -1,7 +1,7 @@
 # TARS Frontmatter Schema Definitions
 # Used by scripts/validate-schema.py to enforce data quality
 # All TARS properties use the tars- prefix
-# Schema version: 3.1.0 (tracked in this comment — the validator treats any
+# Schema version: 3.2.0 (tracked in this comment — the validator treats any
 # top-level key as an entity type, so the version lives in a comment rather
 # than a top-level scalar).
 

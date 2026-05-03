@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.1 Architecture
+# TARS 3.2 Architecture
 
-This document describes the current framework architecture after the v3.1 "harden, simplify, and extend" release.
+This document describes the current framework architecture after the v3.2 "persistence, cold-start, wikilink hygiene, and self-improvement plumbing" release.
 
-**Version**: 3.1.1  
-**Release**: 2026-04-18 — see `CHANGELOG.md`  
+**Version**: 3.2.0  
+**Release**: 2026-05-03 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Obsidian vault runtime
 
 ## Three operations (Karpathy framing)

@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.2.0 (unreleased)
+## v3.2.0 (2026-05-03)
 
 **Persistence, cold-start, wikilink hygiene, and self-improvement plumbing.**
 
