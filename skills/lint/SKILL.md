@@ -66,6 +66,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Contradictions across related notes | LLM pass over entities co-linked in last 90d | No | Flag; do NOT auto-resolve |
 | Unfiled journal entries (loose `journal/YYYY-MM-DD.md` at journal root) | path check | Yes | Propose `mcp__tars_vault__move_note` into `journal/YYYY-MM/` |
 | Framework self-state drift (`_system/maturity.yaml` vs actual counts; `housekeeping-state.yaml` last_run vs telemetry) | vault scan + telemetry | Yes | Propose update via `update_frontmatter` |
+| Install record health (`_system/install.yaml` missing, empty `vault_path`, `vault_path` ≠ current vault root, `plugin_version` older than `.claude-plugin/plugin.json`) | direct read of `_system/install.yaml` and `.claude-plugin/plugin.json` | Partial (refresh `last_session_at` and `plugin_version`; rest needs user) | Propose `/welcome --relocate` for path mismatch; auto-refresh trivial fields |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
 | Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
 | Telemetry lint — memories saved 90d ago never re-read (durability miss) | `_system/telemetry/*.jsonl` → `memory_persisted` vs subsequent `vault_write`/`answer_delivered` hits | No | Surface for user review |

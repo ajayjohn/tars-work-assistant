@@ -212,6 +212,16 @@ plugin_version: "3.0.0"
 
 **_system/schemas.yaml** -- Frontmatter validation schemas for all entity types (person, vendor, competitor, product, initiative, decision, org-context, journal, task, transcript, companion). Each schema lists required and optional properties with types.
 
+**_system/install.yaml** -- Vault-specific install record. Use the `templates/install.yaml` shape and fill in:
+- `vault_path`: the absolute path to this vault (the folder we just scaffolded). Hooks use this on every session start to detect a moved/duplicated vault and refuse silent writes from a stale folder.
+- `installation_id`: a UUID generated once per install (use `python3 -c "import uuid; print(uuid.uuid4())"` via Bash, or any equivalent generator). Travels with telemetry events.
+- `persona`: leave empty here; Step 5 (or the Phase 3 persona-pick step) writes the chosen persona key.
+- `mode`: default `standard`. The Phase 3 welcome rewrite asks the user "Will you use TARS daily, or only for occasional tasks?" and writes `casual` for the latter; until that lands, leave the default.
+- `plugin_version`: read from `.claude-plugin/plugin.json` so /lint can detect stale installs that need migration.
+- `created` and `last_session_at`: current ISO-8601 timestamp.
+
+Write the file via `mcp__tars_vault__write_note_from_content(file="_system/install.yaml", content=…)`. Do not write secrets here — `install.yaml` is checked-in alongside the rest of `_system/`.
+
 ### 2c: Templates
 
 Create Obsidian templates in `templates/`:

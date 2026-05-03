@@ -1,27 +1,46 @@
 #!/usr/bin/env python3
 """SessionStart hook. Observability-only — never exits non-zero.
 
-Phase 1a skeleton. Reads the event, records the session-start timestamp if the
-vault is available, and emits no additional context. Full banner logic (stale
-housekeeping-state, cron health, alias head-load) lands in later phases per
-PRD §3.2 and §3.5.
+Phase 1 (v3.2): adds vault-path validation. If install.yaml.vault_path
+disagrees with the current working directory, surface a loud warning via
+``additionalContext`` so the user notices before any write happens.
+
+Banner content beyond the mismatch warning, cron-job re-registration, and
+integrations-registry refresh are still pending later phases.
 """
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import in_recursion, read_event, vault_path, write_output
+from _common import in_recursion, read_event, resolve_vault, write_output
+
+
+def _build_context(status: dict) -> str:
+    if status.get("mismatch"):
+        install = status.get("install") or {}
+        stored = install.get("vault_path") or "(unset)"
+        return (
+            "TARS install warning: this folder does not match the vault recorded in "
+            "_system/install.yaml.\n"
+            f"  Recorded vault_path: {stored}\n"
+            "  If you moved or copied the vault, run /welcome --relocate to update "
+            "the install record. Until then, writes are discouraged from this folder."
+        )
+    if status.get("source") == "cwd-config":
+        return (
+            "TARS notice: this vault has no _system/install.yaml. Run /welcome to "
+            "create one — until then, vault-move detection is disabled."
+        )
+    return ""
 
 
 def main() -> int:
     _event = read_event()
     if in_recursion():
         return 0
-    _vault = vault_path()
-    # Phase 1a: skeleton only. Emit empty additionalContext so the harness sees
-    # a valid response. Later phases populate banners + registry refresh.
-    write_output({"hookSpecificOutput": {"additionalContext": ""}})
+    _vault, status = resolve_vault()
+    write_output({"hookSpecificOutput": {"additionalContext": _build_context(status)}})
     return 0
 
 

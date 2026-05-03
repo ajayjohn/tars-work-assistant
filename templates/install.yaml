@@ -1,0 +1,35 @@
+# TARS install state — vault-specific configuration written by /welcome.
+#
+# This file lives at _system/install.yaml inside the user's vault. It records
+# which folder TARS believes is the active vault (vault_path) plus per-install
+# preferences. Hooks consult it on every session start to detect a moved or
+# duplicated vault before any write happens.
+#
+# Edit only via /welcome or /lint --actions; manual edits may be overwritten.
+# If you need to relocate the vault, run /welcome --relocate.
+
+# Absolute path to the vault. Hooks compare this against the current working
+# directory; a mismatch triggers a loud warning and refuses silent writes.
+vault_path: ""
+
+# Stable identifier for this install. Used by telemetry to disambiguate vaults
+# across machines without leaking the path.
+installation_id: ""
+
+# Persona seeded during onboarding. One of: product-leader,
+# sales-customer-facing, delivery-pm, data-science-lead, architect-staff-eng,
+# support-ops-lead, engineering-manager. Empty until /welcome runs.
+persona: ""
+
+# Engagement mode. 'standard' enables weekly maintenance, drift checks, and
+# review queues. 'casual' skips weekly cron registration and review prompts
+# for low-stakes auto-captured artifacts. Default is 'standard'.
+mode: standard
+
+# Plugin version that wrote this file; helps lint detect stale installs that
+# need migration.
+plugin_version: ""
+
+# ISO-8601 timestamps. Updated by SessionStart on each successful resolution.
+created: ""
+last_session_at: ""

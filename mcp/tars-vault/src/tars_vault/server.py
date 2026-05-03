@@ -254,6 +254,44 @@ def _resolve_default_vault(vault_path: str | None) -> str:
     return vault_path or os.environ.get("TARS_VAULT_PATH") or ""
 
 
+def _check_install_record(vault_path: str) -> None:
+    """Emit a stderr warning if _system/install.yaml disagrees with vault_path.
+
+    Hooks already enforce the deny path; this is a server-side observability
+    breadcrumb so operators see the same warning regardless of transport.
+    """
+    if not vault_path:
+        return
+    try:
+        from pathlib import Path
+        import re
+
+        vault = Path(vault_path).expanduser().resolve()
+        install_path = vault / "_system" / "install.yaml"
+        if not install_path.is_file():
+            return
+        text = install_path.read_text(encoding="utf-8")
+        stored = ""
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            m = re.match(r"^vault_path\s*:\s*(.*?)\s*$", line)
+            if m:
+                stored = m.group(1).strip().strip('"').strip("'")
+                break
+        if stored and Path(stored).expanduser().resolve() != vault:
+            print(
+                f"tars-vault: install.yaml vault_path={stored} disagrees with "
+                f"server vault={vault}. Hooks should be denying mutations; "
+                "run /welcome --relocate to reconcile.",
+                file=sys.stderr,
+            )
+    except Exception:
+        # Never let the check take down the server.
+        return
+
+
 def run_stdio(vault_path: str) -> int:
     """Run the MCP server on stdio. Blocks until the transport closes.
 
@@ -273,6 +311,7 @@ def run_stdio(vault_path: str) -> int:
         return 3
 
     default_vault = _resolve_default_vault(vault_path)
+    _check_install_record(default_vault)
     server = Server("tars-vault")
 
     @server.list_tools()
