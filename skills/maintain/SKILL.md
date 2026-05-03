@@ -163,35 +163,11 @@ recent_journals = mcp__tars_vault__search_by_tag(
 
 Surface for user decision: update profile with recent insights (routes to `/learn`) or accept staleness.
 
-### Step 4: Telemetry rollup
+### Step 4: Report + telemetry
 
-Read today's and the prior 13 days' `_system/telemetry/YYYY-MM-DD.jsonl` files and compute a 14-day per-skill rollup. Persist as a markdown note for `_views/skill-activity.base`:
+(Telemetry rollup moved to `/lint` per the v3.1 boundary; the rollup script `scripts/telemetry-rollup.py` is the single source of truth and is consumed by `/briefing` weekly footer + `/maintain --weekly`. Source `.jsonl` retention is 90 days rolling — older files move to `_system/telemetry/archive/YYYY-MM.jsonl.gz` on the weekly maintenance run.)
 
-```
-mcp__tars_vault__create_note(
-  path="journal/YYYY-MM/skill-activity-rollup.md",
-  name="skill-activity-rollup",
-  frontmatter={
-    "tags": ["tars/telemetry-rollup"],
-    "tars-rollup-window": "14d",
-    "tars-skill-invocations": {"meeting": N, "answer": N, …},
-    "tars-vault-writes": N,
-    "tars-memory-accepted": N,
-    "tars-tasks-persisted": N,
-    "tars-answer-hit-tiers": {"tier1": N, "tier2": N, "tier3": N},
-    "tars-lint-findings": {"critical": N, "warnings": N, "auto_fixable": N},
-    "tars-created": "YYYY-MM-DD",
-    "tars-modified": "YYYY-MM-DD"
-  },
-  body="<narrative summary of trends>"
-)
-```
-
-One rollup per month; overwrite in place on each sync. Retention of the source `.jsonl` files is 90 days rolling — older files move to `_system/telemetry/archive/YYYY-MM.jsonl.gz` on the Friday 17:00 maintenance run.
-
-### Step 5: Report + telemetry
-
-Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles, rollup_written}` counts. PostToolUse hook writes the daily-note summary.
+Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. PostToolUse hook writes the daily-note summary.
 
 ---
 
@@ -223,6 +199,66 @@ Archive all / select specific / skip
 
 4. For approved items: `mcp__tars_vault__archive_note(file=…)`. The server applies the `tars/archived` tag, moves to `archive/<entity-type>/YYYY-MM/`, and logs.
 5. Also sweep `inbox/processed/`: items older than 7 days (by `tars-inbox-processed` date) move to `archive/inbox/YYYY-MM/`. Never deletes originals.
+
+---
+
+## Weekly mode (`/maintain --weekly`)
+
+Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user. Casual-mode installs do NOT register this cron; the mode still works on demand if invoked manually.
+
+Why this exists: Claude does not run in the background, so every periodic feature in TARS (telemetry rollup, backlog grouping, staleness/drift/curator proposals) needs a single trigger that opens a session and produces a persistent surface. The cron-fired session ends without a human present, so the only output is a numbered review file the user reads on their next session.
+
+Pipeline:
+
+1. **Telemetry rollup snapshot.** Run `scripts/telemetry-rollup.py --vault $TARS_VAULT_PATH --days 7 --format json` and capture the output. Save the rendered text version to `_system/changelog/YYYY-MM-DD.md` under a "Weekly telemetry rollup" heading so the changelog has a permanent record.
+
+2. **Backlog auto-grouping.** Read every note under `_system/backlog/issues/` (already created by self-evaluation in /core). Group by `tars-issue-type` and the originating skill. Compute a count per group and the most-recent occurrence. Items with `tars-occurrence-count >= 3` over the last 14 days surface as "skill X is failing repeatedly" entries. Never auto-edits any skill — surfacing only.
+
+3. **Lint review queue.** Invoke `/lint --actions` (Phase 5) — see Step 6.5 of `skills/lint/SKILL.md`. Capture the materialized numbered queue.
+
+4. **(Phase 6) User-model + workflow proposals.** When `/learn` and `_system/workflows.yaml` ship, re-run pattern detection over the last 14 days of telemetry and append proposals to the same review queue.
+
+5. **(Phase 7) Curator proposals.** When the curator ships, append memory-staleness (90d), workflow-staleness (60d), and persona-drift (30d telemetry, 14d cooling-off) proposals to the same queue.
+
+6. **Materialize the weekly review file.** Write everything to `inbox/pending/weekly-review-YYYY-MM-DD.md` via `mcp__tars_vault__write_note_from_content`:
+
+   ```
+   ---
+   tags: [tars/inbox, tars/weekly-review]
+   tars-source: maintain-weekly
+   tars-created: YYYY-MM-DD
+   tars-status: pending
+   tars-window-start: <YYYY-MM-DD>
+   tars-window-end:   <YYYY-MM-DD>
+   ---
+
+   # Weekly review — YYYY-MM-DD
+
+   ## Telemetry rollup (last 7 days)
+   <text from telemetry-rollup.py>
+
+   ## Backlog signals
+   <grouped issues with counts>
+
+   ## Lint actions
+   <numbered queue from /lint --actions>
+
+   ## (Phase 6+) User-model + workflow proposals
+   <proposals if any>
+
+   ## (Phase 7+) Curator proposals
+   <proposals if any>
+
+   ## How to act
+   - Reply with `auto-fix all`, `auto-fix N,M`, `review each`, or `skip` for the lint queue.
+   - Approve or dismiss curator items individually by number.
+   ```
+
+7. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for the cooling-off windows used in Phases 6/7.
+
+8. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, review_file_path}`.
+
+The cron-fired session ends here. The user reviews `inbox/pending/weekly-review-YYYY-MM-DD.md` on their next interactive session via the existing inbox-surfacing flow in `/maintain inbox`.
 
 ---
 

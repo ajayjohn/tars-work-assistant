@@ -41,7 +41,9 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 |---------|------|----------------|
 | `lint`, `lint vault`, no argument | All checks | Yes (nightly, see §26.7) |
 | `lint --focus links` / `check broken links` | Broken-link + wikilink-artifact subset | No |
-| `lint --actions wikilinks` | Run `scripts/fix-wikilinks.py --repair-broken --dry-run` and surface `auto_safe` / `needs_review` / `unresolvable` buckets as numbered options | No |
+| `lint --actions` | Run all checks in dry-run, then materialize each fixable finding as a numbered option in a single review queue. Same surface as `lint --actions wikilinks` but spans every check. Used directly by users and as a sub-step of `/maintain --weekly` | No |
+| `lint --actions wikilinks` | Subset: only wikilink remediations (auto_safe / needs_review / unresolvable buckets from `scripts/fix-wikilinks.py --repair-broken --dry-run`) | No |
+| `lint --actions curator` | Subset: memory-staleness (90d) + workflow-staleness (60d) + persona-drift proposals. Respects `tars-pinned: true`. Phase 7 finishes the wiring | No |
 | `lint --focus orphans` | Orphan + sparse subset | No |
 | `lint --focus schema` | Schema validation subset | No |
 | `lint --focus stale` | Staleness-tier subset | No |
@@ -172,6 +174,29 @@ mcp__tars_vault__move_note(src="journal/YYYY-MM-DD.md", dst="journal/YYYY-MM/YYY
 ```
 
 All writes flow through the `tars-vault` MCP server, which logs to `_system/changelog/YYYY-MM-DD.md` via the PostToolUse hook.
+
+### Step 6.5: --actions mode (queued review)
+
+When invoked as `lint --actions` (or `lint --actions <subset>`), do not present the report inline. Instead, materialize every fixable finding as a numbered option in a single review queue and write the queue to disk for asynchronous review:
+
+1. Run Steps 1–4 as usual; collect all findings with their classification.
+2. Filter to actionable buckets: `Critical` + `Warnings` + `Auto-fixable`. Drop `Informational`.
+3. Render a numbered queue with one line per item:
+
+   ```
+   N. [bucket] [check] file: short description → proposed fix
+   ```
+
+4. Caller is one of:
+   - **Interactive user** — render the queue inline; accept the same selection syntax as Step 5 (`auto-fix all`, `auto-fix 1,3`, `review each`, `skip`).
+   - **/maintain --weekly** — render the queue as a markdown section and append to `inbox/pending/weekly-review-YYYY-MM-DD.md`. Do not auto-apply anything. The user reviews on next session.
+
+5. Subset selectors filter to a single check class:
+   - `lint --actions wikilinks` → broken-link / artifact rows only (Phase 2)
+   - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only (Phase 7)
+   - `lint --actions` (no subset) → all of the above plus schema, framework, dedupe, sparse, telemetry-lint surfaces.
+
+6. Emit a `lint_actions_queued` telemetry event with `{count, subset, surface: "inline"|"weekly-review"}`.
 
 ### Step 7: Log and emit telemetry
 
