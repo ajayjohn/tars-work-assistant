@@ -43,6 +43,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | `lint --focus links` / `check broken links` | Broken-link + wikilink-artifact subset | No |
 | `lint --actions` | Run all checks in dry-run, then materialize each fixable finding as a numbered option in a single review queue. Same surface as `lint --actions wikilinks` but spans every check. Used directly by users and as a sub-step of `/maintain --weekly` | No |
 | `lint --actions wikilinks` | Subset: only wikilink remediations (auto_safe / needs_review / unresolvable buckets from `scripts/fix-wikilinks.py --repair-broken --dry-run`) | No |
+| `lint --actions patterns` | Subset: user-model + workflow proposals from `/learn --review-patterns` (Phase 6) | No |
 | `lint --actions curator` | Subset: memory-staleness (90d) + workflow-staleness (60d) + persona-drift proposals. Respects `tars-pinned: true`. Phase 7 finishes the wiring | No |
 | `lint --focus orphans` | Orphan + sparse subset | No |
 | `lint --focus schema` | Schema validation subset | No |
@@ -70,6 +71,9 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Unfiled journal entries (loose `journal/YYYY-MM-DD.md` at journal root) | path check | Yes | Propose `mcp__tars_vault__move_note` into `journal/YYYY-MM/` |
 | Framework self-state drift (`_system/maturity.yaml` vs actual counts; `housekeeping-state.yaml` last_run vs telemetry) | vault scan + telemetry | Yes | Propose update via `update_frontmatter` |
 | Install record health (`_system/install.yaml` missing, empty `vault_path`, `vault_path` ≠ current vault root, `plugin_version` older than `.claude-plugin/plugin.json`) | direct read of `_system/install.yaml` and `.claude-plugin/plugin.json` | Partial (refresh `last_session_at` and `plugin_version`; rest needs user) | Propose `/welcome --relocate` for path mismatch; auto-refresh trivial fields |
+| Observed-vs-declared drift (`_system/user-model.md` differs from `_system/config.md`: e.g. observed `tars-bluf-tolerance: low` vs declared `tars-bluf-level: high`) | direct read of both notes | No | Surface; recommend `/learn --review-patterns` or a manual config edit |
+| User-model staleness (`tars-last-pattern-scan` empty or older than 14d AND there is recent telemetry) | `_system/user-model.md` frontmatter + telemetry mtimes | No | Propose `/learn --review-patterns` |
+| Workflows registry health (`_system/workflows.yaml` missing, schema-invalid, or contains entries whose `last_used` is null after 60d AND not pinned) | direct read of the registry | No | Surface for review; retirement proposals come from Phase 7 curator |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
 | Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
 | Telemetry lint — memories saved 90d ago never re-read (durability miss) | `_system/telemetry/*.jsonl` → `memory_persisted` vs subsequent `vault_write`/`answer_delivered` hits | No | Surface for user review |
@@ -193,6 +197,7 @@ When invoked as `lint --actions` (or `lint --actions <subset>`), do not present 
 
 5. Subset selectors filter to a single check class:
    - `lint --actions wikilinks` → broken-link / artifact rows only (Phase 2)
+   - `lint --actions patterns` → user-model + workflow proposals only. Sources its candidate list from `/learn --review-patterns` (Phase 6); no telemetry re-aggregation here. Each proposal renders as `kind=user-model field=<f> before=<v> after=<v> evidence=<count>×<window>` or `kind=workflow id=<id> trigger="…" steps=[…]`. Selection: `accept all`, `accept N`, `review each`, `skip`. (Phase 6)
    - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only (Phase 7)
    - `lint --actions` (no subset) → all of the above plus schema, framework, dedupe, sparse, telemetry-lint surfaces.
 

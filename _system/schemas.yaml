@@ -276,3 +276,31 @@ idea:
   property_rules:
     tars-status:
       enum: [proposed, accepted, implemented, rejected]
+
+# Observed-preference user model (Phase 6, plan §R3). Single living note at
+# _system/user-model.md. Updated passively by /learn during /maintain --weekly
+# when a pattern repeats 3+ times in 14d of telemetry. Never auto-applied —
+# proposals land in inbox/pending/weekly-review-YYYY-MM-DD.md for review.
+user-model:
+  required_tags: [tars/user-model]
+  required_properties:
+    - tars-summary
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - tars-last-pattern-scan
+    - tars-bluf-tolerance
+    - tars-decision-speed
+    - tars-default-skill
+    - tars-meeting-cadence
+    - tars-recurring-concerns
+    - tars-vendor-sentiment
+    - tars-observed-skill-mix
+    - tars-pinned-fields
+  property_rules:
+    tars-bluf-tolerance:
+      enum: ["", high, medium, low]
+    tars-decision-speed:
+      enum: ["", fast, deliberate, slow]
+    tars-meeting-cadence:
+      enum: ["", daily, several-per-day, a-few-per-week, rare]

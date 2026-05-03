@@ -186,6 +186,8 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 2. If ambiguous between two routes, ask a bounded clarification question
 3. If no signal matches, default to `skills/answer/`
 4. Multiple signals can co-occur: process primary request, then trigger auto side-effects
+5. **Workflow aliases** — before falling through to default routing, check `_system/workflows.yaml` (Phase 6). If the request text matches a workflow's `trigger` (case-insensitive substring or exact `/<id>` match), execute the workflow's ordered `steps` list and increment its `use_count` + `last_used`. Workflow expansion is transparent — surface "Routing via workflow `<id>`" before invoking the first step.
+6. **Observed preferences** — read `_system/user-model.md` once per session and apply its non-empty fields as soft defaults. Examples: `tars-bluf-tolerance: low` biases output toward expanded detail; `tars-default-skill` only matters when the signal is genuinely ambiguous (a tiebreaker, not an override). Declared config in `_system/config.md` always wins over observed preferences when they conflict — `/lint` flags persistent drift between the two.
 
 ---
 

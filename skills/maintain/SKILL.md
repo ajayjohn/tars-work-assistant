@@ -216,7 +216,7 @@ Pipeline:
 
 3. **Lint review queue.** Invoke `/lint --actions` (Phase 5) — see Step 6.5 of `skills/lint/SKILL.md`. Capture the materialized numbered queue.
 
-4. **(Phase 6) User-model + workflow proposals.** When `/learn` and `_system/workflows.yaml` ship, re-run pattern detection over the last 14 days of telemetry and append proposals to the same review queue.
+4. **User-model + workflow proposals (Phase 6).** Invoke `/learn --review-patterns` (Mode C in `skills/learn/SKILL.md`) with the cron-fired surface flag so the call returns proposals as structured data instead of rendering inline. Append the structured proposals under a "User-model + workflow proposals" section in the review queue. Each row labels its kind (`user-model` field update or `workflow` proposal) plus the evidence count and 14-day window. Pinned fields (`tars-pinned-fields` in user-model, `pinned: true` in workflows) are skipped silently — surface a one-line "N pinned-field matches suppressed" notice if any were filtered.
 
 5. **(Phase 7) Curator proposals.** When the curator ships, append memory-staleness (90d), workflow-staleness (60d), and persona-drift (30d telemetry, 14d cooling-off) proposals to the same queue.
 
@@ -243,8 +243,10 @@ Pipeline:
    ## Lint actions
    <numbered queue from /lint --actions>
 
-   ## (Phase 6+) User-model + workflow proposals
-   <proposals if any>
+   ## User-model + workflow proposals
+   <numbered list of proposals from /learn --review-patterns; each labeled
+    user-model:<field> or workflow:<id>. Empty section heading retained
+    when no proposals so the structure stays predictable for /lint.>
 
    ## (Phase 7+) Curator proposals
    <proposals if any>
