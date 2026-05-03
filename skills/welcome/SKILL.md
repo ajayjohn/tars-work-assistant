@@ -350,7 +350,6 @@ Copy or verify the following obsidian-skills are present in `.claude/skills/`:
 | obsidian-bases | `.claude/skills/obsidian-bases/SKILL.md` + `references/` | .base file creation and querying |
 | obsidian-markdown | `.claude/skills/obsidian-markdown/SKILL.md` + `references/` | Markdown and frontmatter conventions |
 | json-canvas | `.claude/skills/json-canvas/SKILL.md` + `references/` | Canvas file creation |
-| defuddle | `.claude/skills/defuddle/SKILL.md` | Web content extraction |
 
 ### Installation procedure
 
@@ -699,7 +698,6 @@ Display a comprehensive summary of what was configured.
 - obsidian-bases: {installed | verified | missing}
 - obsidian-markdown: {installed | verified | missing}
 - json-canvas: {installed | verified | missing}
-- defuddle: {installed | verified | missing}
 
 ### Integrations
 - Calendar: {provider} ({connected | error | not configured})

@@ -93,7 +93,7 @@ Route each selected item to the appropriate skill. Between items, report progres
 
 - **Transcript** → invoke `/meeting` pipeline with the file content (steps 2–14).
 - **Image** → multimodal read, calendar correlation for timestamp, companion note via `mcp__tars_vault__create_note(template="companion", path="contexts/YYYY-MM/…")` with the §26.13 frontmatter contract, extracted tasks/facts routed through `/tasks` / `/learn`.
-- **Article/link** → `defuddle` extraction, then `/learn` wisdom mode.
+- **Article/link** → `WebFetch` extraction, then `/learn` wisdom mode.
 - **PDF** → text extraction, companion note, filed in `contexts/YYYY-MM/`.
 - **Tasks-only** → `/tasks` extract mode (accountability test + numbered review).
 - **Facts-only** → `/learn` memory mode (durability test + numbered review).

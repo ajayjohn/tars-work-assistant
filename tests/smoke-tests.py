@@ -251,7 +251,6 @@ def check_obsidian_skills(vault_path):
         "obsidian-bases/SKILL.md",
         "obsidian-markdown/SKILL.md",
         "json-canvas/SKILL.md",
-        "defuddle/SKILL.md",
     ]
 
     missing = [s for s in required if not (vault / ".claude" / "skills" / s).exists()]

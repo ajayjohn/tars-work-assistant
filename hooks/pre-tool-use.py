@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """PreToolUse hook.
 
-v3.2 enforces two safety rules at the hook layer:
+v3.2 enforces four safety rules at the hook layer (defense-in-depth: the
+in-house MCP server runs the same checks server-side, but the hook catches
+issues before the MCP ever sees the payload — including for Bash-driven
+writes that bypass the MCP):
 
   1. Refuse ``mcp__tars_vault__*`` mutations when ``_system/install.yaml``
      disagrees with the current working directory (Phase 1).
 
   2. Refuse mutations whose content payload contains wikilinks with smart
-     quotes or characters Obsidian forbids in filenames (Phase 2). The
-     in-house MCP server enforces the same rule for defense-in-depth, but
-     the hook catches the same issue before the MCP server ever sees the
-     payload — useful when the user runs Bash-driven writes.
+     quotes or characters Obsidian forbids in filenames (Phase 2).
 
-Other PreToolUse rules (40KB cap, ``tars-`` prefix enforcement) land in
-later phases.
+  3. Refuse `create_note` / `write_note_from_content` whose body exceeds
+     40,000 bytes — point the caller at `append_note`, which chunks
+     server-side (Phase 4).
+
+  4. Refuse `create_note` / `update_frontmatter` whose frontmatter (or
+     `updates` map) contains keys that are neither ``tars-`` prefixed nor
+     in the reserved set (`tags`, `aliases`), unless the caller passes
+     `allow_user_properties=true` (Phase 4).
 """
 import json
 import re
@@ -92,6 +98,78 @@ def _content_fields(tool_name: str, tool_input: dict) -> list[str]:
     return fields
 
 
+_NON_PREFIX_RESERVED = frozenset({"tags", "aliases"})
+_BODY_BYTE_LIMIT = 40_000
+
+
+def _check_payload_size(tool_name: str, tool_input: dict) -> str:
+    """Return a deny reason if a non-chunking write tool exceeds 40KB.
+
+    `append_note` is the chunking variant — it is *meant* to take large
+    payloads — so we only guard `create_note` / `write_note_from_content`.
+    """
+    if tool_name not in (
+        "mcp__tars_vault__create_note",
+        "mcp__tars_vault__write_note_from_content",
+    ):
+        return ""
+    body = tool_input.get("body")
+    if not isinstance(body, str):
+        return ""
+    n = len(body.encode("utf-8"))
+    if n > _BODY_BYTE_LIMIT:
+        return (
+            f"Refusing vault write: body is {n:,} bytes which exceeds the "
+            f"{_BODY_BYTE_LIMIT:,}-byte cap on {tool_name.split('__')[-1]}. "
+            "Use mcp__tars_vault__append_note (chunked) for large content, or "
+            "split the write across multiple notes."
+        )
+    return ""
+
+
+def _check_prefix(tool_name: str, tool_input: dict) -> str:
+    """Return a deny reason if frontmatter/updates contain non-tars keys.
+
+    Allows: tars-* keys; tags / aliases; anything when allow_user_properties=true.
+    """
+    if tool_name == "mcp__tars_vault__create_note":
+        fm = tool_input.get("frontmatter") or {}
+        if not isinstance(fm, dict):
+            return ""
+        if tool_input.get("allow_user_properties"):
+            return ""
+        bad = [
+            k for k in fm.keys()
+            if not k.startswith("tars-") and k not in _NON_PREFIX_RESERVED
+        ]
+        if bad:
+            return (
+                f"Refusing vault write: frontmatter keys "
+                f"{', '.join(repr(k) for k in bad)} are not tars-prefixed and "
+                "not reserved (tags, aliases). Pass allow_user_properties=true "
+                "to permit user-owned keys."
+            )
+        return ""
+    if tool_name == "mcp__tars_vault__update_frontmatter":
+        updates = tool_input.get("updates") or {}
+        if not isinstance(updates, dict):
+            return ""
+        if tool_input.get("allow_user_properties"):
+            return ""
+        bad = [
+            k for k in updates.keys()
+            if not k.startswith("tars-") and k not in _NON_PREFIX_RESERVED
+        ]
+        if bad:
+            return (
+                f"Refusing frontmatter update: keys "
+                f"{', '.join(repr(k) for k in bad)} are not tars-prefixed and "
+                "not reserved (tags, aliases). Pass allow_user_properties=true "
+                "to permit user-owned keys."
+            )
+    return ""
+
+
 def _deny(reason: str) -> None:
     write_output(
         {
@@ -124,9 +202,11 @@ def main() -> int:
         )
         return 0
 
+    ti = tool_input if isinstance(tool_input, dict) else {}
+
     # Rule 2: bad wikilinks in content payload.
     findings: list[str] = []
-    for chunk in _content_fields(tool_name, tool_input if isinstance(tool_input, dict) else {}):
+    for chunk in _content_fields(tool_name, ti):
         findings.extend(_scan_bad_wikilinks(chunk))
     if findings:
         _deny(
@@ -134,6 +214,18 @@ def main() -> int:
             "Use mcp__tars_vault__format_wikilink to form links. Findings: "
             + "; ".join(findings)
         )
+        return 0
+
+    # Rule 3: 40KB body cap on non-chunking write tools.
+    size_reason = _check_payload_size(tool_name, ti)
+    if size_reason:
+        _deny(size_reason)
+        return 0
+
+    # Rule 4: tars- prefix enforcement on frontmatter / updates.
+    prefix_reason = _check_prefix(tool_name, ti)
+    if prefix_reason:
+        _deny(prefix_reason)
         return 0
 
     write_output({})

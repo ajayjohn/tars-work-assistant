@@ -312,7 +312,7 @@ Pre-write hooks and the MCP server reject any `[[...]]` containing smart quotes 
 
 Every workflow must:
 
-1. **Append summary to daily note** via `obsidian daily:append`
+1. **Append summary to daily note** via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)` (the server resolves the daily-note path and chunks at 40 KB)
    ```
    ## Meeting processed: [[YYYY-MM-DD Meeting Title]]
    - Tasks: N created (of M extracted)

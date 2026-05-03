@@ -694,7 +694,7 @@ Save with flag for periodic review? [Y / Rephrase / Skip]
 
 **If saved with flag:**
 - Wrap the content in markers: `<!-- tars-flag:negative YYYY-MM-DD -->content<!-- end-tars-flag -->`
-- Set `tars-has-flagged-content: true` on the person's note via `obsidian property:set`
+- Set `tars-has-flagged-content: true` on the person's note via `mcp__tars_vault__update_frontmatter(file="memory/people/<name>", updates={"tars-has-flagged-content": true})`
 - Flagged content appears in the `_views/flagged-content.base` for periodic cleanup
 
 **If rephrase:** Ask user for alternative wording and save the rephrased version without a flag.
