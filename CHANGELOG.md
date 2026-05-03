@@ -1,5 +1,47 @@
 # Changelog
 
+## v3.2.0 (unreleased)
+
+**Persistence, cold-start, wikilink hygiene, and self-improvement plumbing.**
+
+A round of foundational work: every onboarded user can produce a useful day-1 briefing, broken backlinks stop accumulating and existing ones get repaired, the cron-fired weekly job actually has work to do, and observed preferences accrue without manual restating. Casual users who only use TARS for occasional decks/drafts/brainstorms are explicitly supported via a `mode: casual` toggle that gates review queues and weekly cron registration.
+
+### Added
+
+- **Persistent install record (`_system/install.yaml`).** Vault-specific record carrying `vault_path`, `installation_id`, `persona`, `mode`, `plugin_version`, and timestamps. Hooks consult it on every session start to detect a moved or duplicated vault and refuse silent writes.
+- **Persona templates (`templates/personas/`).** Seven starter profiles — product-leader, sales-customer-facing, delivery-pm, data-science-lead, architect-staff-eng, support-ops-lead, engineering-manager — each ~1.5 KB with `tars-config-defaults`, `tars-taxonomy-tags`, `tars-briefing-sections`, `tars-default-mode`. The wizard reads the chosen persona and applies its defaults to `_system/config.md` and `_system/taxonomy.md`.
+- **Engagement modes (`standard` | `casual`).** Casual mode skips Step 5 rounds 3-4 in welcome, registers only the daily-briefing cron (opt-in), and suppresses staleness/drift/curator proposals on session start. Power-user behavior is the default.
+- **Wikilink discipline (forward correctness).** New MCP tool `mcp__tars_vault__format_wikilink(text, kind)` resolves raw text into an Obsidian-safe wikilink via the alias registry and vault file lookup. Status taxonomy: `resolved`, `disambiguation_needed`, `new_entity`, `error`. Skills MUST use this instead of hand-forming `[[...]]`.
+- **Wikilink discipline (write-side rejection).** `create_note`, `append_note`, `write_note_from_content` reject content payloads containing wikilinks with smart quotes or Obsidian-illegal characters. The `pre-tool-use` hook runs the same scan as defense-in-depth.
+- **Wikilink retroactive repair.** `scripts/fix-wikilinks.py --repair-broken` scans every wikilink, classifies into `auto_safe` / `needs_review` / `unresolvable` buckets, and `--apply` only acts on `auto_safe`. The other two buckets surface via `/lint --actions wikilinks`. The four-pattern bracket repair from v3.1 is preserved.
+- **`_views/broken-links.base`** — Bases view over notes with broken-link counts.
+- **40 KB body cap + `tars-` prefix enforcement at the hook layer.** `pre-tool-use` rejects oversized bodies on non-chunking write tools (pointing the caller at `append_note`) and rejects non-prefixed frontmatter keys outside the reserved set (`tags`, `aliases`) unless `allow_user_properties=true`.
+- **SessionStart banner.** Composes install-mismatch warning, legacy-vault notice, stale `tools-registry.yaml` notice (24h TTL), and unregistered-cron notice (parses `_system/housekeeping-state.yaml` cron_jobs block).
+- **Session-summary stubs.** `pre-compact` and `session-end` write `inbox/pending/claude-session-<ts>.md` with frontmatter so `/maintain inbox` surfaces sessions next time.
+- **Telemetry rollup script (`scripts/telemetry-rollup.py`).** Stdlib aggregator over `_system/telemetry/*.jsonl`. `--days N` (default 7), `--format text|json`, `--since`/`--until` window overrides. Aggregates events-by-type, skills loaded, vault writes by destination, retrieval source-tier mix, miss signals, daily totals. Single source feeds `/briefing` weekly footer + `/maintain --weekly`.
+- **Active `/lint --actions` mode.** Materializes fixable findings as a numbered queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for cron-fired callers. Subsets: `wikilinks`, `patterns`, `curator`.
+- **Weekly maintenance job (`/maintain --weekly`).** Cron-fired Sunday 18:00 (registered by `welcome` Step 7 in standard mode). Pipeline: telemetry rollup → `_system/changelog/`, backlog auto-grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping-state cooling-off timestamps.
+- **Briefing weekly-rollup footer.** `/briefing` calls the rollup script in text mode on the configured weekday (default Monday) and appends the output. Degrades silently on script error or zero-event windows.
+- **User model (`templates/user-model.md`).** Single living note (~5 KB cap) capturing observed preferences distinct from declared config: BLUF tolerance, decision speed, default skill, meeting cadence, recurring concerns, vendor sentiment, observed skill mix. Updated passively by `/learn` Mode C when patterns repeat ≥3× in 14 days.
+- **Workflows (`templates/workflows.yaml`).** Vault-owned saved multi-step routing aliases. Created only on user approval of pattern proposals from `/maintain --weekly`. `core` consults the registry before default routing.
+- **`/learn --review-patterns` (Mode C).** Detects candidate patterns from telemetry, returns proposals to either an inline numbered list or to `/maintain --weekly`'s review queue. Honors `tars-pinned-fields` and `pinned: true`.
+- **Vault-side staleness curator (`scripts/archive.py --check workflows`).** Workflow-staleness check (60 days unused) and memory-staleness check honoring `tars-pinned: true`. Always archive, never delete. Surfaced via `/lint --actions curator` and `/maintain --weekly`.
+- **Persona-drift detection.** Inside `/maintain --weekly`, runs only when ≥30 days of telemetry exist and the cooling-off window (14 days) has elapsed. Compares observed skill-mix signature against persona expectations and proposes a switch when drift exceeds threshold.
+
+### Changed
+
+- **Routing rules.** `core` now consults `_system/workflows.yaml` (workflow-alias expansion) and `_system/user-model.md` (observed-preference soft defaults) before default fallthrough. Declared config in `_system/config.md` always wins on conflict.
+- **Wikilink discipline paragraph in `core`.** New mandatory subsection. One-line pointers added to `meeting`, `learn`, `communicate`, `briefing`, `initiative`, `answer`, `tasks`.
+- **Welcome wizard restructured.** New Step 1.5 (persona + mode pick), Step 2b writes `install.yaml`, Step 5 skips rounds 3-4 in casual mode, Step 6 skips weekly-schedule prompts in casual mode, Step 7 registers `tars-weekly-maintenance` cron in standard mode.
+- **Lint check table.** New rows: install-record health, observed-vs-declared drift, user-model staleness, workflows registry health.
+- **Maintain weekly mode** is now a real pipeline; the v3.1 Step 4 telemetry-rollup-as-journal-note was removed in favor of `scripts/telemetry-rollup.py` and `/lint` ownership of telemetry-derived findings.
+- **Stdlib YAML parser** in `tars_vault/_common.py` now correctly recognizes nested-mapping keys that contain hyphens (e.g. `tars-bluf-level:`).
+
+### Removed
+
+- **`.claude/skills/defuddle/`.** Not central to any of the seven personas; URL ingestion (rare) falls back to `WebFetch`. References in `welcome`, `CLAUDE.md`, `maintain`, and `tests/smoke-tests.py` were also removed.
+- **Two legacy `obsidian-cli` direct examples** in `core` and `meeting` replaced with `mcp__tars_vault__*` equivalents.
+
 ## v3.1.1 (2026-04-18)
 
 **Patch — make the `tars-vault` MCP server actually work.**

@@ -218,7 +218,19 @@ Pipeline:
 
 4. **User-model + workflow proposals (Phase 6).** Invoke `/learn --review-patterns` (Mode C in `skills/learn/SKILL.md`) with the cron-fired surface flag so the call returns proposals as structured data instead of rendering inline. Append the structured proposals under a "User-model + workflow proposals" section in the review queue. Each row labels its kind (`user-model` field update or `workflow` proposal) plus the evidence count and 14-day window. Pinned fields (`tars-pinned-fields` in user-model, `pinned: true` in workflows) are skipped silently — surface a one-line "N pinned-field matches suppressed" notice if any were filtered.
 
-5. **(Phase 7) Curator proposals.** When the curator ships, append memory-staleness (90d), workflow-staleness (60d), and persona-drift (30d telemetry, 14d cooling-off) proposals to the same queue.
+5. **Curator proposals (Phase 7).** Run three checks; each appends numbered proposals to the weekly review file under "Curator proposals". All checks honor cooling-off windows tracked in `_system/housekeeping-state.yaml`:
+
+   a. **Memory + workflow staleness.** Bash `scripts/archive.py --vault $TARS_VAULT_PATH --json --check all`. From the JSON: `memory.archivable` rows (excluding `protected`) become `memory:<file>` proposals; `workflows.candidates` rows become `workflow:<id>` proposals. `tars-pinned: true` notes and `pinned: true` workflows are filtered by the script — surface a one-line "N pinned items skipped" notice from the `pinned_skipped` summary fields. Track `last_run.archive_check` in housekeeping-state; if last run was less than 7 days ago, skip this check (cooling-off).
+
+   b. **Persona drift.** Only run when (i) `_system/install.yaml.persona` is set, (ii) ≥30 days of telemetry exist, (iii) `last_run.persona_drift_check` is ≥14 days old or unset. Compute the user's 30-day skill-mix signature from `scripts/telemetry-rollup.py --days 30 --format json` (`skills_loaded` map). Compare against each persona template's `tars-briefing-sections` + implied skill mix:
+      - `product-leader` → expects `briefing` + `think` + `learn` weighted toward customer-signals/roadmap.
+      - `sales-customer-facing` → `briefing` + `meeting` + `tasks` weighted toward accounts/follow-ups.
+      - `delivery-pm` → `briefing` + `tasks` + `initiative` weighted toward blockers/RAID.
+      - `data-science-lead` → `think` (mode D) + `learn` weighted toward experiments/metrics.
+      - `architect-staff-eng` → `think` (mode A) + `learn` weighted toward ADRs/RFCs.
+      - `support-ops-lead` → `briefing` + `tasks` weighted toward incidents/SLAs.
+      - `engineering-manager` → `meeting` (1:1s) + `briefing` weighted toward team signals.
+   If the observed signature matches a different persona by ≥40% margin over the current persona, append a single `persona:<current>→<proposed>` proposal with the supporting evidence (top-3 most-invoked skills, top-3 recurring concerns from user-model). Update `last_run.persona_drift_check` to today regardless of whether a proposal was emitted.
 
 6. **Materialize the weekly review file.** Write everything to `inbox/pending/weekly-review-YYYY-MM-DD.md` via `mcp__tars_vault__write_note_from_content`:
 
@@ -248,17 +260,25 @@ Pipeline:
     user-model:<field> or workflow:<id>. Empty section heading retained
     when no proposals so the structure stays predictable for /lint.>
 
-   ## (Phase 7+) Curator proposals
-   <proposals if any>
+   ## Curator proposals
+   <numbered list of proposals from scripts/archive.py + persona-drift
+    check; each labeled memory:<file>, workflow:<id>, or
+    persona:<from>→<to>. Pinned-skipped count surfaces as a one-line
+    notice. Empty section heading retained when no proposals.>
 
    ## How to act
    - Reply with `auto-fix all`, `auto-fix N,M`, `review each`, or `skip` for the lint queue.
    - Approve or dismiss curator items individually by number.
+   - Approving a curator item triggers `mcp__tars_vault__archive_note` (memory),
+     a `_system/workflows.yaml` edit (workflow retirement), or
+     `update_frontmatter(file="install", updates={"persona": "<new>"})`
+     (persona switch). Every action logs to `_system/changelog/YYYY-MM-DD.md`
+     with reversibility notes.
    ```
 
-7. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for the cooling-off windows used in Phases 6/7.
+7. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for cooling-off windows: `last_run.archive_check` (7d), `last_run.persona_drift_check` (14d), and `last_run.pattern_scan` (any). All live under a new `last_run` block in `_system/housekeeping-state.yaml`; the SessionStart hook reads them when computing the cron-job notice (Phase 4).
 
-8. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, review_file_path}`.
+8. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, curator_memory, curator_workflow, persona_drift_proposed, review_file_path}`.
 
 The cron-fired session ends here. The user reviews `inbox/pending/weekly-review-YYYY-MM-DD.md` on their next interactive session via the existing inbox-surfacing flow in `/maintain inbox`.
 
