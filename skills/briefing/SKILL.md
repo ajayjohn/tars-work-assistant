@@ -18,7 +18,7 @@ help:
 
 Unified protocol for daily and weekly briefings. Mode is determined by the request signal.
 
-All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list.
+All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list. **Form every wikilink in the briefing body via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
 | Signal | Mode |
 |--------|------|

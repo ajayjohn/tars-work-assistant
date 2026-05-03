@@ -283,6 +283,19 @@ When processing content containing person names, apply this cascade before any d
 
 **Constraint**: NEVER guess when ambiguous. Confidence below 70%, do not proceed. An incorrect name propagates to memory, journal, and tasks, requiring manual cleanup across multiple files.
 
+### Wikilink discipline (mandatory)
+
+Before writing any `[[...]]` wikilink in generated content (meeting notes, journal entries, memory updates, briefings, drafts, anything written through `mcp__tars_vault__create_note` / `append_note` / `write_note_from_content`), call `mcp__tars_vault__format_wikilink(text=…, kind=…)` and use the returned `link`. Never hand-form a wikilink from raw text.
+
+The helper handles four things skills used to get wrong: smart-quote normalization (`'` → `'`), Obsidian-illegal characters (`\ / : * ? " < > | [ ] # ^` get sanitized to `-`), alias-registry resolution (canonical entity names), and casing/spacing drift (`DataPortal` → `Data Portal` when the canonical file exists). Status handling:
+
+- `resolved` → use `link` directly.
+- `disambiguation_needed` → ask the user via multiple-choice; never guess.
+- `new_entity` → decide between creating the entity (if it passes the Durability Test in §Universal protocols) or falling back to plain text. Do not write the link to a file that does not exist without an explicit decision.
+- `error` → drop the link; surface plain text instead.
+
+Pre-write hooks and the MCP server reject any `[[...]]` containing smart quotes or illegal characters. Skipping `format_wikilink` will surface as a write rejection — fix the call site, not the content.
+
 ### Activity logging
 
 Every workflow must:

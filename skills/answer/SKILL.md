@@ -39,7 +39,7 @@ Answer questions by searching across TARS information sources in priority order.
 **Key rules**:
 - Never answer internal questions from web search alone. Exhaust internal sources first.
 - If answering from LLM knowledge with no source, confidence is **Low** — flag explicitly.
-- Cite with wikilinks + chunk indices for Tier-B hits (e.g., `[[2026-03-10 CSI Onsite Day 1]]#chunk-14`).
+- Cite with wikilinks + chunk indices for Tier-B hits (e.g., `[[2026-03-10 CSI Onsite Day 1]]#chunk-14`). Citations point at canonical filenames returned by retrieval; if you need to construct a link from a name (rather than reuse one returned by search), call `mcp__tars_vault__format_wikilink` first — see core → "Wikilink discipline".
 - Emit telemetry `answer_delivered` with `source_hit_tier` array covering which priorities contributed.
 
 ---

@@ -241,6 +241,33 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["results"],
         },
     },
+    "format_wikilink": {
+        "description": (
+            "Resolve raw text into an Obsidian-safe wikilink via the alias "
+            "registry and vault file lookup. Returns status=resolved | "
+            "disambiguation_needed | new_entity | error. Skills MUST use this "
+            "instead of hand-forming [[...]] from user-provided text."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "text": {
+                    "type": "string",
+                    "description": "Reference text to convert into a wikilink.",
+                },
+                "kind": {
+                    "type": "string",
+                    "description": (
+                        "Optional entity kind hint (person, vendor, competitor, "
+                        "product, initiative, decision, org-context). Restricts "
+                        "alias-registry matches when provided."
+                    ),
+                },
+            },
+            "required": ["text"],
+        },
+    },
 }
 
 

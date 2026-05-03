@@ -1,0 +1,24 @@
+filters:
+  and:
+    - file.hasProperty("tars-broken-links")
+    - 'tars-broken-links > 0'
+
+properties:
+  tars-broken-links:
+    displayName: "Broken Link Count"
+  tars-broken-links-last-scan:
+    displayName: "Last Scan"
+  tars-broken-links-sample:
+    displayName: "Sample Targets"
+
+views:
+  - type: table
+    name: "Notes with broken wikilinks"
+    order:
+      - file.name
+      - tars-broken-links
+      - tars-broken-links-sample
+      - tars-broken-links-last-scan
+    sort:
+      - property: tars-broken-links
+        direction: desc

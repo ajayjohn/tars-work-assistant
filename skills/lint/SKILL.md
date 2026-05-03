@@ -41,6 +41,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 |---------|------|----------------|
 | `lint`, `lint vault`, no argument | All checks | Yes (nightly, see §26.7) |
 | `lint --focus links` / `check broken links` | Broken-link + wikilink-artifact subset | No |
+| `lint --actions wikilinks` | Run `scripts/fix-wikilinks.py --repair-broken --dry-run` and surface `auto_safe` / `needs_review` / `unresolvable` buckets as numbered options | No |
 | `lint --focus orphans` | Orphan + sparse subset | No |
 | `lint --focus schema` | Schema validation subset | No |
 | `lint --focus stale` | Staleness-tier subset | No |
@@ -90,6 +91,11 @@ scripts/validate-schema.py --vault <TARS_VAULT_PATH> --json
 scripts/scan-secrets.py    --vault <TARS_VAULT_PATH> --json
 scripts/health-check.py    --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
 scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
+scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json --repair-broken
+                                  # broken-link scan; classifies into
+                                  # auto_safe / needs_review / unresolvable.
+                                  # --apply only acts on auto_safe; the
+                                  # other buckets surface as /lint actions.
 ```
 
 ### Step 3: Run MCP-backed checks

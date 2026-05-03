@@ -20,6 +20,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
+from ..validators import validate_no_bad_wikilinks
 
 
 DEFAULT_CHUNK = 40_000
@@ -38,6 +39,12 @@ def append_note(**kwargs: Any) -> dict:
         return _common.error("missing 'file'")
     if not isinstance(content, str):
         return _common.error("'content' must be a string")
+
+    link_errors = validate_no_bad_wikilinks(content)
+    if link_errors:
+        return _common.error(
+            "wikilink validation failed: " + "; ".join(link_errors)
+        )
 
     try:
         vault_p = _common.resolve_vault_path(vault)
