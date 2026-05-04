@@ -226,9 +226,9 @@ jobs:
           match = re.search(pattern, content, re.DOTALL)
           if match:
               notes = match.group(1).strip()
-              # Limit to 5000 chars for GitHub release
-              if len(notes) > 5000:
-                  notes = notes[:4997] + '...'
+              # Limit to 25000 chars for GitHub release (bodies support up to 125KB)
+              if len(notes) > 25000:
+                  notes = notes[:24997] + '...'
               print(notes)
           else:
               print(f'Release v{\"$VERSION\"}')
