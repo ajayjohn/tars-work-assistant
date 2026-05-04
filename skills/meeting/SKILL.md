@@ -20,7 +20,7 @@ help:
 
 The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline (plus a 7b nuance-capture sub-step) with mandatory user review gates.
 
-All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation.
+All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation. **Wikilinks must be formed via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` containing smart quotes or illegal characters is rejected at the MCP and hook layers.**
 
 **Hooks now enforce** `tars-` prefix, content chunking, alias-registry load, changelog writes, and telemetry. The pipeline body below describes intent; the MCP server handles validation and logging. Legacy `obsidian-cli` examples map 1:1 to the `mcp__tars_vault__*` tools in the core skill's write-interface table.
 
@@ -694,7 +694,7 @@ Save with flag for periodic review? [Y / Rephrase / Skip]
 
 **If saved with flag:**
 - Wrap the content in markers: `<!-- tars-flag:negative YYYY-MM-DD -->content<!-- end-tars-flag -->`
-- Set `tars-has-flagged-content: true` on the person's note via `obsidian property:set`
+- Set `tars-has-flagged-content: true` on the person's note via `mcp__tars_vault__update_frontmatter(file="memory/people/<name>", updates={"tars-has-flagged-content": true})`
 - Flagged content appears in the `_views/flagged-content.base` for periodic cleanup
 
 **If rephrase:** Ask user for alternative wording and save the rephrased version without a flag.

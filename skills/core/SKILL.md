@@ -70,6 +70,18 @@ Populated during onboarding (`/welcome`). Read from `_system/config.md`.
 - **Company**: {company}
 - **Industry**: {industry}
 
+### Persona + engagement mode
+
+`_system/install.yaml` carries two fields that subtly shape every other skill:
+
+- `persona`: one of `product-leader`, `sales-customer-facing`, `delivery-pm`, `data-science-lead`, `architect-staff-eng`, `support-ops-lead`, `engineering-manager`, or empty. Seeds `tars-bluf-level`, `tars-default-analysis-mode`, `tars-review-gate-strictness`, `tars-briefing-style`, and `tars-briefing-sections` in `_system/config.md` during onboarding. Skills should read those derived `tars-*` keys from `config.md` rather than re-deriving from the persona — the persona is the seed, not the running config.
+- `mode`: `standard` (default) or `casual`. In casual mode the router and write-side skills should:
+  - Skip review gates for low-stakes byproducts of `/create`, `/communicate`, `/think` (entity mentions, draft auto-files). High-stakes writes (people, decisions, performance, tasks) still confirm.
+  - Suppress staleness/drift/curator proposals on session start. The user opted out of the weekly cron; surfacing the same noise on every session would defeat the point.
+  - Auto-file `/create` outputs to `contexts/artifacts/YYYY-MM/` and `/communicate` drafts to `journal/YYYY-MM/` without companion files or schema review.
+
+Both fields are loaded at session start by hooks; skills can read via `mcp__tars_vault__read_note(file="install")` and consult `frontmatter.mode`.
+
 ### Integrations — provider-agnostic resolver
 
 TARS is provider-agnostic. Skills NEVER hard-code MCP server names (no `mcp__apple_calendar__list_events`, no `mcp__microsoft_365_*`). Instead, resolve the appropriate tool via capability:
@@ -174,6 +186,8 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 2. If ambiguous between two routes, ask a bounded clarification question
 3. If no signal matches, default to `skills/answer/`
 4. Multiple signals can co-occur: process primary request, then trigger auto side-effects
+5. **Workflow aliases** — before falling through to default routing, check `_system/workflows.yaml` (Phase 6). If the request text matches a workflow's `trigger` (case-insensitive substring or exact `/<id>` match), execute the workflow's ordered `steps` list and increment its `use_count` + `last_used`. Workflow expansion is transparent — surface "Routing via workflow `<id>`" before invoking the first step.
+6. **Observed preferences** — read `_system/user-model.md` once per session and apply its non-empty fields as soft defaults. Examples: `tars-bluf-tolerance: low` biases output toward expanded detail; `tars-default-skill` only matters when the signal is genuinely ambiguous (a tiebreaker, not an override). Declared config in `_system/config.md` always wins over observed preferences when they conflict — `/lint` flags persistent drift between the two.
 
 ---
 
@@ -283,11 +297,24 @@ When processing content containing person names, apply this cascade before any d
 
 **Constraint**: NEVER guess when ambiguous. Confidence below 70%, do not proceed. An incorrect name propagates to memory, journal, and tasks, requiring manual cleanup across multiple files.
 
+### Wikilink discipline (mandatory)
+
+Before writing any `[[...]]` wikilink in generated content (meeting notes, journal entries, memory updates, briefings, drafts, anything written through `mcp__tars_vault__create_note` / `append_note` / `write_note_from_content`), call `mcp__tars_vault__format_wikilink(text=…, kind=…)` and use the returned `link`. Never hand-form a wikilink from raw text.
+
+The helper handles four things skills used to get wrong: smart-quote normalization (`'` → `'`), Obsidian-illegal characters (`\ / : * ? " < > | [ ] # ^` get sanitized to `-`), alias-registry resolution (canonical entity names), and casing/spacing drift (`DataPortal` → `Data Portal` when the canonical file exists). Status handling:
+
+- `resolved` → use `link` directly.
+- `disambiguation_needed` → ask the user via multiple-choice; never guess.
+- `new_entity` → decide between creating the entity (if it passes the Durability Test in §Universal protocols) or falling back to plain text. Do not write the link to a file that does not exist without an explicit decision.
+- `error` → drop the link; surface plain text instead.
+
+Pre-write hooks and the MCP server reject any `[[...]]` containing smart quotes or illegal characters. Skipping `format_wikilink` will surface as a write rejection — fix the call site, not the content.
+
 ### Activity logging
 
 Every workflow must:
 
-1. **Append summary to daily note** via `obsidian daily:append`
+1. **Append summary to daily note** via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)` (the server resolves the daily-note path and chunks at 40 KB)
    ```
    ## Meeting processed: [[YYYY-MM-DD Meeting Title]]
    - Tasks: N created (of M extracted)

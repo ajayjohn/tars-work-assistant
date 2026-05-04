@@ -14,19 +14,23 @@ TARS is built around a few core ideas:
 - Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
 - Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and vault filing.
 - Tasks and durable memory always go through review before persistence.
+- Cold-start friction is addressed by seven onboarding personas; light-touch users (decks/drafts/brainstorms only) are first-class via a casual engagement mode.
+- Wikilink hygiene is centralized: every `[[…]]` flows through `format_wikilink`; smart-quote and Obsidian-illegal links are rejected at the write side; legacy broken links can be repaired in bulk.
+- Periodic work runs only via cron jobs registered during `/welcome` — Claude does not run in the background, so every staleness, drift, and rollup feature is bound to a single `tars-weekly-maintenance` job that opens a session and writes a numbered review queue for next time.
 
 ## What ships in the framework
 
-The framework ships with 13 skills, 13 commands, 15 templates (plus 9 office content outlines), 16 live views, and 12 deterministic scripts.
+The framework ships with 13 skills, 13 commands, 16 templates (15 entity templates + 9 office content outlines + 7 personas + a user-model + a workflows registry), 17 live views, and 13 deterministic scripts.
 
 Core user-facing capabilities:
-- Daily and weekly briefings with calendar, task, people, and initiative context
+- Daily and weekly briefings with calendar, task, people, and initiative context (plus a Monday telemetry footer)
 - Meeting processing that links transcripts, journal notes, decisions, and follow-through — with nuance-capture pass
 - Task extraction with accountability testing, duplicate checks, age / escalation tracking
 - Durable memory capture for people, initiatives, decisions, products, vendors, competitors, and organizational context
 - Hybrid fast lookup — FTS5 over memory, semantic over journal + transcripts + contexts, plus integrations
 - Strategic analysis (five modes), communications drafting (RASCI + brand-aware), initiative planning
-- `/lint` vault health pass + `/maintain` inbox / sync / archive sweep
+- `/lint --actions` materialized review queue (subsets: wikilinks, patterns, curator) + `/maintain --weekly` cron-fired pipeline
+- `/learn --review-patterns` for observed-preference learning (user model + workflow-alias proposals)
 - `/create` office output orchestration via Anthropic's first-party skills
 
 ## Architecture at a glance
@@ -45,18 +49,18 @@ scripts/          Deterministic stdlib-only validators and maintenance utilities
 .claude/skills/   Obsidian-specific helper skills used by the agent
 ```
 
-A deployed TARS vault uses this runtime layout:
+A deployed TARS vault uses this runtime layout. These directories live in your **vault**, not in this repository — the plugin scaffolds them on first `/welcome`:
 
 ```text
 memory/                 Durable knowledge graph
 journal/YYYY-MM/        Skill outputs and dated notes
 contexts/               Deep reference material and generated artifacts
-inbox/pending/          Raw intake waiting for processing
+inbox/pending/          Raw intake waiting for processing (incl. weekly review queues)
 inbox/processed/        Processed intake awaiting later maintenance
 archive/transcripts/    Preserved transcript notes with journal backlinks
 ```
 
-Legacy directories or compatibility files may still exist in some checkouts for migration context, but the active runtime source of truth lives in the current system files and workflow definitions.
+The plugin/vault boundary is strict: plugin-shipped skills are read-only from a user's perspective, and any auto-created or user-tunable behavior lives in the vault (`_system/install.yaml`, `_system/user-model.md`, `_system/workflows.yaml`).
 
 ## Quick start
 
@@ -96,7 +100,7 @@ Start here depending on what you need:
 - [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](CHANGELOG.md) for release history
 - [docs/CATALOG.md](docs/CATALOG.md) for the product and adoption overview
-- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration
+- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration (v3.0 → v3.1; v3.1 → v3.2 needs no migration)
 - [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) for Claude Remote Control on mobile
 
 ## License

@@ -70,7 +70,6 @@ Technical references for working with the Obsidian vault are in `.claude/skills/
 | obsidian-bases | `.claude/skills/obsidian-bases/SKILL.md` | .base file YAML for live queries |
 | obsidian-markdown | `.claude/skills/obsidian-markdown/SKILL.md` | Wikilinks, frontmatter, callouts, embeds |
 | json-canvas | `.claude/skills/json-canvas/SKILL.md` | Canvas file format for visual maps |
-| defuddle | `.claude/skills/defuddle/SKILL.md` | Web content extraction |
 
 ---
 

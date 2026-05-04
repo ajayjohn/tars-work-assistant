@@ -19,7 +19,7 @@ help:
 
 Two complementary modes for building TARS's knowledge base. Memory mode persists durable facts from conversations. Wisdom mode extracts insights from learning content.
 
-All vault writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). The server runs the auto-wikilink pass (§3.3) before every body write — ambiguous names surface for batched review, never silent link insertion.
+All vault writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). The server runs the auto-wikilink pass (§3.3) before every body write — ambiguous names surface for batched review, never silent link insertion. **Form every wikilink in generated content via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
 ---
 
@@ -29,6 +29,7 @@ All vault writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → 
 |--------|------|
 | "remember that...", "save to memory", "learn that..." | Memory |
 | "extract wisdom from...", "learn from this article/podcast/book" | Wisdom |
+| `/learn --review-patterns` (explicit) or invoked from `/maintain --weekly` | Pattern review (Mode C, see end of file) |
 | Ambiguous | Ask: "Should I save this as a memory fact, or extract wisdom from it as learning content?" |
 
 ---
@@ -613,3 +614,73 @@ If any errors occur during processing:
 - ALL frontmatter MUST conform to `_system/schemas.yaml`
 - NEVER skip negative sentiment detection (Issue 8) for person-related content
 - NEVER auto-resolve contradictions — always ask the user
+
+---
+
+# MODE C: Pattern review (`/learn --review-patterns`)
+
+Triggered explicitly by `/learn --review-patterns` or invoked as a sub-step of `/maintain --weekly` (cron-fired). The pass is read-mostly: scans telemetry, proposes user-model and workflow updates, never auto-applies.
+
+Why it exists: Phase 6 ships passive observed-preference learning. Patterns the user does repeatedly (skill mix, cadence, vendor sentiment, recurring concerns, repeated multi-step routings like "always run /think A after /think B") should accrue without the user re-stating them on every session.
+
+## Step 1: Load source data
+
+- `scripts/telemetry-rollup.py --vault $TARS_VAULT_PATH --days 14 --format json` — primary signal source.
+- `mcp__tars_vault__read_note(file="user-model")` — current observed state (creates from `templates/user-model.md` if missing).
+- `mcp__tars_vault__read_note(file="workflows")` (i.e. `_system/workflows.yaml`) — current saved aliases.
+- Last 14 days of `journal/YYYY-MM/*.md` for surfaced concerns / vendor mentions.
+
+## Step 2: Detect candidate patterns
+
+A pattern is a candidate when it repeats **at least 3 times in 14 days**. Detection per signal type:
+
+| Signal | Source | Proposal |
+|--------|--------|----------|
+| Most-invoked skill | `events_by_type.skill_loaded` (rolled up per skill) | Update `tars-default-skill` if it differs from current value. |
+| Skill mix shift | `skills_loaded` map vs current `tars-observed-skill-mix` | Replace the map; bound at top-20 by recency. |
+| Meeting cadence | `events_by_type.meeting_processed` per week | Bucket → `daily` / `several-per-day` / `a-few-per-week` / `rare`. |
+| BLUF tolerance | recurrence of "more detail" / "expand" → `low`; "shorter" / "tl;dr" → `high` | Update `tars-bluf-tolerance` only after 3+ same-direction signals. |
+| Vendor sentiment | journal text mentioning a known vendor with negative/positive markers | Update `tars-vendor-sentiment[vendor]` after 3+ matching mentions. |
+| Recurring concerns | topic phrases recurring across `/think`, `/learn`, `/answer` | Append to `tars-recurring-concerns` list (top-10, evict oldest). |
+| Multi-step routing | sequential `skill_loaded` pairs where skill B follows skill A within 5 minutes ≥3× | Propose a new entry in `_system/workflows.yaml` with id `<a>-then-<b>` and trigger taken from the typical user-message phrase that preceded the sequence. |
+
+For each candidate produce a proposal record:
+
+```
+{
+  "kind": "user-model" | "workflow",
+  "field": "<field-name or workflow id>",
+  "before": "<current value>",
+  "after":  "<proposed value>",
+  "evidence": {"count": N, "window_days": 14, "examples": [...]},
+}
+```
+
+Honor `tars-pinned-fields` in `user-model.md` (skip those fields entirely) and `pinned: true` in `workflows.yaml` (skip retirement proposals — that lives in Phase 7 curator).
+
+## Step 3: Surface proposals
+
+Two paths depending on caller:
+
+- **Interactive (`/learn --review-patterns`)** — render a numbered list inline. Selection syntax: `accept all`, `accept N,M`, `review each`, `skip`. On accept, write the user-model patch via `mcp__tars_vault__update_frontmatter` and any workflow proposals via `mcp__tars_vault__write_note_from_content` (or `update_frontmatter` if the file exists). Never edit `_system/workflows.yaml` outside this confirmation flow.
+
+- **From `/maintain --weekly`** — return the proposals as structured data so the maintain skill can append them to `inbox/pending/weekly-review-YYYY-MM-DD.md` under "User-model + workflow proposals". The user reviews on next session; nothing is applied here.
+
+## Step 4: Persist scan timestamp
+
+Update `_system/user-model.md`:
+- `tars-last-pattern-scan`: today's ISO date
+- `tars-modified`: today's ISO date
+
+Even on zero proposals — this lets `/lint` detect when the scan has gone stale.
+
+## Step 5: Telemetry
+
+Emit `learn_pattern_scan` with `{candidates, proposals_user_model, proposals_workflow, surface: "inline"|"weekly-review"}`.
+
+## Constraints
+
+- NEVER auto-apply a proposal in interactive or weekly flow without confirmation.
+- NEVER propose changes to a pinned field; surface a notice in the rendered output instead ("3 patterns matched a pinned field, suppressed").
+- NEVER edit a workflow's `created`, `last_used`, or `use_count` from this skill — those are set by the router when the workflow fires.
+- The 3-in-14-days threshold is a default; the user may pass `--threshold N --window D` to `/learn --review-patterns` for tighter or looser scans.

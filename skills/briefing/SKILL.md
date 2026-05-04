@@ -18,7 +18,7 @@ help:
 
 Unified protocol for daily and weekly briefings. Mode is determined by the request signal.
 
-All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list.
+All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list. **Form every wikilink in the briefing body via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
 | Signal | Mode |
 |--------|------|
@@ -215,6 +215,21 @@ are illustrative; the skill always pulls actual counts at briefing generation ti
 
 ---
 
+## Step 6.5: Weekly telemetry rollup footer
+
+If today's weekday matches `tars-weekly-rollup-day` in `_system/config.md` (default: Monday), append a "## Telemetry rollup (last 7 days)" section to the briefing body. The section's content comes from a single Bash call:
+
+```bash
+scripts/telemetry-rollup.py --vault $TARS_VAULT_PATH --days 7 --format text
+```
+
+Indent each output line by two spaces under the section header so it renders as a Markdown literal block, then continue. Skip the section silently when:
+- today is not the configured rollup weekday;
+- the script returns an error (degrade gracefully — never fail the briefing);
+- the rollup reports zero events in the window (avoid showing an empty footer).
+
+The same script powers `/maintain --weekly`, so the daily briefing and the cron-fired weekly maintenance file see consistent numbers.
+
 ## Step 7: Save and display
 
 ```
@@ -228,7 +243,7 @@ mcp__tars_vault__create_note(
     "tars-briefing-type": "daily",
     "tars-created": "YYYY-MM-DD"
   },
-  body="<generated briefing markdown>"
+  body="<generated briefing markdown, including weekly footer if applicable>"
 )
 ```
 

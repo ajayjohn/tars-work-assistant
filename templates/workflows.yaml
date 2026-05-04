@@ -1,0 +1,39 @@
+# Saved multi-step routing aliases (TARS user-side workflows).
+#
+# Lives at _system/workflows.yaml. Each entry is a behavioral routing alias
+# the user (or /lint --actions) approved — never auto-created. Workflows are
+# vault-owned data, NOT plugin skills. They can be edited freely.
+#
+# Schema:
+#   workflows: list of entries with these fields:
+#     id              required, kebab-case unique slug
+#     name            required, human-readable
+#     trigger         required, free-text phrase (matched case-insensitively
+#                     against router signal text); also matches a slash form
+#                     like "/<id>" if the user prefers that surface
+#     description     required, one-line summary
+#     steps           required, ordered list of skill invocations.
+#                     Each step is { skill: <name>, mode?: <subskill or args> }.
+#     created         ISO-8601 date the workflow was saved
+#     last_used       ISO-8601 date the workflow last fired (null until first run)
+#     use_count       integer; incremented per invocation
+#     pinned          boolean; if true, /lint --actions curator never proposes retirement
+#
+# Example:
+#   workflows:
+#     - id: post-council-stress-test
+#       name: "After /think B, run adversarial pre-mortem"
+#       trigger: "council session"
+#       description: "Following a Strategic Council pass, immediately run /think A on the same proposal."
+#       steps:
+#         - { skill: think, mode: B }
+#         - { skill: think, mode: A }
+#       created: 2026-05-12
+#       last_used: null
+#       use_count: 0
+#       pinned: false
+#
+# Empty registry — populated by /lint --actions when the user approves
+# pattern proposals from /maintain --weekly.
+
+workflows: []

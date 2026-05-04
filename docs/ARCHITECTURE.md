@@ -1,16 +1,16 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.1 Architecture
+# TARS 3.2 Architecture
 
-This document describes the current framework architecture after the v3.1 "harden, simplify, and extend" release.
+This document describes the current framework architecture after the v3.2 "persistence, cold-start, wikilink hygiene, and self-improvement plumbing" release.
 
-**Version**: 3.1.1  
-**Release**: 2026-04-18 — see `CHANGELOG.md`  
+**Version**: 3.2.0  
+**Release**: 2026-05-03 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Obsidian vault runtime
 
 ## Three operations (Karpathy framing)
 
-TARS v3.1 makes the three-operations pattern explicit:
+TARS v3.2 makes the three-operations pattern explicit:
 
 - **Ingest** — meetings, transcripts, inbox items, manual learning. Skills: `/meeting`, `/learn`, `/maintain`, SessionEnd / PreCompact hooks.
 - **Query** — retrieval from vault memory + journal + transcripts + integrations. Skills: `/answer`, `/briefing`, `/think`, `/initiative`.
@@ -18,7 +18,7 @@ TARS v3.1 makes the three-operations pattern explicit:
 
 ## System model
 
-TARS 3.1 operates directly on an Obsidian vault and treats that vault as the persistent runtime state.
+TARS 3.2 operates directly on an Obsidian vault and treats that vault as the persistent runtime state.
 
 At a high level:
 - the repository is the framework source, packaging logic, and documentation
@@ -234,7 +234,7 @@ These bases replaced `_index.md` as the primary query surface. They reduce drift
 
 ### Script layer
 
-`scripts/` holds deterministic utilities that support the skills and release workflow. The active set is stdlib-only (optional deps wrapped in `try/except ImportError` with fallback parsers per PRD §26.2): schema validation, secret scanning, health checks (including the merged-in flagged-content sub-check), archival, sync / hydration, search-index builder, wikilink fixer, integrations v2 migration, MCP tool discovery, capability classifier, version bump, plugin validation, packaging.
+`scripts/` holds deterministic utilities that support the skills and release workflow. The active set is stdlib-only (optional deps wrapped in `try/except ImportError` with fallback parsers per PRD §26.2): schema validation, secret scanning, health checks (including the merged-in flagged-content sub-check), archival (memory + workflow staleness, v3.2), sync / hydration, search-index builder, wikilink fixer (incl. v3.2 `--repair-broken` mode), telemetry rollup (v3.2), integrations v2 migration, MCP tool discovery, capability classifier, version bump, plugin validation, packaging.
 
 Not every script is a runtime dependency for end users. Some are maintainer tools used during packaging, testing, or migration support. The `scripts/githooks/` folder holds the `prepare-commit-msg` + `pre-push` authorship guards installed by `scripts/githooks/install-githooks.sh`.
 
@@ -248,7 +248,23 @@ The Obsidian-native rebuild introduced the most important architectural changes 
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the vault, not a copied `reference/` bundle
 
-## What's new in v3.1
+## What's new in v3.2
+
+- **Persistent install record (`_system/install.yaml`)** — vault-specific record carrying `vault_path`, `installation_id`, `persona`, `mode`, `plugin_version`, and timestamps. Hooks consult it on every session start; install/CWD mismatch refuses silent writes via the pre-tool-use hook.
+- **Persona-driven cold start** — seven onboarding personas (`templates/personas/`) seed `_system/config.md` defaults, `_system/taxonomy.md` starter tags, and `_system/briefing-sections` so day-1 briefings are role-aware.
+- **Engagement modes (`standard` | `casual`)** — casual mode skips Step 5 rounds 3-4 in welcome, registers only the opt-in daily-briefing cron, and suppresses staleness/drift/curator proposals on session start. Power-user behavior is the default.
+- **Wikilink discipline (forward + retroactive)** — new `mcp__tars_vault__format_wikilink(text, kind)` tool resolves raw text to an Obsidian-safe link via the alias registry + vault file lookup. Write tools and the pre-tool-use hook reject content with smart quotes or Obsidian-illegal characters. `scripts/fix-wikilinks.py --repair-broken` classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable` with apply-only-on-safe semantics.
+- **40 KB body cap + `tars-` prefix enforcement** at the hook layer for non-chunking write tools.
+- **SessionStart banner** — composes install-mismatch, legacy-vault, stale `tools-registry.yaml`, and unregistered-cron notices.
+- **Active `/lint --actions`** — materializes fixable findings as a numbered review queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for cron-fired callers. Subsets: `wikilinks`, `patterns`, `curator`.
+- **Weekly maintenance job (`/maintain --weekly`)** — cron-fired Sunday 18:00 (registered by `/welcome` Step 7 in standard mode). Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
+- **Telemetry rollup script (`scripts/telemetry-rollup.py`)** — stdlib aggregator over `_system/telemetry/*.jsonl`. Same source feeds `/briefing` weekly footer (Mondays) and `/maintain --weekly`.
+- **Observed-preference user model (`_system/user-model.md`)** — single living note (~5 KB cap) capturing BLUF tolerance, decision speed, default skill, meeting cadence, recurring concerns, vendor sentiment, observed skill mix. Updated passively by `/learn` Mode C when patterns repeat ≥3× in 14 days.
+- **Workflows registry (`_system/workflows.yaml`)** — vault-owned saved multi-step routing aliases. Created only on user approval. `core` consults the registry before default routing.
+- **Vault-side staleness curator** — workflow-staleness (60 days unused) and memory-staleness (90 days, honoring `tars-pinned: true`) checks in `scripts/archive.py --check workflows`. Always archive, never delete.
+- **Persona-drift detection** — runs inside `/maintain --weekly` only when ≥30 days of telemetry exist and the 14-day cooling-off has elapsed. Compares observed skill-mix against persona expectations.
+
+## What was new in v3.1
 
 - **Hook-based enforcement** replaces duplicated prompt-level reminders. SessionStart, PreCompact, SessionEnd, PreToolUse, PostToolUse all go through stdlib-only Python scripts under `hooks/`.
 - **`tars-vault` MCP server** centralizes writes, validation, chunking, alias resolution, and secret scanning. Skills call `mcp__tars_vault__*` tools; raw `obsidian-cli` is retained only for edge cases.

@@ -22,6 +22,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
+from ..validators import validate_no_bad_wikilinks
 
 
 def create_note(**kwargs: Any) -> dict:
@@ -41,6 +42,12 @@ def create_note(**kwargs: Any) -> dict:
         return _common.error("'frontmatter' must be a mapping")
     if not isinstance(body, str):
         return _common.error("'body' must be a string")
+
+    link_errors = validate_no_bad_wikilinks(body)
+    if link_errors:
+        return _common.error(
+            "wikilink validation failed: " + "; ".join(link_errors)
+        )
 
     try:
         vault_p = _common.resolve_vault_path(vault)

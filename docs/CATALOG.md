@@ -64,6 +64,18 @@ The answer workflow searches memory first, then journal, then transcript archive
 
 TARS supports structured strategic analysis, stakeholder-aware drafting, initiative planning, and artifact creation while grounding those outputs in what the vault already knows.
 
+### Persona-driven cold start (v3.2)
+
+Onboarding is built around seven role personas — Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Engineer, Support / Ops Lead, Engineering Manager. Each persona seeds role-aware briefing layout, BLUF level, default analysis mode, review-gate strictness, and starter taxonomy tags so the day-1 briefing is useful instead of empty. A separate engagement-mode toggle (`standard` vs `casual`) lets occasional users (decks, drafts, brainstorms only) skip the weekly maintenance pipeline and review queues without losing single-shot value.
+
+### Wikilink discipline (v3.2)
+
+Every wikilink TARS writes is formed via the in-house `format_wikilink` MCP tool, which normalizes smart quotes, sanitizes Obsidian-illegal characters, and resolves canonical names through the alias registry + vault file lookup. Write tools and a pre-write hook reject any `[[…]]` containing forbidden characters. A retroactive `fix-wikilinks --repair-broken` mode classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
+
+### Self-improvement loop (v3.2)
+
+A single weekly cron job (`tars-weekly-maintenance`, Sunday evening, registered in standard mode) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the vault-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
+
 ## Who it is for
 
 TARS is best suited to:
