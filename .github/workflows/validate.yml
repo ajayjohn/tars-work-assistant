@@ -39,8 +39,11 @@ jobs:
         run: |
           ERRORS=0
 
-          # Check required directories
-          for dir in _system _views memory journal contexts inbox templates scripts skills tests; do
+          # Check required directories shipped IN the plugin. memory/, journal/,
+          # contexts/, inbox/, archive/ are vault-side — they live in the user's
+          # working vault and must NEVER be checked into the plugin repo (per
+          # CLAUDE.md "Plugin/vault boundary" guidance).
+          for dir in _system _views templates scripts skills tests; do
             if [ ! -d "$dir" ]; then
               echo "::error::Missing required directory: $dir"
               ERRORS=$((ERRORS + 1))

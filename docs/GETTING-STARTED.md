@@ -13,7 +13,7 @@ You need:
 - Claude Code or Claude Cowork with the TARS framework installed
 - a vault location dedicated to your TARS workspace
 
-If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 to v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md).
+If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 → v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 → v3.2 has no breaking changes; reopen the vault and `/welcome` will offer to write the new `_system/install.yaml` install record on first session.
 
 ## Installation
 
@@ -43,11 +43,13 @@ The repository contains the framework source. The vault you point TARS at is the
 Run `/welcome`.
 
 The welcome flow:
+- asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
+- asks whether you'll use TARS **daily or only for occasional tasks** (decks, drafts, brainstorms) — picks **standard** vs **casual** mode (see "Engagement modes" below)
 - creates the TARS vault structure
-- writes `_system/` files, templates, and live views
+- writes `_system/` files (including the new `install.yaml` install record), templates, and live views
 - installs or verifies the Obsidian helper skills in `.claude/skills/`
 - configures integration metadata
-- captures your initial profile and operating context
+- captures your initial profile and operating context (skips the "key people" + "active initiatives" rounds in casual mode)
 - registers briefing and maintenance schedules when supported
 
 After setup, the vault should contain:
@@ -64,6 +66,15 @@ archive/transcripts/
 templates/
 scripts/
 ```
+
+## Engagement modes (v3.2)
+
+Two modes set during `/welcome` and recorded in `_system/install.yaml`:
+
+- **standard** (default) — full pipeline. Three cron jobs registered: `tars-daily-briefing`, `tars-weekly-briefing`, `tars-weekly-maintenance`. Review gates are strict on durable writes (people, decisions, performance, tasks). Weekly review queue lands in `inbox/pending/weekly-review-YYYY-MM-DD.md` for triage.
+- **casual** — light-touch. Only `tars-daily-briefing` is offered (opt-in). No weekly maintenance, no drift checks, no curator proposals on session start. Low-stakes byproducts of `/create`, `/communicate`, `/think` (entity mentions, draft auto-files) are auto-accepted; high-stakes writes still confirm. Switch later via `/welcome --upgrade`.
+
+Both modes share the same wikilink discipline, secret scan, and plugin/vault boundary — the difference is how much ceremony shows up in the chat.
 
 ## Integrations
 
