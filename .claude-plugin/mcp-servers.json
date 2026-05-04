@@ -1,6 +1,6 @@
 {
   "$schema": "https://claude.ai/schemas/plugin-mcp-servers.schema.json",
-  "_comment": "TARS v3.1 plugin-shipped MCP servers. Phase 1a skeleton — only tars-vault is shipped; office rendering delegates to Anthropic's first-party pptx/docx/xlsx/pdf skills per PRD §3.1b.",
+  "_comment": "TARS v3.2.1 plugin-shipped MCP servers. Only tars-vault is shipped; office rendering delegates to Anthropic's first-party pptx/docx/xlsx/pdf skills per PRD §3.1b.",
   "mcpServers": {
     "tars-vault": {
       "type": "stdio",

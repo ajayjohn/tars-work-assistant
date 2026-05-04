@@ -4,7 +4,7 @@
 
 This document describes the current framework architecture after the v3.2 "persistence, cold-start, wikilink hygiene, and self-improvement plumbing" release.
 
-**Version**: 3.2.0  
+**Version**: 3.2.1  
 **Release**: 2026-05-03 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Obsidian vault runtime
 

@@ -1,4 +1,4 @@
-# TARS v3.1 hooks
+# TARS v3.2 hooks
 
 Claude Code lifecycle hooks. Wired in via `.claude/settings.json` (plugin-level)
 and enforced by the Claude Code harness at the correct lifecycle events.

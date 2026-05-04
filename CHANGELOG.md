@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.2.1 (2026-05-04)
+
+**Patch — fix hook and MCP server paths that break on spaces in directory names.**
+
+Paths containing spaces (e.g. `Library/Application Support/`) caused all six plugin hooks to fail at launch because `${CLAUDE_PLUGIN_ROOT}` was not quoted in the shell command strings inside `hooks/hooks.json`. The unquoted expansion split the path into multiple shell arguments, breaking the `python3` invocation.
+
+### Fixed
+
+- **`hooks/hooks.json` — quote `${CLAUDE_PLUGIN_ROOT}` in all hook commands.** All six hook entries (`SessionStart`, `InstructionsLoaded`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`) now wrap the expanded path in double quotes so paths with spaces are treated as a single argument.
+- **`.claude-plugin/mcp-servers.json` — updated comment to v3.2.1.**
+
 ## v3.2.0 (2026-05-03)
 
 **Persistence, cold-start, wikilink hygiene, and self-improvement plumbing.**
