@@ -218,7 +218,7 @@ mcp__tars_vault__search_by_tag(tag="tars/initiative", query="<entity>", limit=5)
 mcp__tars_vault__search_by_tag(tag="tars/decision",   query="<entity>", limit=5)
 ```
 
-Phase 4 adds `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for paraphrase/prose matching over journal + transcripts + contexts.
+Use `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for paraphrase/prose matching over journal + transcripts + contexts.
 
 ### Classification
 
