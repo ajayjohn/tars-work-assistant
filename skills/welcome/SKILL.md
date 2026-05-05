@@ -556,66 +556,143 @@ onboarding:
 
 ## Step 7: Register cron jobs
 
-Use CronCreate to register scheduled jobs. Store job IDs in `_system/housekeeping-state.yaml`. Claude does not run in the background; cron jobs are the only path to truly proactive behavior, so this step matters whether the user is power or casual.
+Claude does not run in the background; cron jobs are the only path to truly proactive behavior, so this step matters whether the user is power or casual.
+
+### Step 7a: Detect available scheduler(s)
+
+```
+result = mcp__tars_vault__resolve_capability(capability="scheduler")
+```
+
+This returns `available` (list of schedulers present) and `preferred` (recommended pick).  Read the `note` field — it will explicitly warn when both schedulers are active on the same machine.
+
+**Available schedulers:**
+| Scheduler | Persistence | Visibility | Expiry |
+|-----------|-------------|------------|--------|
+| `mcp__scheduled-tasks` | Persistent MCP server | Claude Code only | None |
+| `CronCreate` | Built-in Claude tool | Claude Code + Cowork | ~7 days |
+
+**Preferred**: `mcp__scheduled-tasks` when available (no TTL, no weekly re-registration). Otherwise `CronCreate`.
+
+### Step 7b: Mutual-exclusion check (CRITICAL)
+
+Before registering any job, read the current `_system/housekeeping-state.yaml` `cron_jobs` block.
+
+For each job you are about to register:
+1. Read `scheduler_type` for that job.
+2. If `scheduler_type` is set (not null) and `status` is `registered`:
+   - **The job is already registered with that scheduler. DO NOT register with any other scheduler.**
+   - If the registered scheduler is the same as the one you're about to use → proceed to re-registration check only.
+   - If the registered scheduler differs from the one you're about to use → skip registration entirely for this job. Surface a notice: "Job `<name>` is already registered with `<current_scheduler>`. To switch schedulers, use `/maintain --re-register`."
+3. If `scheduler_type` is null or `status` is `not_registered` → proceed to Step 7c.
+
+This rule prevents duplicate execution on machines where both Claude Desktop (Cowork) and Claude Code are active simultaneously.
+
+### Step 7c: Confirm-before-run preference
+
+Before registering, ask the user about confirm-before-run behavior (one question, not per-job):
+
+> "When a scheduled job fires, should TARS:
+>   [1] Run automatically (default — no interruption)
+>   [2] Ask me first — show pending jobs and let me accept, skip, or postpone each one"
+
+Store the answer as the global default. Users can override per-job later. If the user picks option 2, set `confirm_before_run: true` for all jobs being registered now. Also ask:
+
+> "If you don't respond within [4] hours, should TARS: [1] Run anyway  [2] Skip for today"
+
+Store as `auto_timeout_hours` (default 4) and `auto_timeout_action` (`run` | `skip`).
+
+**Mode gating on confirm-before-run**: Casual mode defaults to `confirm_before_run: false`. Standard mode defaults to `confirm_before_run: true` (recommended — the user stays in control of when reports land).
+
+### Step 7d: Register each job
 
 **Mode gating**:
-- **Standard**: register all three jobs (`tars-daily-briefing`, `tars-weekly-briefing`, `tars-weekly-maintenance`).
-- **Casual**: register `tars-daily-briefing` only, and only if the user opts in (ask: "Want a daily morning briefing?"). Skip the weekly jobs entirely.
+- **Standard**: register all four jobs (`tars-daily-briefing`, `tars-weekly-briefing`, `tars-weekly-maintenance`, `tars-nightly-lint`).
+- **Casual**: register `tars-daily-briefing` only, and only if the user opts in. Skip the weekly/nightly jobs.
 
-### Daily briefing (both modes; opt-in for casual)
+For each job, choose the cron command based on `confirm_before_run`:
 
+| confirm_before_run | Command |
+|--------------------|---------|
+| false (auto-run) | `"Run <job_name>"` — e.g. `"Run /briefing"` |
+| true (confirm first) | `"TARS scheduled: <job_name> is due. Accept, skip, or postpone?"` |
+
+#### Daily briefing (both modes; opt-in for casual)
+
+**With `mcp__scheduled-tasks`:**
+```
+mcp__scheduled_tasks__create_task(
+  name: "tars-daily-briefing",
+  schedule: "<cron_expression>",
+  prompt: "<command per confirm_before_run setting above>"
+)
+```
+
+**With `CronCreate`:**
 ```
 CronCreate:
   name: "tars-daily-briefing"
-  schedule: "{configured_time} {configured_tz}"  # e.g., "0 7 30 * * *" for 7:30am
-  command: "Run daily briefing"
-  description: "Generate morning briefing with schedule, tasks, and context"
+  schedule: "<cron_expression>"
+  command: "<command per confirm_before_run setting above>"
+  description: "TARS daily briefing"
 ```
 
-### Weekly briefing (standard mode only)
+#### Weekly briefing (standard mode only)
+
+Register with the same scheduler type as `daily_briefing`. Never mix schedulers across jobs — pick one and use it for all.
 
 ```
-CronCreate:
-  name: "tars-weekly-briefing"
-  schedule: "{configured_day} {configured_time}"  # e.g., Monday 8:00am
-  command: "Run weekly briefing"
-  description: "Generate weekly planning briefing with initiative health, upcoming meetings, and priorities"
+name: "tars-weekly-briefing"
+schedule: "<Monday HH:MM cron>"
+command: "<command per confirm_before_run>"
 ```
 
-### Weekly maintenance (standard mode only — new in v3.2)
-
-This is the single periodic job that backstops every staleness/drift/curator/rollup feature in TARS. It opens a session Sunday evening, runs `/maintain --weekly`, and writes a numbered review file to `inbox/pending/weekly-review-YYYY-MM-DD.md`. The user reviews on their next session.
+#### Weekly maintenance (standard mode only)
 
 ```
-CronCreate:
-  name: "tars-weekly-maintenance"
-  schedule: "0 18 * * 0"   # Sunday 18:00 in user's local timezone
-  command: "Run /maintain --weekly"
-  description: "Telemetry rollup, backlog grouping, lint --actions queue, curator + drift proposals"
+name: "tars-weekly-maintenance"
+schedule: "0 18 * * 0"  # Sunday 18:00 local
+command: "<command per confirm_before_run>"
 ```
 
-Store returned job IDs:
+#### Nightly lint (standard mode only)
+
+```
+name: "tars-nightly-lint"
+schedule: "0 2 * * *"   # 2:00am local
+command: "Run /lint --quiet"   # lint always auto-runs; confirm_before_run not applied
+```
+
+### Step 7e: Store job state
+
+After each successful registration, write to `_system/housekeeping-state.yaml` immediately (do not batch — if a later job fails, earlier ones are preserved):
+
 ```yaml
-# _system/housekeeping-state.yaml
 cron_jobs:
-  daily_briefing:        # always present; null if user opted out
-    id: "{job_id}"
-    schedule: "{cron}"
+  daily_briefing:
+    id: "{returned_job_id}"
+    scheduler_type: "{mcp__scheduled-tasks|CronCreate}"
+    schedule: "{cron_expression}"
     status: registered
-  weekly_briefing:       # standard mode only
-    id: "{job_id}"
-    schedule: "{cron}"
-    status: registered
-  weekly_maintenance:    # standard mode only — new in v3.2
-    id: "{job_id}"
-    schedule: "0 18 * * 0"
-    status: registered
+    confirm_before_run: {true|false}
+    auto_timeout_hours: {N}
+    auto_timeout_action: "{run|skip}"
+    cron_create_registered_at: "{ISO-8601}"  # only for CronCreate
+  weekly_briefing:
+    ...  # same fields; null if casual mode
 ```
 
-If CronCreate is not available in the environment:
-- Log that cron registration was skipped
-- Note that session-start housekeeping (core skill) serves as fallback
-- Inform user they can register jobs manually later
+Also update `_system/schedule.md` table row for each registered job (Scheduler column, Job ID column, Registered At column).
+
+Record the chosen scheduler type in `_system/install.yaml`:
+```yaml
+scheduler_type: "{mcp__scheduled-tasks|CronCreate}"
+```
+
+If no scheduler is available at all:
+- Log `status: not_registered` for all jobs
+- Inform user: "No scheduler available — briefings won't fire automatically. You can run them manually anytime."
+- Note that session-start housekeeping serves as the only trigger
 
 ### Migration check (Step 7 tail)
 

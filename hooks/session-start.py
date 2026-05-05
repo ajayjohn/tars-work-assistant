@@ -159,12 +159,55 @@ def _registry_notice(vault: Path) -> str:
     return ""
 
 
-def _cron_notice(vault: Path) -> str:
-    """Surface jobs that look unregistered.
+_CRON_CREATE_TTL_DAYS = 7
+_CRON_CREATE_WARN_DAYS = 2  # warn when ≤ this many days before expiry
 
-    Stdlib-only YAML reader: we already use the same minimal parser in
-    `_read_install_yaml`. For housekeeping-state.yaml we just look for the
-    cron_jobs block and the per-job `id` and `status` fields one indent in.
+
+def _parse_cron_jobs(text: str) -> dict[str, dict[str, str]]:
+    """Parse the cron_jobs block from housekeeping-state.yaml.
+
+    Stdlib-only. Returns {job_name: {property: value}} with all values as
+    stripped strings (null/~/"" → "").
+    """
+    job_state: dict[str, dict[str, str]] = {}
+    in_block = False
+    current_job: str | None = None
+    for raw in text.splitlines():
+        if raw.startswith("cron_jobs:"):
+            in_block = True
+            continue
+        if in_block:
+            if raw and not raw[0].isspace() and not raw.startswith("#"):
+                in_block = False
+                continue
+            stripped = raw.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indent = len(raw) - len(raw.lstrip(" "))
+            if indent == 2 and stripped.endswith(":"):
+                current_job = stripped[:-1].strip()
+                job_state.setdefault(current_job, {})
+            elif current_job and indent >= 4 and ":" in stripped:
+                key, _, value = stripped.partition(":")
+                val = value.strip().strip('"').strip("'")
+                if val.lower() in ("null", "~", "none"):
+                    val = ""
+                job_state[current_job][key.strip()] = val
+    return job_state
+
+
+def _cron_notice(vault: Path) -> str:
+    """Surface scheduler health issues at session start.
+
+    Checks performed (all stdlib, no MCP calls):
+      1. Unregistered jobs — scheduler_type is null/empty or status != registered.
+      2. CronCreate TTL expiry — cron_create_registered_at + 7d ≤ today+2d.
+         These are re-registered automatically in /maintain; notice is informational.
+      3. Mutual-exclusion drift — install.yaml scheduler_type disagrees with
+         housekeeping-state.yaml (indicates a scheduler was changed without updating
+         both records). Surface as a warning; auto-fix is NOT performed.
+
+    Never blocks the session (observability-only).
     """
     target = vault / "_system" / "housekeeping-state.yaml"
     if not target.is_file():
@@ -173,43 +216,58 @@ def _cron_notice(vault: Path) -> str:
         text = target.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return ""
-    issues: list[str] = []
-    in_block = False
-    current_job: str | None = None
-    job_state: dict[str, dict[str, str]] = {}
-    for raw in text.splitlines():
-        if raw.startswith("cron_jobs:"):
-            in_block = True
-            continue
-        if in_block:
-            # Detect the next top-level key (no leading spaces) → exit block.
-            if raw and not raw[0].isspace() and not raw.startswith("#"):
-                in_block = False
-                continue
-            stripped = raw.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            # Two-space indent → job name; deeper indent → property.
-            indent = len(raw) - len(raw.lstrip(" "))
-            if indent == 2 and stripped.endswith(":"):
-                current_job = stripped[:-1].strip()
-                job_state.setdefault(current_job, {})
-            elif current_job and indent >= 4 and ":" in stripped:
-                key, _, value = stripped.partition(":")
-                job_state[current_job][key.strip()] = value.strip().strip('"').strip("'")
+
+    job_state = _parse_cron_jobs(text)
+
+    unregistered: list[str] = []
+    expiring_soon: list[str] = []
+    now = time.time()
+
     for job, props in job_state.items():
-        job_id = props.get("id", "").lower()
-        status = props.get("status", "").lower()
-        if job_id in ("", "null", "~", "none") or status in ("not_registered", ""):
-            issues.append(job)
-    if not issues:
-        return ""
-    return (
-        "TARS notice: cron jobs not registered: "
-        + ", ".join(issues)
-        + ". Re-run /welcome step 7 to register them — Claude does not run in the "
-        "background, so unregistered jobs simply never fire."
-    )
+        job_id = props.get("id", "")
+        status = props.get("status", "")
+        scheduler_type = props.get("scheduler_type", "")
+
+        if not job_id or status in ("not_registered", ""):
+            unregistered.append(job)
+            continue
+
+        # CronCreate TTL check.
+        if scheduler_type == "CronCreate":
+            registered_at_str = props.get("cron_create_registered_at", "")
+            if registered_at_str:
+                try:
+                    # Parse ISO-8601 date/datetime — take just the date portion.
+                    date_part = registered_at_str[:10]
+                    import datetime as _dt
+                    reg_date = _dt.date.fromisoformat(date_part)
+                    age_days = (_dt.date.today() - reg_date).days
+                    days_left = _CRON_CREATE_TTL_DAYS - age_days
+                    if days_left <= _CRON_CREATE_WARN_DAYS:
+                        expiring_soon.append(f"{job} ({days_left}d remaining)")
+                except (ValueError, TypeError):
+                    pass
+
+    parts: list[str] = []
+
+    if unregistered:
+        parts.append(
+            "TARS notice: cron jobs not registered: "
+            + ", ".join(unregistered)
+            + ". Run /welcome step 7 to register them — Claude does not run in the "
+            "background, so unregistered jobs simply never fire."
+        )
+
+    if expiring_soon:
+        parts.append(
+            "TARS notice: CronCreate job(s) expiring soon: "
+            + ", ".join(expiring_soon)
+            + ". /maintain will re-register them automatically. "
+            "If /maintain is not scheduled, re-run /welcome step 7 or run "
+            "`/maintain` manually to renew."
+        )
+
+    return "\n\n".join(parts)
 
 
 def _migration_notice(vault: Path) -> str:

@@ -45,6 +45,7 @@ All vault writes go through `mcp__tars_vault__*` tools. External integrations re
 | Archive | "archive sweep" | Staleness archival with 90d backlink + active-task guardrails |
 | Worktrees | "list worktrees", `/maintain worktrees` | Discover, merge, and prune git worktrees |
 | Migrations | "run migrations", `/maintain migrations` | Apply pending schema/vault-structure migrations |
+| Re-register | "re-register jobs", `/maintain --re-register` | Switch or renew scheduler registrations with mutual exclusion |
 | Maintenance | "run maintenance", "housekeeping", cron | Archive + sync; inbox only if non-empty |
 
 **Automatic** (SessionStart): if `_system/housekeeping-state.yaml.last_run` is not today, the hook runs `archive --auto` + `sync --light` silently (surface-only; never applies without review). **Cron**: Friday 17:00 local by default (`_system/schedule.md`, registered via CronCreate in `/welcome`).
@@ -303,6 +304,58 @@ Each migration writes a results summary. On success, `housekeeping-state.yaml.pl
 
 ---
 
+## Re-register mode (`/maintain --re-register`)
+
+Triggered by: "re-register jobs", "switch scheduler", `/maintain --re-register`, or when the user wants to explicitly change which scheduler owns their TARS jobs.
+
+This is the ONLY supported path for switching a job from one scheduler to another. SessionStart and the weekly CronCreate renewal step never switch schedulers — they only maintain the current one.
+
+### Step 1: Show current state
+
+```
+Current scheduler registrations:
+  daily_briefing      → mcp__scheduled-tasks (job: abc-123)
+  weekly_briefing     → CronCreate (job: xyz-789, registered 2026-04-29 — expires in 5d)
+  weekly_maintenance  → CronCreate (job: xyz-790, registered 2026-04-29 — expires in 5d)
+  lint                → not_registered
+
+Available schedulers: mcp__scheduled-tasks (connected), CronCreate
+```
+
+Detect available schedulers using `mcp__tars_vault__resolve_capability(capability="scheduler")`.
+
+### Step 2: Present options
+
+```
+Re-register options:
+  [1] Switch all CronCreate jobs to mcp__scheduled-tasks (recommended — persistent)
+  [2] Switch all mcp__scheduled-tasks jobs to CronCreate
+  [3] Register unregistered jobs only
+  [4] Cancel all registrations (unregister everything)
+  [5] Cancel — keep current setup
+```
+
+### Step 3: Execute with mutual-exclusion enforcement
+
+For each job being re-registered:
+1. **Cancel the old registration first**, before creating the new one:
+   - `mcp__scheduled-tasks`: call the cancel/delete tool to remove the old job by stored ID.
+   - `CronCreate`: call `CronDelete` with the stored job ID.
+2. Create the new registration with the new scheduler, using the stored `schedule` value and the same `confirm_before_run` command form.
+3. Update `housekeeping-state.yaml`: `id`, `scheduler_type`, `cron_create_registered_at`, `status`.
+4. Update `_system/schedule.md` table row.
+5. Update `_system/install.yaml` `scheduler_type` if all jobs now share a single scheduler.
+
+**CRITICAL**: Always cancel the old job before creating the new one. Never leave both active simultaneously — even briefly — on a machine where both schedulers are accessible.
+
+### Constraints
+
+- NEVER register a new scheduler entry without cancelling the old one first.
+- If the old-job cancellation fails, abort the switch for that job and surface the error.
+- NEVER auto-switch schedulers during SessionStart or weekly maintenance — user consent required here.
+
+---
+
 ## Weekly mode (`/maintain --weekly`)
 
 Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user. Casual-mode installs do NOT register this cron; the mode still works on demand if invoked manually.
@@ -377,9 +430,18 @@ Pipeline:
      with reversibility notes.
    ```
 
-7. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for cooling-off windows: `last_run.archive_check` (7d), `last_run.persona_drift_check` (14d), and `last_run.pattern_scan` (any). All live under a new `last_run` block in `_system/housekeeping-state.yaml`; the SessionStart hook reads them when computing the cron-job notice (Phase 4).
+7. **CronCreate re-registration check (v3.3).** Read `_system/housekeeping-state.yaml` `cron_jobs` block. For each job where `scheduler_type == "CronCreate"`:
+   - Compute age from `cron_create_registered_at`.
+   - If age ≥ 5 days (within the 7-day TTL window), re-register with CronCreate using the stored `schedule` and the same `confirm_before_run` command form.
+   - Update `cron_create_registered_at` to today's ISO-8601 date after successful re-registration.
+   - Update the job row in `_system/schedule.md`.
+   - NEVER switch from CronCreate to `mcp__scheduled-tasks` here — use the same scheduler_type that was originally recorded.
+   - If re-registration fails (CronCreate not available in this session), log the failure to the weekly review file and do not change the housekeeping-state.
+   - Jobs with `scheduler_type == "mcp__scheduled-tasks"` are persistent — skip this step for them.
 
-8. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, curator_memory, curator_workflow, persona_drift_proposed, review_file_path}`.
+8. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for cooling-off windows: `last_run.archive_check` (7d), `last_run.persona_drift_check` (14d), and `last_run.pattern_scan` (any). All live under a new `last_run` block in `_system/housekeeping-state.yaml`; the SessionStart hook reads them when computing the cron-job notice.
+
+9. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, curator_memory, curator_workflow, persona_drift_proposed, review_file_path, cron_reregistered}`.
 
 The cron-fired session ends here. The user reviews `inbox/pending/weekly-review-YYYY-MM-DD.md` on their next interactive session via the existing inbox-surfacing flow in `/maintain inbox`.
 

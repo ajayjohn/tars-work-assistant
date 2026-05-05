@@ -79,8 +79,11 @@ Populated during onboarding (`/welcome`). Read from `_system/config.md`.
   - Skip review gates for low-stakes byproducts of `/create`, `/communicate`, `/think` (entity mentions, draft auto-files). High-stakes writes (people, decisions, performance, tasks) still confirm.
   - Suppress staleness/drift/curator proposals on session start. The user opted out of the weekly cron; surfacing the same noise on every session would defeat the point.
   - Auto-file `/create` outputs to `contexts/artifacts/YYYY-MM/` and `/communicate` drafts to `journal/YYYY-MM/` without companion files or schema review.
+- `scheduler_type`: which scheduler was used for job registration (`mcp__scheduled-tasks` | `CronCreate` | empty). Skills and hooks use this for mutual-exclusion checks — never register with a second scheduler while this field is set to a different one.
 
-Both fields are loaded at session start by hooks; skills can read via `mcp__tars_vault__read_note(file="install")` and consult `frontmatter.mode`.
+Scheduled-job behavior is governed by the per-job `confirm_before_run`, `auto_timeout_hours`, and `auto_timeout_action` fields in `_system/housekeeping-state.yaml` `cron_jobs`. See "Scheduled job execution protocol" below.
+
+All fields are loaded at session start by hooks; skills can read via `mcp__tars_vault__read_note(file="install")` and consult `frontmatter.mode`.
 
 ### Integrations — provider-agnostic resolver
 
@@ -334,6 +337,64 @@ Every workflow must:
 **When user suggests improvements**:
 - Capture as idea note in `_system/backlog/ideas/` using idea template
 - Set `tars-status: proposed`
+
+### Scheduled job execution protocol (confirm-before-run)
+
+When a cron-fired session opens and the prompt contains the text `"TARS scheduled:"`, this is a confirm-before-run session. Apply the following protocol instead of running the job directly.
+
+#### Step 1: Parse due jobs from the prompt
+
+The cron command text takes the form:
+```
+TARS scheduled: <job_name> is due. Accept, skip, or postpone?
+```
+
+Multiple jobs may fire simultaneously (e.g. daily briefing + weekly briefing both due on Monday morning). Read `_system/housekeeping-state.yaml` `cron_jobs` block to identify all jobs that are due today (match on schedule day/time vs current time).
+
+#### Step 2: Present the confirmation prompt
+
+Surface a single, consolidated prompt listing all due jobs:
+
+```
+⏰ TARS scheduled jobs due:
+  [1] Daily briefing (07:30 CT)
+  [2] Weekly briefing (Mon 08:00 CT)
+
+For each: accept / skip / postpone N hours
+Or: all / none / postpone all N hours
+
+If no response in {auto_timeout_hours}h, will {auto_timeout_action}.
+```
+
+Keep it short and scannable — this may appear as a notification the user sees briefly.
+
+#### Step 3: Execute based on user response
+
+| Response | Action |
+|----------|--------|
+| `accept` / `all` / `yes` | Run all due jobs in sequence |
+| `accept N` | Run only job N |
+| `skip` / `none` / `no` | Do not run; write skip record to journal |
+| `postpone N hours` / `postpone Nh` | Re-register a one-time cron firing at now + N hours |
+| No response (timeout) | Execute `auto_timeout_action` for each job |
+
+**Skip record**: when a job is skipped or timed-out to skip, write a one-line entry to `journal/YYYY-MM/YYYY-MM-DD-tars-job-skips.md`:
+```
+- {job_name} skipped at {HH:MM} — {reason: user-declined | timeout | postponed}
+```
+
+**Postpone**: re-register the job as a one-time cron at `now + N hours`. For `mcp__scheduled-tasks`, create a one-time task. For `CronCreate`, compute the future time and use `CronCreate` with that single timestamp. Do NOT cancel the recurring schedule — only this occurrence is postponed.
+
+**Repeated skips**: if the same job has been skipped 3+ times in the past 14 days (count entries in the skip journal), append a suggestion in the next briefing:
+> "You've skipped the weekly briefing 3 times recently. Want to change the schedule or disable it?"
+
+#### Step 4: Fully-automatic mode
+
+When `confirm_before_run: false` (default), the cron command is `"Run /briefing"` or `"Run /maintain --weekly"` — no confirmation prompt is shown. TARS executes immediately. This is the current v3.2 behavior, preserved as the default for all jobs.
+
+#### Step 5: Auto-run mode (timeout path)
+
+If `auto_timeout_action: run` and no user response was received, run the jobs silently at the end of the session. Add a notice to the next session's context: "Daily briefing auto-ran at 07:30 CT (no response to confirm prompt)."
 
 ### Write ordering
 
