@@ -157,14 +157,7 @@ Map each passing insight to the correct memory folder:
 
 For each insight that passes the durability test, classify against existing vault knowledge:
 
-| Classification | Action |
-|---------------|--------|
-| **NEW** | Present for review. Will create new content. |
-| **UPDATE** | Show diff to user: "Current: 'Jane leads platform.' Update to: 'Jane leads platform and mobile.' Update?" |
-| **REDUNDANT** | Skip silently. Mention in summary: "Already in memory. Skipping." |
-| **CONTRADICTS** | Ask user: "Memory says REST. Input says GraphQL. Which is current?" |
-
-Never persist REDUNDANT items. Never persist CONTRADICTS items without resolution.
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check-before-write). Never persist REDUNDANT items. Never persist CONTRADICTS items without resolution.
 
 ---
 
@@ -375,12 +368,7 @@ mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<topic keywords>", limi
 
 Compare against existing vault knowledge. Apply the knowledge check (Issue 7):
 
-| Classification | Action |
-|---------------|--------|
-| **NEW** | Include in wisdom report and propose for memory |
-| **UPDATE** | Note the enhancement. Show diff if proposing memory update. |
-| **REDUNDANT** | Include in report for completeness. Do NOT propose memory update. |
-| **CONTRADICTS** | Flag in report. Ask user which version to keep. |
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check-before-write).
 
 ---
 

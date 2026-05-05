@@ -36,6 +36,17 @@ Modes: **inbox** (classify and route pending items), **sync** (drift detection b
 
 Hygiene — broken wikilinks, orphans, schema violations, staleness banners, contradictions, framework self-state drift — moved to `/lint` in v3.1. Reference-update mode was retired (v2.1 artifact).
 
+## Relationship to `/lint`
+
+- **/maintain**: Workflow/ingest scope. Focuses on external boundary sync (inbox routing, calendar drift, task gap checks, git worktree hygiene).
+- **/lint**: Structural/hygiene scope. Focuses on intra-vault integrity (broken wikilinks, orphans, schema violations, staleness warnings).
+
+## Invocation contexts
+
+- **Interactive**: The user asks for a specific check (e.g., "process inbox") or the full pipeline ("run maintenance"). Results render directly in chat.
+- **Background (cron)**: `tars-weekly-maintenance` invokes `/maintain --weekly` silently. Nothing auto-applies; everything flows into a review queue note for the next session.
+- **Session startup**: The SessionStart hook may prompt the user to run maintenance if the `last_run` timestamp indicates it is due.
+
 All vault writes go through `mcp__tars_vault__*` tools. External integrations resolve via `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code provider names.
 
 | Mode | Trigger | Purpose |

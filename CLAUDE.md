@@ -171,11 +171,11 @@ On every session start, verify (most of these are driven by the SessionStart hoo
 3. **Vault accessible**: Run `obsidian daily:read`. If fails, report vault connection issue.
 4. **Schemas present**: Verify `_system/schemas.yaml` exists via `mcp__tars_vault__read_note(file="schemas")`.
 5. **Alias registry present**: Verify `_system/alias-registry.md` exists.
-6. **Integration registry fresh**: Hook reads `_system/tools-registry.yaml`. If missing or TTL (24h) exceeded, `mcp__tars_vault__refresh_integrations` repopulates from the live MCP tool roster.
-7. **Housekeeping state**: Read `_system/housekeeping-state.yaml`. If `last_run` is not today, run automatic daily maintenance (archive sweep, `/lint`, sync) silently unless the user's request is urgent.
-8. **Pending migrations**: The SessionStart hook runs `scripts/run-migrations.py --list` and surfaces a notice if any pending migrations exist (vault `plugin_version` behind plugin version). Offer `/maintain migrations` to apply them.
+6. **Integration registry**: Trust the hook to emit a stale registry notice.
+7. **Housekeeping state**: Trust the hook. Do not run maintenance pre-emptively; offer `/maintain` at the end of the session if a notice was emitted.
+8. **Pending migrations**: Trust the hook. Offer `/maintain migrations` if a notice was emitted.
 9. **Anthropic rendering skills**: Read `_system/config.md.tars-anthropic-skills`. `/create` uses this to gate office formats (pptx / docx / xlsx / pdf / web-artifacts-builder).
-10. **Cron jobs**: If briefing/maintenance/lint schedules are configured, verify cron jobs are active. Re-register any that expired.
+10. **Cron jobs**: Trust the hook to emit expiration notices.
 
 If the vault is not initialized (no `_system/config.md`), route to `/welcome` for onboarding.
 
