@@ -59,7 +59,7 @@ TARS operates on three verbs:
 | `mcp__tars_vault__resolve_capability` | Provider-agnostic integration resolver | hardcoded MCP server names |
 | `mcp__tars_vault__refresh_integrations` | Force re-discovery of MCP tools | — |
 
-**Hooks now enforce** tars-prefix checks, large-content rejection, alias-registry loading, changelog writes, and telemetry emission. Skill prompts do not re-assert these guarantees — the MCP server and `PreToolUse`/`PostToolUse`/`SessionStart` hooks handle them. If an obsidian-cli invocation appears in a skill body, treat it as a legacy example that maps to the tool above.
+**Hooks now enforce** tars-prefix checks, large-content rejection, alias-registry loading, and telemetry emission. Skill prompts do not re-assert these guarantees — the MCP server and `PreToolUse`/`PostToolUse`/`SessionStart` hooks handle them. Skills write daily-note summaries and changelog entries explicitly via `mcp__tars_vault__append_note`. If an obsidian-cli invocation appears in a skill body, treat it as a legacy example that maps to the tool above.
 
 ### User profile
 
@@ -124,20 +124,11 @@ Every response starts with the answer, recommendation, or key finding. Context f
 
 ### Banned phrases
 
-| Phrase | Why |
-|--------|-----|
-| Game-changing | LLM marker |
-| Delve | LLM marker |
-| Landscape | LLM marker |
-| Tapestry | LLM marker |
-| Bustling | LLM marker |
-| Synergize / Synergy | Corporate jargon |
-| Paradigm shift | Corporate jargon |
-| I hope this email finds you well | Waste of space |
-| Let's circle back | Be specific: "We will review Tuesday" |
-| Please kindly | Just "Please" |
-| Proactively / Seamlessly / Collaboratively | Adverb fluff |
-| Certainly! / Absolutely! | Bookend filler |
+**LLM markers** (avoid — signals generic AI output): Game-changing, Delve, Landscape, Tapestry, Bustling
+
+**Corporate jargon**: Synergize/Synergy, Paradigm shift
+
+**Filler and fluff**: "I hope this email finds you well" (waste of space), "Let's circle back" (be specific: "We will review Tuesday"), "Please kindly" (just "Please"), Proactively/Seamlessly/Collaboratively (adverb fluff), "Certainly!"/"Absolutely!" (bookend filler)
 
 ### Structural constraints
 
@@ -545,34 +536,7 @@ When a question about a meeting discussion cannot be answered from journal entri
 
 Before beginning any strategic analysis, select 1-2 frameworks and state the selection: "I am approaching this using [Framework] because [Reason]."
 
-### Framework catalog
-
-**Vision and product**
-
-| Framework | When to use |
-|-----------|-------------|
-| Working Backwards | Clarifying customer value. Start with press release/FAQ. |
-| Jobs-to-be-Done | Understanding the progress the user is trying to make |
-| North Star | Identifying the single metric that captures long-term value |
-
-**Prioritization**
-
-| Framework | When to use |
-|-----------|-------------|
-| Cost of Delay (CD3) | Quantifying economic impact of speed vs perfection |
-| Cynefin | Categorizing the problem domain (Simple/Complicated/Complex/Chaotic) |
-| One-Way vs Two-Way Doors | Distinguishing reversible experiments from irreversible commitments |
-| Eisenhower Matrix | Protecting time from urgency bias |
-
-**Risk and critical thinking**
-
-| Framework | When to use |
-|-----------|-------------|
-| Pre-Mortem | Assume failure 6 months out. What caused it? |
-| First Principles | Breaking down to fundamental truths. Remove assumptions. |
-| Red Team Critique | Adversarial review of a plan or proposal |
-| Inversion (Munger) | "What guarantees failure?" Then check if we're avoiding it. |
-| Second-Order Thinking | What happens after the obvious consequence? |
+The full framework catalog (Working Backwards, Jobs-to-be-Done, North Star, CD3, Cynefin, One-Way vs Two-Way Doors, Eisenhower, Pre-Mortem, First Principles, Red Team, Inversion, Second-Order Thinking) lives in `skills/think/manifesto.md` and is loaded when `/think` is invoked.
 
 ---
 

@@ -186,7 +186,7 @@ mcp__tars_vault__update_frontmatter(file=<task>, property="tars-escalation-level
 mcp__tars_vault__move_note(src="journal/YYYY-MM-DD.md", dst="journal/YYYY-MM/YYYY-MM-DD.md")
 ```
 
-All writes flow through the `tars-vault` MCP server, which logs to `_system/changelog/YYYY-MM-DD.md` via the PostToolUse hook.
+All writes flow through the `tars-vault` MCP server. The PostToolUse hook emits `vault_write` telemetry for each mutation. Skills write changelog entries explicitly.
 
 ### Step 6.5: --actions mode (queued review)
 
@@ -231,7 +231,7 @@ Emit one `lint_run` telemetry event per invocation:
 }
 ```
 
-The PostToolUse hook appends a lint-summary line to the daily note. No explicit daily-note append is required.
+Append the lint summary to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`.
 
 ---
 
@@ -240,7 +240,8 @@ The PostToolUse hook appends a lint-summary line to the daily note. No explicit 
 `/lint` runs nightly at 02:00 local time via CronCreate (see §26.7). The scheduled run:
 
 - Surfaces proposals only — never applies auto-fixes without user review.
-- Writes its report to `journal/YYYY-MM/YYYY-MM-DD-lint.md`.
+- **Empty-review skip gate**: if a scheduled run completes Steps 1–4 with zero Critical, Warning, or Auto-fixable findings, skip the review file write entirely. Emit a `lint_clean` telemetry event (`{event: "lint_clean", scope: "scheduled", checks_run: N}`) and exit. This prevents inbox clutter from clean-vault runs.
+- When findings exist, writes its report to `journal/YYYY-MM/YYYY-MM-DD-lint.md`.
 - Emits telemetry.
 - Skips if `_system/housekeeping-state.yaml` shows a manual lint already ran in the last 12h.
 
@@ -250,7 +251,7 @@ The PostToolUse hook appends a lint-summary line to the daily note. No explicit 
 
 1. Never auto-resolve contradictions — humans decide which version is current.
 2. Never delete files; propose archive via `mcp__tars_vault__archive_note` (which enforces the 90-day backlink + active-task guardrails).
-3. Never write to the vault without the PostToolUse hook path; bypass would skip the changelog entry.
+3. Never bypass `mcp__tars_vault__*` tools for vault writes — the PostToolUse hook emits telemetry on each mutation.
 4. Never run on stale `housekeeping-state.yaml` without refreshing it afterwards — the nightly cadence depends on that marker.
 5. Auto-fix scope is narrow: wikilink artifacts, missing required schema fields with computable defaults, alias-registry sync, framework self-state drift, unfiled journal entries. Anything touching body content needs explicit review.
 6. Never surface more than 50 findings in a single report — paginate or narrow with `--focus` if over-large.

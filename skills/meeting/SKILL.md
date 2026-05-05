@@ -789,11 +789,20 @@ Report all unresolved names in the output summary.
 
 ---
 
-## Step 13: Daily-note + changelog (handled by PostToolUse hook)
+## Step 13: Daily-note + changelog
 
-The `PostToolUse` hook appends a structured entry to `_system/changelog/YYYY-MM-DD.md` on every successful vault mutation (skill, tool, file, batch_id, timestamp). Daily-note appends are batched by the same hook.
+The `PostToolUse` hook emits a `vault_write` telemetry event for each MCP write. It does not write to the daily note or changelog.
 
-Skills no longer emit per-workflow changelog entries. If richer batch context is needed (e.g., "this was meeting processing for transcript X"), emit a telemetry event via the MCP server rather than writing to the changelog directly.
+Append a meeting-processing summary to today's daily note explicitly:
+
+```
+mcp__tars_vault__append_note(
+  file="journal/YYYY-MM-DD",
+  content="## Meeting processed: [[YYYY-MM-DD Meeting Title]]\n- Tasks: N created (of M extracted)\n- Memory: N updates\n- Transcript: archived to [[archive/transcripts/...]]\n"
+)
+```
+
+Write a changelog entry to `_system/changelog/YYYY-MM-DD.md` with batch_id for rollback.
 
 Emit at minimum: `meeting_processed`, `tasks_proposed`, `memory_proposed`.
 
@@ -818,7 +827,7 @@ mcp__tars_vault__append_note(file="<issue-note>",
   content="## Occurrence YYYY-MM-DD\n<Error context from this run>")
 ```
 
-Note: the `PostToolUse` hook also auto-dedupes framework-level MCP failures into `_system/backlog/issues/`. This step is for pipeline-level errors (missed calendar match, unresolved attendee, secret-scan block) that the hook wouldn't see.
+Note: the `PostToolUse` hook emits telemetry only. Backlog deduplication is the skill's responsibility. This step covers pipeline-level errors (missed calendar match, unresolved attendee, secret-scan block).
 
 ### If new issue
 

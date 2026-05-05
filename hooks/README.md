@@ -11,7 +11,7 @@ stdin, validate the environment, and exit 0 without writing.
 |------|-----------|---------|
 | `session-start.py` | SessionStart | staleness banner, reach-ability checks, alias-registry head-load, cron health |
 | `pre-tool-use.py` | PreToolUse | block obsidian `create` with no args; warn on >40KB payload; enforce `tars-` prefix |
-| `post-tool-use.py` | PostToolUse | append changelog row; dedupe backlog issues on failure |
+| `post-tool-use.py` | PostToolUse | emit `vault_write` telemetry event on successful vault-mutating MCP calls |
 | `pre-compact.py` | PreCompact | flush decisions/commitments to `inbox/pending/claude-session-*.md` |
 | `session-end.py` | SessionEnd | same as PreCompact for sessions that close without compacting |
 | `instructions-loaded.py` | InstructionsLoaded | append `skill_loaded` to telemetry jsonl |

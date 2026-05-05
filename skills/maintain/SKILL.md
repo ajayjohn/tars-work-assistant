@@ -119,7 +119,7 @@ NEVER delete source files. The subsequent archive-sweep step (§below) moves `in
 
 ### Step 6: Summary
 
-Emit `inbox_processed` telemetry. PostToolUse hook writes the daily-note summary.
+Emit `inbox_processed` telemetry. Append an inbox-processing summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -176,7 +176,7 @@ Surface for user decision: update profile with recent insights (routes to `/lear
 
 (Telemetry rollup moved to `/lint` per the v3.1 boundary; the rollup script `scripts/telemetry-rollup.py` is the single source of truth and is consumed by `/briefing` weekly footer + `/maintain --weekly`. Source `.jsonl` retention is 90 days rolling — older files move to `_system/telemetry/archive/YYYY-MM.jsonl.gz` on the weekly maintenance run.)
 
-Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. PostToolUse hook writes the daily-note summary.
+Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. Append the sync summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -469,7 +469,7 @@ Triggered by: "run maintenance", "housekeeping", or cron.
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_run",     value="YYYY-MM-DD")
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_success", value=true)
    ```
-7. Emit `maintenance_run` telemetry. PostToolUse hook writes daily-note summary.
+7. Emit `maintenance_run` telemetry. Append the maintenance summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -497,5 +497,5 @@ Triggered by: "run maintenance", "housekeeping", or cron.
 
 ### Universal
 - ALWAYS emit telemetry for every mode run (`inbox_processed`, `sync_completed`, `archive_swept`, `maintenance_run`).
-- ALWAYS use `mcp__tars_vault__*` tools for vault writes; PostToolUse hook handles changelog.
+- ALWAYS use `mcp__tars_vault__*` tools for vault writes. Append daily-note and changelog entries explicitly.
 - NEVER use direct file I/O for vault content.

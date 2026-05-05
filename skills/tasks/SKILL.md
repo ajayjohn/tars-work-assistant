@@ -256,9 +256,9 @@ On create, emit these fields unset — `/lint`'s task-age check fills them in an
 
 ---
 
-## Step 8: Daily-note log (handled by PostToolUse hook)
+## Step 8: Daily-note log
 
-The `PostToolUse` hook appends a tasks-extracted summary line to the daily note after the last `create_note` call completes. Emit telemetry events `task_proposed` (count, accountability_pass_count) and `task_persisted` (count).
+The `PostToolUse` hook emits `vault_write` telemetry for each MCP write. Append a tasks-extracted summary to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`. Emit telemetry events `task_proposed` (count, accountability_pass_count) and `task_persisted` (count).
 
 ---
 
@@ -394,7 +394,7 @@ mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-st
 mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-completed",    value="YYYY-MM-DD")
 mcp__tars_vault__update_frontmatter(file="Review hiring plan", property="tars-completed-by", value="[[User Name]]")
 ```
-The PostToolUse hook writes the daily-note "task completed" line. Emit telemetry `task_completed`.
+Append the "task completed" line to today's daily note explicitly via `mcp__tars_vault__append_note`. Emit telemetry `task_completed`.
 
 ### Reprioritize a task
 
