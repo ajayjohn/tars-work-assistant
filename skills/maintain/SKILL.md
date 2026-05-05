@@ -10,23 +10,29 @@ triggers:
   - "sync"
   - "check for gaps"
   - "archive sweep"
+  - "worktrees"
+  - "list worktrees"
 help:
   purpose: |-
     Vault maintenance scoped to ingest-adjacent workflows: inbox processing, calendar/task sync,
-    and archive sweep. Hygiene checks (broken links, orphans, schema violations, staleness,
-    contradictions, framework state drift) moved to `/lint` in v3.1.
+    archive sweep, worktree hygiene, and pending vault migrations. Hygiene checks (broken links,
+    orphans, schema violations, staleness, contradictions, framework state drift) moved to
+    `/lint` in v3.1.
   use_cases:
     - "Process my inbox"
     - "Sync tasks and calendar"
     - "Check for gaps"
     - "Archive stale notes"
     - "Run maintenance"
-  scope: maintenance,inbox,sync,archive,housekeeping
+    - "List worktrees"
+    - "Merge / prune worktrees"
+    - "Run pending migrations"
+  scope: maintenance,inbox,sync,archive,housekeeping,worktrees,migrations
 ---
 
 # Maintain skill: inbox, sync, and archive
 
-Three modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails). A fourth "maintenance" trigger runs all three in sequence.
+Modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
 
 Hygiene — broken wikilinks, orphans, schema violations, staleness banners, contradictions, framework self-state drift — moved to `/lint` in v3.1. Reference-update mode was retired (v2.1 artifact).
 
@@ -37,6 +43,8 @@ All vault writes go through `mcp__tars_vault__*` tools. External integrations re
 | Inbox | "process inbox" | Classify and route pending inbox items (multimodal) |
 | Sync | "sync", "check for gaps" | Calendar gaps, task drift, memory freshness |
 | Archive | "archive sweep" | Staleness archival with 90d backlink + active-task guardrails |
+| Worktrees | "list worktrees", `/maintain worktrees` | Discover, merge, and prune git worktrees |
+| Migrations | "run migrations", `/maintain migrations` | Apply pending schema/vault-structure migrations |
 | Maintenance | "run maintenance", "housekeeping", cron | Archive + sync; inbox only if non-empty |
 
 **Automatic** (SessionStart): if `_system/housekeeping-state.yaml.last_run` is not today, the hook runs `archive --auto` + `sync --light` silently (surface-only; never applies without review). **Cron**: Friday 17:00 local by default (`_system/schedule.md`, registered via CronCreate in `/welcome`).
@@ -199,6 +207,99 @@ Archive all / select specific / skip
 
 4. For approved items: `mcp__tars_vault__archive_note(file=…)`. The server applies the `tars/archived` tag, moves to `archive/<entity-type>/YYYY-MM/`, and logs.
 5. Also sweep `inbox/processed/`: items older than 7 days (by `tars-inbox-processed` date) move to `archive/inbox/YYYY-MM/`. Never deletes originals.
+
+---
+
+## Worktrees mode (`/maintain worktrees`)
+
+Triggered by: "list worktrees", "worktree hygiene", "clean up worktrees", or explicitly `/maintain worktrees`.
+
+When Claude Code runs sessions in isolated git worktrees, stale branches accumulate over time. This mode surfaces them and lets the user merge or prune each one.
+
+### Step 1: Discover worktrees
+
+```bash
+git worktree list --porcelain
+```
+
+Parse the output into a list of `{path, branch, HEAD}` records. Skip the main worktree (first entry). For each non-main worktree:
+
+- Compute `commits_ahead` vs `main`: `git rev-list --count main..<branch>`
+- Check last-commit date: `git log -1 --format="%ci" <branch>`
+- Check if any TARS vault files were written in this worktree (look for new/modified `.md` files relative to `main`)
+
+### Step 2: Present inventory
+
+```
+Active worktrees (excluding main):
+  1. claude/feature-xyz  (3 commits ahead, last activity: 2026-04-28)
+     — 2 vault files modified (may need merge review)
+  2. claude/old-task     (0 commits ahead, last activity: 2026-03-10)
+     — nothing ahead of main; safe to prune
+
+Actions: [merge N] [prune N] [merge all safe] [prune all stale] [skip]
+```
+
+A worktree is **safe to prune** when it has 0 commits ahead of main and its last activity is older than 7 days.
+
+### Step 3: Execute user selection
+
+- **Merge N**: run `git merge <branch>` from the main worktree checkout, then offer to run `git worktree remove <path> --force` on success.
+- **Prune N**: run `git worktree remove <path> --force` (safe-to-prune only; confirm on others).
+- **Prune all stale**: batch-prune all 0-commits-ahead worktrees older than 7 days without additional confirmation.
+- After pruning: run `git worktree prune` to clean up stale admin files.
+
+### Step 4: Summary
+
+Report counts: merged, pruned, skipped. Log to `_system/changelog/YYYY-MM-DD.md` if any action was taken.
+
+### Constraints
+
+- NEVER merge without showing the commit delta first.
+- NEVER prune a worktree that has commits ahead of main without explicit user confirmation.
+- NEVER run destructive git operations (reset, force-push) — merge and worktree-remove only.
+
+---
+
+## Migrations mode (`/maintain migrations`)
+
+Triggered by: "run migrations", "run pending migrations", or as part of `/maintain --realign` (Phase 5).
+
+Applies pending schema and vault-structure migrations that ship with each plugin version. Migrations are idempotent Python scripts in `scripts/migrations/`.
+
+### Step 1: Check pending migrations
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
+```
+
+This compares `_system/housekeeping-state.yaml.plugin_version` against the available migration scripts and prints pending ones.
+
+### Step 2: Present the list
+
+```
+Pending migrations (vault is at v3.1.x; plugin is v3.3.0):
+  1. v3.2.0-add-tars-category       — backfill tars-category on 228 task notes
+  2. v3.3.0-backfill-journal-aliases — add aliases to 13+ journal files with slug mismatch
+
+Run all? [all / pick specific N,M / dry-run first / skip]
+```
+
+Always offer dry-run first. Never apply without user acknowledgement.
+
+### Step 3: Apply
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --apply [--migration v3.2.0-add-tars-category]
+```
+
+Each migration writes a results summary. On success, `housekeeping-state.yaml.plugin_version` advances to match the plugin.
+
+### Constraints
+
+- NEVER apply migrations without showing the dry-run diff first.
+- Migrations are additive-only — they set missing fields, never delete or rename user content.
+- A failed migration leaves a partial results file in `journal/YYYY-MM/migration-<id>-FAILED.md` and does NOT advance the version.
 
 ---
 

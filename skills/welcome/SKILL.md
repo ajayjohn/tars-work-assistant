@@ -617,10 +617,30 @@ If CronCreate is not available in the environment:
 - Note that session-start housekeeping (core skill) serves as fallback
 - Inform user they can register jobs manually later
 
+### Migration check (Step 7 tail)
+
+After recording job IDs, check whether any migrations are pending:
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
+```
+
+If pending migrations are found:
+1. Surface a notice: "N pending migration(s) need to run to bring your vault up to plugin version X.X.X."
+2. Offer to run them now: "Run migrations now? [Y/n — recommended for fresh onboarding]"
+3. If accepted: run `python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --dry-run`, show the plan, then confirm before `--apply`.
+4. On success, `plugin_version` in housekeeping-state.yaml advances automatically.
+5. If declined: remind user they can run `/maintain migrations` at any time.
+
+For an existing vault being re-onboarded (user ran /welcome --relocate or upgrade):
+- Always run the migration check — the vault may be multiple versions behind.
+- Apply migrations before completing onboarding so the vault is schema-current before first use.
+
 Update `_system/maturity.yaml`:
 ```yaml
 onboarding:
   cron_jobs: true  # or false if skipped
+  migrations_applied: true  # or false if skipped/deferred
 ```
 
 ---
