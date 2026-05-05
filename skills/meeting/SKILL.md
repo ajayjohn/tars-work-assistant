@@ -224,7 +224,7 @@ Use `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for par
 
 Classify each piece of information from the transcript against existing vault knowledge:
 
-Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check-before-write).
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing).
 
 ### Report to user
 
@@ -672,7 +672,7 @@ All 4 criteria must pass:
 
 For each item passing the durability test, compare against the vault inventory from Step 5:
 
-Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check-before-write).
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing).
 
 ### Negative sentiment detection (Issue 8)
 
