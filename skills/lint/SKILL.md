@@ -44,7 +44,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | `lint --actions` | Run all checks in dry-run, then materialize each fixable finding as a numbered option in a single review queue. Same surface as `lint --actions wikilinks` but spans every check. Used directly by users and as a sub-step of `/maintain --weekly` | No |
 | `lint --actions wikilinks` | Subset: only wikilink remediations (auto_safe / needs_review / unresolvable buckets from `scripts/fix-wikilinks.py --repair-broken --dry-run`) | No |
 | `lint --actions patterns` | Subset: user-model + workflow proposals from `/learn --review-patterns` (Phase 6) | No |
-
+| `lint --actions curator` | Subset: memory-staleness (90d) + workflow-staleness (60d) + persona-drift proposals. Respects `tars-pinned: true`. | No |
 | `lint --focus orphans` | Orphan + sparse subset | No |
 | `lint --focus schema` | Schema validation subset | No |
 | `lint --focus stale` | Staleness-tier subset | No |
@@ -209,7 +209,7 @@ When invoked as `lint --actions` (or `lint --actions <subset>`), do not present 
      (a) `scripts/fix-wikilinks.py --repair-broken --json` — bracket-artifact repairs (auto_safe auto-applied; needs_review surfaced).
      (b) `scripts/heal-wikilinks.py --json --dry-run` — fuzzy broken-link repairs. distance≤1 rows become auto-fixable entries; distance=2 rows become suggestion entries. Apply auto-fix bucket by running `scripts/heal-wikilinks.py --apply`; apply is logged to `_system/changelog/`. Never auto-apply suggestion bucket — present to user with the ranked candidates.
    - `lint --actions patterns` → user-model + workflow proposals only. Sources its candidate list from `/learn --review-patterns` (Phase 6); no telemetry re-aggregation here. Each proposal renders as `kind=user-model field=<f> before=<v> after=<v> evidence=<count>×<window>` or `kind=workflow id=<id> trigger="…" steps=[…]`. Selection: `accept all`, `accept N`, `review each`, `skip`. (Phase 6)
-
+   - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only. Source: `scripts/archive.py --vault $TARS_VAULT_PATH --json --check all` plus the persona-drift check described in `skills/maintain/SKILL.md` weekly mode step 5. Each row labels its kind (`memory:<file>`, `workflow:<id>`, `persona:<from>→<to>`) plus age and the protection set for memory items. Selection: `archive all`, `archive N,M`, `review each`, `skip`. On "archive", call `mcp__tars_vault__archive_note(file=…)`. Workflow items become `workflows.yaml` edits via `mcp__tars_vault__write_note_from_content`. Persona-switch acceptance updates `_system/install.yaml` `persona:` field via `mcp__tars_vault__update_frontmatter`. Every action logs to `_system/changelog/YYYY-MM-DD.md` with `{action: archive|workflow-retire|persona-switch, target, reversibility: <how to undo>, batch_id}`.
    - `lint --actions` (no subset) → all of the above plus schema, framework, dedupe, sparse, telemetry-lint surfaces.
 
 6. Emit a `lint_actions_queued` telemetry event with `{count, subset, surface: "inline"|"weekly-review"}`.
