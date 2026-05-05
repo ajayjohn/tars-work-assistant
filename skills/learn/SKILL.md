@@ -81,7 +81,7 @@ For each entity or topic identified:
 mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<entity>", limit=5)
 ```
 
-Phase 4 adds `mcp__tars_vault__fts_search` for paraphrase/body matching — important for REDUNDANT detection where a different phrasing captures the same fact.
+Use `mcp__tars_vault__fts_search` for paraphrase/body matching — important for REDUNDANT detection where a different phrasing captures the same fact.
 
 Then read the specific files that match:
 

@@ -53,9 +53,9 @@ TARS operates on three verbs:
 | `mcp__tars_vault__move_note` | Move preserving wikilinks | manual move |
 | `mcp__tars_vault__resolve_alias` | Canonical-name lookup via alias registry | substring match |
 | `mcp__tars_vault__scan_secrets` | Run secret scan | `python3 scripts/scan-secrets.py` |
-| `mcp__tars_vault__fts_search` | Tier-A keyword search (Phase 4) | — |
-| `mcp__tars_vault__semantic_search` | Tier-B hybrid search (Phase 4) | — |
-| `mcp__tars_vault__classify_file` | Organization Engine classifier (Phase 3/7) | — |
+| `mcp__tars_vault__fts_search` | Tier-A keyword search (FTS5 over memory) | — |
+| `mcp__tars_vault__semantic_search` | Tier-B hybrid search (semantic + FTS over prose) | — |
+| `mcp__tars_vault__classify_file` | Organization Engine classifier | — |
 | `mcp__tars_vault__resolve_capability` | Provider-agnostic integration resolver | hardcoded MCP server names |
 | `mcp__tars_vault__refresh_integrations` | Force re-discovery of MCP tools | — |
 
