@@ -44,13 +44,13 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | `lint --actions` | Run all checks in dry-run, then materialize each fixable finding as a numbered option in a single review queue. Same surface as `lint --actions wikilinks` but spans every check. Used directly by users and as a sub-step of `/maintain --weekly` | No |
 | `lint --actions wikilinks` | Subset: only wikilink remediations (auto_safe / needs_review / unresolvable buckets from `scripts/fix-wikilinks.py --repair-broken --dry-run`) | No |
 | `lint --actions patterns` | Subset: user-model + workflow proposals from `/learn --review-patterns` (Phase 6) | No |
-| `lint --actions curator` | Subset: memory-staleness (90d) + workflow-staleness (60d) + persona-drift proposals. Respects `tars-pinned: true`. Phase 7 finishes the wiring | No |
+| `lint --actions curator` | Subset: memory-staleness (90d) + workflow-staleness (60d) + persona-drift proposals. Respects `tars-pinned: true`. | No |
 | `lint --focus orphans` | Orphan + sparse subset | No |
 | `lint --focus schema` | Schema validation subset | No |
 | `lint --focus stale` | Staleness-tier subset | No |
 | `lint --focus contradictions` | Contradiction detection subset | No |
 | `lint --focus framework` | Framework self-state drift | No |
-| `lint --focus organize` | Organization-engine proposals (§3.7) | No (v3.1 placeholder; full wiring Phase 7) |
+
 
 ---
 
@@ -58,7 +58,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 
 | Check | Source | Auto-fixable | Action on fail |
 |-------|--------|-------------:|----------------|
-| Broken wikilinks | `mcp__tars_vault__search_by_tag` over all `[[…]]` patterns + `resolve_alias` | No | Propose: fix via alias registry / create stub / flag unverified |
+| Broken wikilinks | `scripts/health-check.py` (exact match) + `scripts/heal-wikilinks.py` (fuzzy, v3.3) | Partial (distance≤1 auto-fix; distance=2 suggest; distance>2 none) | Auto-apply distance≤1 fixes with `--apply`; surface distance=2 suggestions as numbered options; unresolvable → propose create-stub or flag |
 | Quadruple-bracket artifacts (`[[[[Name]]|Alias]]`, `[[[[Name]]]]`) | regex via `scripts/fix-wikilinks.py --json` | Yes | Auto-fix with confirmation |
 | Orphan notes (0 backlinks, not referenced from a `.base` view) | link graph from `search_by_tag` | No | Propose archive or tag `tars/orphan` |
 | Missing backlinks (A links B; B doesn't reflect A) | graph | Partial | Informational; offer to insert a reference when source is memory |
@@ -70,10 +70,10 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Contradictions across related notes | LLM pass over entities co-linked in last 90d | No | Flag; do NOT auto-resolve |
 | Unfiled journal entries (loose `journal/YYYY-MM-DD.md` at journal root) | path check | Yes | Propose `mcp__tars_vault__move_note` into `journal/YYYY-MM/` |
 | Framework self-state drift (`_system/maturity.yaml` vs actual counts; `housekeeping-state.yaml` last_run vs telemetry) | vault scan + telemetry | Yes | Propose update via `update_frontmatter` |
-| Install record health (`_system/install.yaml` missing, empty `vault_path`, `vault_path` ≠ current vault root, `plugin_version` older than `.claude-plugin/plugin.json`) | direct read of `_system/install.yaml` and `.claude-plugin/plugin.json` | Partial (refresh `last_session_at` and `plugin_version`; rest needs user) | Propose `/welcome --relocate` for path mismatch; auto-refresh trivial fields |
+| Install record health + version drift (`_system/install.yaml` missing, empty `vault_path`, `vault_path` ≠ current vault root, or `plugin_version` in either `_system/install.yaml` or `_system/housekeeping-state.yaml` older than `.claude-plugin/plugin.json`) | direct read of `_system/install.yaml`, `_system/housekeeping-state.yaml`, and `.claude-plugin/plugin.json` | Partial (refresh `last_session_at` and `plugin_version`; path mismatch + pending migrations need user) | Propose `/welcome --relocate` for path mismatch; offer `/maintain migrations` for version drift; auto-refresh trivial fields |
 | Observed-vs-declared drift (`_system/user-model.md` differs from `_system/config.md`: e.g. observed `tars-bluf-tolerance: low` vs declared `tars-bluf-level: high`) | direct read of both notes | No | Surface; recommend `/learn --review-patterns` or a manual config edit |
 | User-model staleness (`tars-last-pattern-scan` empty or older than 14d AND there is recent telemetry) | `_system/user-model.md` frontmatter + telemetry mtimes | No | Propose `/learn --review-patterns` |
-| Workflows registry health (`_system/workflows.yaml` missing, schema-invalid, or contains entries whose `last_used` is null after 60d AND not pinned) | direct read of the registry | No | Surface for review; retirement proposals come from Phase 7 curator |
+| Workflows registry health (`_system/workflows.yaml` missing, schema-invalid, or contains entries whose `last_used` is null after 60d AND not pinned) | direct read of the registry | No | Surface for review |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
 | Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
 | Telemetry lint — memories saved 90d ago never re-read (durability miss) | `_system/telemetry/*.jsonl` → `memory_persisted` vs subsequent `vault_write`/`answer_delivered` hits | No | Surface for user review |
@@ -93,15 +93,24 @@ Determine which checks to run based on the mode trigger. For the default "all" m
 Call Python scripts in parallel where independent, collect JSON results:
 
 ```
-scripts/validate-schema.py --vault <TARS_VAULT_PATH> --json
-scripts/scan-secrets.py    --vault <TARS_VAULT_PATH> --json
-scripts/health-check.py    --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
-scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
-scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json --repair-broken
-                                  # broken-link scan; classifies into
-                                  # auto_safe / needs_review / unresolvable.
-                                  # --apply only acts on auto_safe; the
-                                  # other buckets surface as /lint actions.
+scripts/validate-schema.py  --vault <TARS_VAULT_PATH> --json
+scripts/scan-secrets.py     --vault <TARS_VAULT_PATH> --json
+scripts/health-check.py     --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
+scripts/fix-wikilinks.py    --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
+scripts/fix-wikilinks.py    --vault <TARS_VAULT_PATH> --json --repair-broken
+                                   # broken-link scan; classifies into
+                                   # auto_safe / needs_review / unresolvable.
+                                   # --apply only acts on auto_safe; the
+                                   # other buckets surface as /lint actions.
+scripts/heal-wikilinks.py   --vault <TARS_VAULT_PATH> --json --dry-run
+                                   # fuzzy broken-link healer (v3.3).
+                                   # Three-stage pipeline: slug-normalization →
+                                   # alias-registry → Levenshtein ≤2.
+                                   # distance ≤ 1 → auto_fix bucket (safe to apply).
+                                   # distance = 2 → suggest bucket (surface to user).
+                                   # distance > 2 → unresolvable.
+                                   # Run AFTER fix-wikilinks.py so artifact-bracket
+                                   # repairs are already applied.
 ```
 
 ### Step 3: Run MCP-backed checks
@@ -177,7 +186,7 @@ mcp__tars_vault__update_frontmatter(file=<task>, property="tars-escalation-level
 mcp__tars_vault__move_note(src="journal/YYYY-MM-DD.md", dst="journal/YYYY-MM/YYYY-MM-DD.md")
 ```
 
-All writes flow through the `tars-vault` MCP server, which logs to `_system/changelog/YYYY-MM-DD.md` via the PostToolUse hook.
+All writes flow through the `tars-vault` MCP server. The PostToolUse hook emits `vault_write` telemetry for each mutation. Skills write changelog entries explicitly.
 
 ### Step 6.5: --actions mode (queued review)
 
@@ -196,9 +205,11 @@ When invoked as `lint --actions` (or `lint --actions <subset>`), do not present 
    - **/maintain --weekly** — render the queue as a markdown section and append to `inbox/pending/weekly-review-YYYY-MM-DD.md`. Do not auto-apply anything. The user reviews on next session.
 
 5. Subset selectors filter to a single check class:
-   - `lint --actions wikilinks` → broken-link / artifact rows only (Phase 2)
+   - `lint --actions wikilinks` → broken-link / artifact rows only. Sources:
+     (a) `scripts/fix-wikilinks.py --repair-broken --json` — bracket-artifact repairs (auto_safe auto-applied; needs_review surfaced).
+     (b) `scripts/heal-wikilinks.py --json --dry-run` — fuzzy broken-link repairs. distance≤1 rows become auto-fixable entries; distance=2 rows become suggestion entries. Apply auto-fix bucket by running `scripts/heal-wikilinks.py --apply`; apply is logged to `_system/changelog/`. Never auto-apply suggestion bucket — present to user with the ranked candidates.
    - `lint --actions patterns` → user-model + workflow proposals only. Sources its candidate list from `/learn --review-patterns` (Phase 6); no telemetry re-aggregation here. Each proposal renders as `kind=user-model field=<f> before=<v> after=<v> evidence=<count>×<window>` or `kind=workflow id=<id> trigger="…" steps=[…]`. Selection: `accept all`, `accept N`, `review each`, `skip`. (Phase 6)
-   - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only. Source: `scripts/archive.py --vault $TARS_VAULT_PATH --json --check all` plus the persona-drift check described in `skills/maintain/SKILL.md` weekly mode step 5. Each row labels its kind (`memory:<file>`, `workflow:<id>`, `persona:<from>→<to>`) plus age and the protection set for memory items. Selection: `archive all`, `archive N,M`, `review each`, `skip`. On "archive", call `mcp__tars_vault__archive_note(file=…)`. Workflow items become `workflows.yaml` edits via `mcp__tars_vault__write_note_from_content`. Persona-switch acceptance updates `_system/install.yaml` `persona:` field via `mcp__tars_vault__update_frontmatter`. Every action logs to `_system/changelog/YYYY-MM-DD.md` with `{action: archive|workflow-retire|persona-switch, target, reversibility: <how to undo>, batch_id}`. (Phase 7)
+   - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only. Source: `scripts/archive.py --vault $TARS_VAULT_PATH --json --check all` plus the persona-drift check described in `skills/maintain/SKILL.md` weekly mode step 5. Each row labels its kind (`memory:<file>`, `workflow:<id>`, `persona:<from>→<to>`) plus age and the protection set for memory items. Selection: `archive all`, `archive N,M`, `review each`, `skip`. On "archive", call `mcp__tars_vault__archive_note(file=…)`. Workflow items become `workflows.yaml` edits via `mcp__tars_vault__write_note_from_content`. Persona-switch acceptance updates `_system/install.yaml` `persona:` field via `mcp__tars_vault__update_frontmatter`. Every action logs to `_system/changelog/YYYY-MM-DD.md` with `{action: archive|workflow-retire|persona-switch, target, reversibility: <how to undo>, batch_id}`.
    - `lint --actions` (no subset) → all of the above plus schema, framework, dedupe, sparse, telemetry-lint surfaces.
 
 6. Emit a `lint_actions_queued` telemetry event with `{count, subset, surface: "inline"|"weekly-review"}`.
@@ -220,7 +231,7 @@ Emit one `lint_run` telemetry event per invocation:
 }
 ```
 
-The PostToolUse hook appends a lint-summary line to the daily note. No explicit daily-note append is required.
+Append the lint summary to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`.
 
 ---
 
@@ -229,7 +240,8 @@ The PostToolUse hook appends a lint-summary line to the daily note. No explicit 
 `/lint` runs nightly at 02:00 local time via CronCreate (see §26.7). The scheduled run:
 
 - Surfaces proposals only — never applies auto-fixes without user review.
-- Writes its report to `journal/YYYY-MM/YYYY-MM-DD-lint.md`.
+- **Empty-review skip gate**: if a scheduled run completes Steps 1–4 with zero Critical, Warning, or Auto-fixable findings, skip the review file write entirely. Emit a `lint_clean` telemetry event (`{event: "lint_clean", scope: "scheduled", checks_run: N}`) and exit. This prevents inbox clutter from clean-vault runs.
+- When findings exist, writes its report to `journal/YYYY-MM/YYYY-MM-DD-lint.md`.
 - Emits telemetry.
 - Skips if `_system/housekeeping-state.yaml` shows a manual lint already ran in the last 12h.
 
@@ -239,7 +251,7 @@ The PostToolUse hook appends a lint-summary line to the daily note. No explicit 
 
 1. Never auto-resolve contradictions — humans decide which version is current.
 2. Never delete files; propose archive via `mcp__tars_vault__archive_note` (which enforces the 90-day backlink + active-task guardrails).
-3. Never write to the vault without the PostToolUse hook path; bypass would skip the changelog entry.
+3. Never bypass `mcp__tars_vault__*` tools for vault writes — the PostToolUse hook emits telemetry on each mutation.
 4. Never run on stale `housekeeping-state.yaml` without refreshing it afterwards — the nightly cadence depends on that marker.
 5. Auto-fix scope is narrow: wikilink artifacts, missing required schema fields with computable defaults, alias-registry sync, framework self-state drift, unfiled journal entries. Anything touching body content needs explicit review.
 6. Never surface more than 50 findings in a single report — paginate or narrow with `--focus` if over-large.

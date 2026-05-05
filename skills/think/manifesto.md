@@ -59,3 +59,36 @@ They are often at odds. The CPO wants to say "Yes" to the client; the CTO wants 
    - *CPO:* "We need this for the Q1 Board meeting."
    - *CTO:* "Then we need to cut the scope by 50%."
 4. **Consensus:** They align on a recommendation. "We can do a smaller version (CTO win) but market it as a Phase 1 pilot (CPO win)."
+
+---
+
+## Decision frameworks catalog
+
+Before beginning any strategic analysis, select 1-2 frameworks and state the selection: "I am approaching this using [Framework] because [Reason]."
+
+**Vision and product**
+
+| Framework | When to use |
+|-----------|-------------|
+| Working Backwards | Clarifying customer value. Start with press release/FAQ. |
+| Jobs-to-be-Done | Understanding the progress the user is trying to make |
+| North Star | Identifying the single metric that captures long-term value |
+
+**Prioritization**
+
+| Framework | When to use |
+|-----------|-------------|
+| Cost of Delay (CD3) | Quantifying economic impact of speed vs perfection |
+| Cynefin | Categorizing the problem domain (Simple/Complicated/Complex/Chaotic) |
+| One-Way vs Two-Way Doors | Distinguishing reversible experiments from irreversible commitments |
+| Eisenhower Matrix | Protecting time from urgency bias |
+
+**Risk and critical thinking**
+
+| Framework | When to use |
+|-----------|-------------|
+| Pre-Mortem | Assume failure 6 months out. What caused it? |
+| First Principles | Breaking down to fundamental truths. Remove assumptions. |
+| Red Team Critique | Adversarial review of a plan or proposal |
+| Inversion (Munger) | "What guarantees failure?" Then check if we're avoiding it. |
+| Second-Order Thinking | What happens after the obvious consequence? |

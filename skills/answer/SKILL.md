@@ -23,15 +23,15 @@ Answer questions by searching across TARS information sources in priority order.
 
 ---
 
-## Source priority — hybrid retrieval (v3.1)
+## Source priority — hybrid retrieval
 
 | Priority | Source / tool | Contains | Confidence |
 |----------|---------------|----------|------------|
 | 1 | **Memory files** — `mcp__tars_vault__search_by_tag(tag="tars/<type>", …)` + `read_note` | Durable facts, relationships, decisions, preferences | High |
-| 2 | **Tier-A FTS5** — `mcp__tars_vault__fts_search(scope="memory", query=…)` (Phase 4) | Keyword/BM25 over short structured notes | High |
+| 2 | **Tier-A FTS5** — `mcp__tars_vault__fts_search(scope="memory", query=…)` | Keyword/BM25 over short structured notes | High |
 | 3 | **Task notes** — `mcp__tars_vault__search_by_tag(tag="tars/task", …)` + task integration (`resolve_capability(capability="tasks")`) | Action items, deadlines, assignments | High |
 | 4 | **Journal entries** — `mcp__tars_vault__search_by_tag(tag="tars/journal", …)` + semantic | Meeting summaries, briefings, wisdom | High |
-| 5 | **Tier-B semantic** — `mcp__tars_vault__semantic_search(scope="journal\|transcripts\|contexts", …)` (Phase 4) | Paraphrase/quote recall over prose | Medium-High |
+| 5 | **Tier-B semantic** — `mcp__tars_vault__semantic_search(scope="journal\|transcripts\|contexts", …)` | Paraphrase/quote recall over prose | Medium-High |
 | 6 | **Transcript archives** — full-read fallback when semantic returned low scores | Verbatim quotes | High (verbatim) |
 | 7 | **Integration sources** — `resolve_capability(capability="calendar\|tasks\|project-tracker\|…")` | Schedule, live data from provider MCPs | High |
 | 8 (last) | **Web search** | External information | Medium-Low — flag explicitly |
@@ -115,7 +115,7 @@ mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<person name>", limit=
 mcp__tars_vault__search_by_tag(tag="tars/meeting", query="<topic or person>", limit=10)
 ```
 
-Read matching journal entries. If the user asks about a specific detail discussed in a meeting and the journal summary lacks it, call `mcp__tars_vault__semantic_search(scope="transcripts", query=…)` (Phase 4) or proceed to transcript fallback (Step 3).
+Read matching journal entries. If the user asks about a specific detail discussed in a meeting and the journal summary lacks it, call `mcp__tars_vault__semantic_search(scope="transcripts", query=…)` or proceed to transcript fallback (Step 3).
 
 ### Task queries
 
@@ -162,10 +162,10 @@ Look for "Decisions" sections in meeting summaries.
 ### General knowledge
 
 Follow the full hierarchy:
-1. Memory: `mcp__tars_vault__fts_search(scope="memory", query="<keywords>", limit=10)` (Phase 4; until then `search_by_tag`).
+1. Memory: `mcp__tars_vault__fts_search(scope="memory", query="<keywords>", limit=10)`.
 2. Tasks: `resolve_capability(capability="tasks")` + `search_by_tag(tag="tars/task", …)`.
-3. Journal: `mcp__tars_vault__semantic_search(scope="journal", query="<keywords>", limit=10)` (Phase 4).
-4. Contexts: `mcp__tars_vault__semantic_search(scope="contexts", query="<keywords>", limit=5)` (Phase 4).
+3. Journal: `mcp__tars_vault__semantic_search(scope="journal", query="<keywords>", limit=10)`.
+4. Contexts: `mcp__tars_vault__semantic_search(scope="contexts", query="<keywords>", limit=5)`.
 5. Transcripts: if none of the above has the answer (see Step 3).
 6. Web: only if explicitly external information.
 
@@ -346,7 +346,7 @@ I checked: [list of sources searched]. The [specific detail] was not captured.
 
 ## Index-first pattern (MANDATORY)
 
-For vault searches, always use `mcp__tars_vault__search_by_tag` (tag + frontmatter filter) or the Phase-4 `fts_search` / `semantic_search` — never scan folders:
+For vault searches, always use `mcp__tars_vault__search_by_tag` (tag + frontmatter filter) or `fts_search` / `semantic_search` — never scan folders:
 
 ```
 mcp__tars_vault__search_by_tag(tag="tars/person", query="<name>", limit=5)
@@ -432,4 +432,4 @@ If any errors occur during lookup:
 - ALWAYS cite sources using `[[wikilinks]]` for vault files
 - ALWAYS attempt transcript fallback (Issue 6) before saying "I don't know" for meeting-related questions
 - ALWAYS handle gaps honestly — say what was searched and what was not found
-- ALWAYS use `mcp__tars_vault__search_by_tag` (or Phase-4 fts_search / semantic_search) rather than folder scanning
+- ALWAYS use `mcp__tars_vault__search_by_tag` (or `fts_search` / `semantic_search`) rather than folder scanning

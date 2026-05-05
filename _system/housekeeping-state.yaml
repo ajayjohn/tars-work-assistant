@@ -21,18 +21,62 @@ last_sync:
   memory_stale: 0
 
 cron_jobs:
+  # scheduler_type: which scheduler owns this job.
+  #   "mcp__scheduled-tasks" | "CronCreate" | null (unregistered)
+  #
+  # MUTUAL EXCLUSION: A job may only be registered with ONE scheduler at a time.
+  # Before registering, always read scheduler_type. If it is set, use that
+  # scheduler for re-registration — never switch schedulers without explicit
+  # user action, and never register with both. This prevents duplicate execution
+  # on machines where both Claude Code and Claude Cowork are active.
+  #
+  # confirm_before_run: when true, the cron prompt asks the user to
+  #   accept / skip / postpone before executing. Defaults to false (auto-run).
+  # auto_timeout_hours: if user does not respond, this is how long to wait.
+  # auto_timeout_action: "run" (auto-execute on timeout) | "skip" (skip on timeout).
+  #
+  # cron_create_registered_at: ISO timestamp of last CronCreate registration.
+  #   Used to compute TTL (7-day window) and trigger re-registration within 2 days.
+
   daily_briefing:
     id: null
+    scheduler_type: null
     schedule: null
     status: not_registered
+    confirm_before_run: false
+    auto_timeout_hours: 4
+    auto_timeout_action: run
+    cron_create_registered_at: null
+
   weekly_briefing:
     id: null
+    scheduler_type: null
     schedule: null
     status: not_registered
-  maintenance:
+    confirm_before_run: false
+    auto_timeout_hours: 4
+    auto_timeout_action: run
+    cron_create_registered_at: null
+
+  weekly_maintenance:
     id: null
+    scheduler_type: null
     schedule: null
     status: not_registered
+    confirm_before_run: false
+    auto_timeout_hours: 4
+    auto_timeout_action: run
+    cron_create_registered_at: null
+
+  lint:
+    id: null
+    scheduler_type: null
+    schedule: null
+    status: not_registered
+    confirm_before_run: false
+    auto_timeout_hours: 2
+    auto_timeout_action: run
+    cron_create_registered_at: null
 
 inbox:
   last_processed: null
@@ -41,3 +85,13 @@ inbox:
 archive:
   last_sweep: null
   items_archived: 0
+
+# Plugin version recorded at last successful migration run.
+# The migration runner compares this against .claude-plugin/plugin.json to
+# find pending migrations.  Set to "0.0.0" to force all migrations to run.
+plugin_version: "3.2.1"
+
+last_run:
+  archive_check: null
+  persona_drift_check: null
+  pattern_scan: null

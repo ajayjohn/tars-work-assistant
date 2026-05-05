@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.2 Architecture
+# TARS 3.3 Architecture
 
-This document describes the current framework architecture after the v3.2 "persistence, cold-start, wikilink hygiene, and self-improvement plumbing" release.
+This document describes the current framework architecture as of v3.3, which builds on v3.2 ("persistence, cold-start, wikilink hygiene, and self-improvement plumbing") with documentation-code alignment fixes, token-efficiency consolidation, and removal of the casual/standard engagement modes.
 
-**Version**: 3.2.1  
-**Release**: 2026-05-03 — see `CHANGELOG.md`  
+**Version**: 3.3.0  
+**Release**: 2026-05-05 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Obsidian vault runtime
 
 ## Three operations (Karpathy framing)
@@ -252,12 +252,12 @@ The Obsidian-native rebuild introduced the most important architectural changes 
 
 - **Persistent install record (`_system/install.yaml`)** — vault-specific record carrying `vault_path`, `installation_id`, `persona`, `mode`, `plugin_version`, and timestamps. Hooks consult it on every session start; install/CWD mismatch refuses silent writes via the pre-tool-use hook.
 - **Persona-driven cold start** — seven onboarding personas (`templates/personas/`) seed `_system/config.md` defaults, `_system/taxonomy.md` starter tags, and `_system/briefing-sections` so day-1 briefings are role-aware.
-- **Engagement modes (`standard` | `casual`)** — casual mode skips Step 5 rounds 3-4 in welcome, registers only the opt-in daily-briefing cron, and suppresses staleness/drift/curator proposals on session start. Power-user behavior is the default.
+- **Engagement modes (`standard` | `casual`) — removed in v3.3.** v3.2 introduced two engagement modes controlled by a `mode:` field in `_system/install.yaml`. v3.3 removed this distinction in favour of uniform graceful degradation — all vaults run the full pipeline and TARS adjusts automatically based on connected integrations.
 - **Wikilink discipline (forward + retroactive)** — new `mcp__tars_vault__format_wikilink(text, kind)` tool resolves raw text to an Obsidian-safe link via the alias registry + vault file lookup. Write tools and the pre-tool-use hook reject content with smart quotes or Obsidian-illegal characters. `scripts/fix-wikilinks.py --repair-broken` classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable` with apply-only-on-safe semantics.
 - **40 KB body cap + `tars-` prefix enforcement** at the hook layer for non-chunking write tools.
 - **SessionStart banner** — composes install-mismatch, legacy-vault, stale `tools-registry.yaml`, and unregistered-cron notices.
 - **Active `/lint --actions`** — materializes fixable findings as a numbered review queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for cron-fired callers. Subsets: `wikilinks`, `patterns`, `curator`.
-- **Weekly maintenance job (`/maintain --weekly`)** — cron-fired Sunday 18:00 (registered by `/welcome` Step 7 in standard mode). Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
+- **Weekly maintenance job (`/maintain --weekly`)** — cron-fired Sunday 18:00 (registered by `/welcome` Step 7). Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
 - **Telemetry rollup script (`scripts/telemetry-rollup.py`)** — stdlib aggregator over `_system/telemetry/*.jsonl`. Same source feeds `/briefing` weekly footer (Mondays) and `/maintain --weekly`.
 - **Observed-preference user model (`_system/user-model.md`)** — single living note (~5 KB cap) capturing BLUF tolerance, decision speed, default skill, meeting cadence, recurring concerns, vendor sentiment, observed skill mix. Updated passively by `/learn` Mode C when patterns repeat ≥3× in 14 days.
 - **Workflows registry (`_system/workflows.yaml`)** — vault-owned saved multi-step routing aliases. Created only on user approval. `core` consults the registry before default routing.

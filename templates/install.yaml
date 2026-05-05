@@ -21,11 +21,6 @@ installation_id: ""
 # support-ops-lead, engineering-manager. Empty until /welcome runs.
 persona: ""
 
-# Engagement mode. 'standard' enables weekly maintenance, drift checks, and
-# review queues. 'casual' skips weekly cron registration and review prompts
-# for low-stakes auto-captured artifacts. Default is 'standard'.
-mode: standard
-
 # Plugin version that wrote this file; helps lint detect stale installs that
 # need migration.
 plugin_version: ""
@@ -33,3 +28,9 @@ plugin_version: ""
 # ISO-8601 timestamps. Updated by SessionStart on each successful resolution.
 created: ""
 last_session_at: ""
+
+# Scheduler type recorded at last job registration.
+# "mcp__scheduled-tasks" | "CronCreate" | "" (unregistered / not yet detected).
+# Used by SessionStart and /maintain to enforce mutual exclusion: a job registered
+# with one scheduler is never silently re-registered with the other.
+scheduler_type: ""

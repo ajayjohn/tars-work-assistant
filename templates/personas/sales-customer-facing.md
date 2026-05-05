@@ -2,7 +2,6 @@
 tars-persona-key: sales-customer-facing
 tars-persona-name: Sales / Customer-Facing Leader
 tars-persona-summary: Owns pipeline, accounts, customer relationships, and deal motion.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: high
   tars-default-analysis-mode: B

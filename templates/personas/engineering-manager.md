@@ -2,7 +2,6 @@
 tars-persona-key: engineering-manager
 tars-persona-name: Engineering Manager
 tars-persona-summary: Owns 1:1s, team health, hiring, delivery, and performance for an engineering team.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: medium
   tars-default-analysis-mode: B

@@ -218,18 +218,13 @@ mcp__tars_vault__search_by_tag(tag="tars/initiative", query="<entity>", limit=5)
 mcp__tars_vault__search_by_tag(tag="tars/decision",   query="<entity>", limit=5)
 ```
 
-Phase 4 adds `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for paraphrase/prose matching over journal + transcripts + contexts.
+Use `mcp__tars_vault__fts_search` and `mcp__tars_vault__semantic_search` for paraphrase/prose matching over journal + transcripts + contexts.
 
 ### Classification
 
 Classify each piece of information from the transcript against existing vault knowledge:
 
-| Classification | Meaning | Action |
-|---------------|---------|--------|
-| `NEW` | Not in the vault at all | Include in extraction |
-| `UPDATE` | Exists but transcript has newer/additional info | Show diff in Step 11 |
-| `REDUNDANT` | Already captured with same detail | Skip silently |
-| `CONTRADICTS` | Transcript says X, vault says Y | Flag for user resolution in Step 11 |
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing).
 
 ### Report to user
 
@@ -510,6 +505,12 @@ Append the structured report from Step 7 to the journal entry body:
 
 When the calendar title differs from the transcript header, keep `tars-calendar-title` in frontmatter for reference.
 
+### Auto-alias (v3.3)
+
+The `tars-vault` MCP server automatically adds a space-form alias (e.g. `"2026-04-06 Gba Ai Panel Prep"`) to the `aliases` list whenever a note is created under `journal/` with a `YYYY-MM-DD-slug` filename. This means wikilinks of the form `[[2026-04-06 GBA AI Panel Prep]]` resolve in Obsidian without any manual alias step.
+
+You do NOT need to add `aliases` manually in Step 8 — the server handles it. The returned `aliases_added` field confirms what was injected. If you supply your own `aliases` list in frontmatter, the server extends it rather than overwriting it.
+
 ---
 
 ## Step 9: Archive transcript (Issue 6)
@@ -671,12 +672,7 @@ All 4 criteria must pass:
 
 For each item passing the durability test, compare against the vault inventory from Step 5:
 
-| Classification | Action |
-|---------------|--------|
-| `NEW` | Include in the review list |
-| `UPDATE` | Show diff: "Current: 'Jane leads platform.' Update to: 'Jane leads platform and mobile.' Save update?" |
-| `REDUNDANT` | Skip: "Already in memory. Skipping." |
-| `CONTRADICTS` | Ask: "Memory says REST. Transcript says GraphQL. Which is current?" |
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing).
 
 ### Negative sentiment detection (Issue 8)
 
@@ -783,11 +779,20 @@ Report all unresolved names in the output summary.
 
 ---
 
-## Step 13: Daily-note + changelog (handled by PostToolUse hook)
+## Step 13: Daily-note + changelog
 
-The `PostToolUse` hook appends a structured entry to `_system/changelog/YYYY-MM-DD.md` on every successful vault mutation (skill, tool, file, batch_id, timestamp). Daily-note appends are batched by the same hook.
+The `PostToolUse` hook emits a `vault_write` telemetry event for each MCP write. It does not write to the daily note or changelog.
 
-Skills no longer emit per-workflow changelog entries. If richer batch context is needed (e.g., "this was meeting processing for transcript X"), emit a telemetry event via the MCP server rather than writing to the changelog directly.
+Append a meeting-processing summary to today's daily note explicitly:
+
+```
+mcp__tars_vault__append_note(
+  file="journal/YYYY-MM-DD",
+  content="## Meeting processed: [[YYYY-MM-DD Meeting Title]]\n- Tasks: N created (of M extracted)\n- Memory: N updates\n- Transcript: archived to [[archive/transcripts/...]]\n"
+)
+```
+
+Write a changelog entry to `_system/changelog/YYYY-MM-DD.md` with batch_id for rollback.
 
 Emit at minimum: `meeting_processed`, `tasks_proposed`, `memory_proposed`.
 
@@ -812,7 +817,7 @@ mcp__tars_vault__append_note(file="<issue-note>",
   content="## Occurrence YYYY-MM-DD\n<Error context from this run>")
 ```
 
-Note: the `PostToolUse` hook also auto-dedupes framework-level MCP failures into `_system/backlog/issues/`. This step is for pipeline-level errors (missed calendar match, unresolved attendee, secret-scan block) that the hook wouldn't see.
+Note: the `PostToolUse` hook emits telemetry only. Backlog deduplication is the skill's responsibility. This step covers pipeline-level errors (missed calendar match, unresolved attendee, secret-scan block).
 
 ### If new issue
 

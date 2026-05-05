@@ -81,7 +81,7 @@ For each entity or topic identified:
 mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<entity>", limit=5)
 ```
 
-Phase 4 adds `mcp__tars_vault__fts_search` for paraphrase/body matching — important for REDUNDANT detection where a different phrasing captures the same fact.
+Use `mcp__tars_vault__fts_search` for paraphrase/body matching — important for REDUNDANT detection where a different phrasing captures the same fact.
 
 Then read the specific files that match:
 
@@ -157,14 +157,7 @@ Map each passing insight to the correct memory folder:
 
 For each insight that passes the durability test, classify against existing vault knowledge:
 
-| Classification | Action |
-|---------------|--------|
-| **NEW** | Present for review. Will create new content. |
-| **UPDATE** | Show diff to user: "Current: 'Jane leads platform.' Update to: 'Jane leads platform and mobile.' Update?" |
-| **REDUNDANT** | Skip silently. Mention in summary: "Already in memory. Skipping." |
-| **CONTRADICTS** | Ask user: "Memory says REST. Input says GraphQL. Which is current?" |
-
-Never persist REDUNDANT items. Never persist CONTRADICTS items without resolution.
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing). Never persist REDUNDANT items. Never persist CONTRADICTS items without resolution.
 
 ---
 
@@ -255,9 +248,9 @@ On `create_note` of a new entity, the server updates the in-process alias regist
 
 ---
 
-## Step 11: Daily-note + changelog (handled by PostToolUse hook)
+## Step 11: Daily-note + changelog
 
-The `PostToolUse` hook appends the memory-action line to the daily note and writes the changelog entry with batch ID. Emit telemetry events `memory_proposed` (count) and `memory_persisted` (count, accepted, rejected).
+The `PostToolUse` hook emits `vault_write` telemetry for each MCP write. Append the memory-action line to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`. Write a changelog entry to `_system/changelog/YYYY-MM-DD.md` with batch ID. Emit telemetry events `memory_proposed` (count) and `memory_persisted` (count, accepted, rejected).
 
 ---
 
@@ -375,12 +368,7 @@ mcp__tars_vault__search_by_tag(tag="tars/<type>", query="<topic keywords>", limi
 
 Compare against existing vault knowledge. Apply the knowledge check (Issue 7):
 
-| Classification | Action |
-|---------------|--------|
-| **NEW** | Include in wisdom report and propose for memory |
-| **UPDATE** | Note the enhancement. Show diff if proposing memory update. |
-| **REDUNDANT** | Include in report for completeness. Do NOT propose memory update. |
-| **CONTRADICTS** | Flag in report. Ask user which version to keep. |
+Apply the canonical `NEW`/`UPDATE`/`REDUNDANT`/`CONTRADICTS` classification rules (see `skills/core/SKILL.md` §Check before writing).
 
 ---
 
@@ -492,9 +480,9 @@ For each confirmed task, create via the task integration. Verify creation by rea
 
 ---
 
-## Step 9: Daily-note + changelog (handled by PostToolUse hook)
+## Step 9: Daily-note + changelog
 
-The `PostToolUse` hook appends the wisdom-extraction line to the daily note and writes the changelog entry after the wisdom journal `create_note` succeeds. Emit telemetry event `wisdom_extracted` with `{insights_extracted, durable_count, memory_proposed, memory_persisted, tasks_created}`.
+The `PostToolUse` hook emits `vault_write` telemetry for each MCP write. Append the wisdom-extraction line to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`. Write a changelog entry after the wisdom journal `create_note` succeeds. Emit telemetry event `wisdom_extracted` with `{insights_extracted, durable_count, memory_proposed, memory_persisted, tasks_created}`.
 
 ---
 

@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.3.0 (2026-05-05)
+
+**Design-efficiency release: doc-code alignment, token trimming, and mode removal.**
+
+This release resolves documentation-implementation mismatches, removes the casual/standard engagement-mode bifurcation, consolidates redundant always-on token surface, and adds data-integrity safeguards for the alias registry and session stubs.
+
+### Removed
+
+- **Engagement modes (`standard` | `casual`).** The `mode:` field in `_system/install.yaml` is removed. All vaults now run the full pipeline and TARS adjusts automatically based on connected integrations. Migration `v3.3.0-remove-casual-mode.py` strips the obsolete field.
+
+### Fixed
+
+- **PostToolUse doc-code mismatch.** 18 incorrect claims across 8 skill files and the hooks README incorrectly stated that the `PostToolUse` hook writes to the daily note, changelog, or deduplicates backlog issues. In reality, it only emits `vault_write` telemetry events. All skills now explicitly write daily-note summaries and changelog entries via `mcp__tars_vault__append_note`.
+- **Session-stub coalescing.** `pre-compact.py` and `session-end.py` now check for existing stubs with matching `(session_id, calendar_day)` before writing, preventing duplicate stubs when both hooks fire for the same session.
+
+### Added
+
+- **Alias registry rebuild migration (`v3.3.0-rebuild-alias-registry.py`).** Recomputes `_system/alias-registry.md` from entity-note `aliases:` frontmatter. Existing manual-only entries are preserved in a `## Manual entries` section for user review.
+- **Lint empty-review skip gate.** Scheduled lint runs that find zero Critical, Warning, or Auto-fixable findings skip writing the review file entirely and emit a `lint_clean` telemetry event. Prevents inbox clutter from clean-vault nightly runs.
+
+### Changed
+
+- **CLAUDE.md token reduction (~1,190 tokens, ~13%).** The duplicated MCP tools table, key constraints enumeration, and routing table were replaced with compact pointers to canonical definitions in `skills/core/SKILL.md`.
+- **Decision frameworks catalog relocated.** The full framework catalog (12 frameworks) moved from `skills/core/SKILL.md` (always-loaded, ~260 tokens) to `skills/think/manifesto.md` (loaded on demand when `/think` is invoked). Core retains a one-line pointer.
+- **Banned phrases table compacted.** 12-row table replaced with grouped-by-category format (~100 tokens saved).
+- **Session self-evaluation rewritten (Phase 5).** Session-end self-evaluation now uses structured criteria instead of freeform reflection.
+- **ARCHITECTURE.md, GETTING-STARTED.md, CATALOG.md** updated to reflect casual-mode removal and v3.3 version.
+
+### Migration
+
+Existing v3.2 vaults: run `python3 scripts/run-migrations.py --vault <path> --apply` to apply `v3.3.0-remove-casual-mode` and `v3.3.0-rebuild-alias-registry`. Both migrations are safe and reversible.
+
+---
+
 ## v3.2.1 (2026-05-04)
 
 **Patch — fix hook and MCP server paths that break on spaces in directory names.**

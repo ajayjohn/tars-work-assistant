@@ -44,13 +44,13 @@ initializes git. This skill replaces both `install.sh` and the legacy `/welcome`
 | Step | Name | Purpose |
 |------|------|---------|
 | 1 | Pre-flight check | Detect existing vault, offer resume or fresh start |
-| 1.5 | Persona + mode | Pick persona; choose daily (standard) or occasional (casual) usage |
-| 2 | Create vault structure | All folders, _system files (incl. `install.yaml` with persona+mode), templates, _views, scripts |
+| 1.5 | Pick a persona | Seed role-appropriate defaults for briefings and analysis |
+| 2 | Create vault structure | All folders, _system files (incl. `install.yaml` with persona), templates, _views, scripts |
 | 3 | Install obsidian-skills | Copy/verify skills into .claude/skills/ |
 | 4 | Configure integrations | Calendar provider, task manager selection |
-| 5 | Initial context gathering | Progressive user profiling (4 rounds; casual mode skips rounds 3-4) |
-| 6 | Configure schedule | Briefing times, maintenance window (standard mode only) |
-| 7 | Register cron jobs | Daily briefing, weekly briefing, weekly maintenance — gated by mode |
+| 5 | Initial context gathering | Progressive user profiling (4 rounds) |
+| 6 | Configure schedule | Briefing times and maintenance window |
+| 7 | Register cron jobs | Daily briefing, weekly briefing, weekly maintenance |
 | 8 | Initialize git | Repo init, .gitignore, initial commit |
 | 9 | Welcome summary | Report, next steps, maturity update |
 
@@ -73,15 +73,13 @@ If `_system/config.md` does not exist or has no user profile, proceed to Step 1.
 
 ---
 
-## Step 1.5: Persona + engagement mode
+## Step 1.5: Pick a persona
 
-Before scaffolding the vault, two short questions seed sensible defaults so day 1 produces a useful briefing instead of an empty one. Both answers are recorded in `_system/install.yaml` (written in Step 2b) and consulted by every subsequent step.
-
-### 1.5a: Pick a persona
+Before scaffolding the vault, one short question seeds sensible defaults so day 1 produces a useful briefing instead of an empty one. The answer is recorded in `_system/install.yaml` (written in Step 2b).
 
 List the available personas under `templates/personas/` (use `Read` on the directory listing — do not invoke the MCP). Present them as a numbered multiple-choice question:
 
-> "Which best matches how you'll use TARS? Pick the closest — you can change it later."
+> "Which best matches your role? Pick the closest — you can change it later."
 >
 > 1. Product Leader — roadmap, customer signals, feature decisions
 > 2. Sales / Customer-Facing — pipeline, accounts, deal motion
@@ -99,19 +97,7 @@ For the chosen persona, read the corresponding file under `templates/personas/<k
 
 Cache the chosen `tars-persona-key` in skill state for use in Step 2b.
 
-### 1.5b: Engagement mode
-
-> "Will you use TARS daily, or only for occasional tasks (decks, drafts, brainstorms)?"
->
-> 1. Daily — full pipeline (recommended for the chosen persona)
-> 2. Occasional — light-touch mode; skips weekly maintenance, drift checks, and review queues. You can switch later via `/welcome --upgrade`.
-
-Cache the answer as `mode: standard` (1) or `mode: casual` (2). The selection drives:
-- Step 5 round 3-4 are skipped in casual mode.
-- Step 6 prompts for daily briefing time only in casual mode (no weekly briefing or maintenance windows).
-- Step 7 registers `tars-daily-briefing` (opt-in) for both modes; `tars-weekly-briefing` and `tars-weekly-maintenance` only in standard mode.
-
-If the user picked persona option 8 ("None of these match"), skip persona-defaults application but still ask about mode. The vault scaffolds with stock defaults.
+If the user picked option 8 ("None of these match"), skip persona-defaults application. The vault scaffolds with stock defaults.
 
 ---
 
@@ -258,8 +244,7 @@ plugin_version: "3.0.0"
 **_system/install.yaml** -- Vault-specific install record. Use the `templates/install.yaml` shape and fill in:
 - `vault_path`: the absolute path to this vault (the folder we just scaffolded). Hooks use this on every session start to detect a moved/duplicated vault and refuse silent writes from a stale folder.
 - `installation_id`: a UUID generated once per install (use `python3 -c "import uuid; print(uuid.uuid4())"` via Bash, or any equivalent generator). Travels with telemetry events.
-- `persona`: the `tars-persona-key` from Step 1.5a, or empty string if the user picked "None of these match".
-- `mode`: `standard` or `casual` from Step 1.5b. Default `standard` if the question was skipped.
+- `persona`: the `tars-persona-key` from Step 1.5, or empty string if the user picked "None of these match".
 - `plugin_version`: read from `.claude-plugin/plugin.json` so /lint can detect stale installs that need migration.
 - `created` and `last_session_at`: current ISO-8601 timestamp.
 
@@ -451,9 +436,7 @@ onboarding:
 
 ## Step 5: Initial context gathering
 
-Progressive context gathering. Do not ask everything at once. Each round is a bounded set of questions (max 3 per round). Use multiple-choice where possible.
-
-**Mode gating**: in casual mode (Step 1.5b answer = 2), run rounds 1-2 only and skip rounds 3-4. Casual users typically don't have a knowledge graph to seed — `/create`, `/communicate`, and `/think` work fine without one, and the Phase 6 user-model passively captures preferences over time. Standard mode runs all four rounds.
+Progressive context gathering. Do not ask everything at once. Each round is a bounded set of questions (max 3 per round). Use multiple-choice where possible. Run all four rounds for every user — rounds 3-4 have a skip/escape option if the user doesn't have the information handy yet.
 
 ### Round 1: Identity
 
@@ -528,23 +511,23 @@ onboarding:
 
 ## Step 6: Configure schedule
 
-Ask for schedule preferences with sensible defaults. Mode gating: in casual mode, ask only the daily-briefing question (and only if the user opts into a daily briefing); skip weekly briefing and maintenance prompts since those cron jobs are not registered.
+Ask for schedule preferences with sensible defaults. All three questions are presented to every user — the cron jobs registered in Step 7 honor these times.
 
 > "When would you like your daily briefing? [default: 7:30am CT]"
 
-> "Weekly briefing day and time? [default: Monday 8:00am CT]" *(standard mode only)*
+> "Weekly briefing day and time? [default: Monday 8:00am CT]"
 
-> "Maintenance window? [default: Friday 5:00pm CT]" *(standard mode only — note: the weekly-maintenance cron registered in Step 7 fires Sunday 18:00 by default and is independent of this prompt; this field configures the on-demand `/maintain` window)*
+> "Maintenance window? [default: Friday 5:00pm CT — note: the weekly-maintenance cron registered in Step 7 fires Sunday 18:00 by default; this field configures the on-demand `/maintain` window]"
 
 Accept natural language time inputs. Resolve to 24-hour format and timezone.
 
 Save to `_system/config.md`:
 - `tars-daily-briefing-time`: "07:30"
 - `tars-daily-briefing-tz`: "America/Chicago"
-- `tars-weekly-briefing-day`: "Monday" *(standard mode only)*
-- `tars-weekly-briefing-time`: "08:00" *(standard mode only)*
-- `tars-maintenance-day`: "Friday" *(standard mode only)*
-- `tars-maintenance-time`: "17:00" *(standard mode only)*
+- `tars-weekly-briefing-day`: "Monday"
+- `tars-weekly-briefing-time`: "08:00"
+- `tars-maintenance-day`: "Friday"
+- `tars-maintenance-time`: "17:00"
 
 Update `_system/maturity.yaml`:
 ```yaml
@@ -556,71 +539,166 @@ onboarding:
 
 ## Step 7: Register cron jobs
 
-Use CronCreate to register scheduled jobs. Store job IDs in `_system/housekeeping-state.yaml`. Claude does not run in the background; cron jobs are the only path to truly proactive behavior, so this step matters whether the user is power or casual.
+Claude does not run in the background; cron jobs are the only path to truly proactive behavior. Offer all four jobs to every user — skipping any of them is the user's choice, not a mode gate.
 
-**Mode gating**:
-- **Standard**: register all three jobs (`tars-daily-briefing`, `tars-weekly-briefing`, `tars-weekly-maintenance`).
-- **Casual**: register `tars-daily-briefing` only, and only if the user opts in (ask: "Want a daily morning briefing?"). Skip the weekly jobs entirely.
+### Step 7a: Detect available scheduler(s)
 
-### Daily briefing (both modes; opt-in for casual)
+```
+result = mcp__tars_vault__resolve_capability(capability="scheduler")
+```
 
+This returns `available` (list of schedulers present) and `preferred` (recommended pick).  Read the `note` field — it will explicitly warn when both schedulers are active on the same machine.
+
+**Available schedulers:**
+| Scheduler | Persistence | Visibility | Expiry |
+|-----------|-------------|------------|--------|
+| `mcp__scheduled-tasks` | Persistent MCP server | Claude Code only | None |
+| `CronCreate` | Built-in Claude tool | Claude Code + Cowork | ~7 days |
+
+**Preferred**: `mcp__scheduled-tasks` when available (no TTL, no weekly re-registration). Otherwise `CronCreate`.
+
+### Step 7b: Mutual-exclusion check (CRITICAL)
+
+Before registering any job, read the current `_system/housekeeping-state.yaml` `cron_jobs` block.
+
+For each job you are about to register:
+1. Read `scheduler_type` for that job.
+2. If `scheduler_type` is set (not null) and `status` is `registered`:
+   - **The job is already registered with that scheduler. DO NOT register with any other scheduler.**
+   - If the registered scheduler is the same as the one you're about to use → proceed to re-registration check only.
+   - If the registered scheduler differs from the one you're about to use → skip registration entirely for this job. Surface a notice: "Job `<name>` is already registered with `<current_scheduler>`. To switch schedulers, use `/maintain --re-register`."
+3. If `scheduler_type` is null or `status` is `not_registered` → proceed to Step 7c.
+
+This rule prevents duplicate execution on machines where both Claude Desktop (Cowork) and Claude Code are active simultaneously.
+
+### Step 7c: Confirm-before-run preference
+
+Before registering, ask the user about confirm-before-run behavior (one question, not per-job):
+
+> "When a scheduled job fires, should TARS:
+>   [1] Run automatically (default — no interruption)
+>   [2] Ask me first — show pending jobs and let me accept, skip, or postpone each one"
+
+Store the answer as the global default. Users can override per-job later. If the user picks option 2, set `confirm_before_run: true` for all jobs being registered now. Also ask:
+
+> "If you don't respond within [4] hours, should TARS: [1] Run anyway  [2] Skip for today"
+
+Store as `auto_timeout_hours` (default 4) and `auto_timeout_action` (`run` | `skip`).
+
+The default is `confirm_before_run: false` (auto-run) — this preserves behavior for users who don't want interruptions. Recommend option 2 to users who want control over when reports land.
+
+### Step 7d: Register each job
+
+Register all four jobs (`tars-daily-briefing`, `tars-weekly-briefing`, `tars-weekly-maintenance`, `tars-nightly-lint`) for every user. Present each as opt-in with a single confirm (e.g. "Register daily briefing at 7:30am CT? [Y/n]") — the default is yes. Users who decline a job can register it later via `/welcome` or manually.
+
+For each job, choose the cron command based on `confirm_before_run`:
+
+| confirm_before_run | Command |
+|--------------------|---------|
+| false (auto-run) | `"Run <job_name>"` — e.g. `"Run /briefing"` |
+| true (confirm first) | `"TARS scheduled: <job_name> is due. Accept, skip, or postpone?"` |
+
+#### Daily briefing
+
+**With `mcp__scheduled-tasks`:**
+```
+mcp__scheduled_tasks__create_task(
+  name: "tars-daily-briefing",
+  schedule: "<cron_expression>",
+  prompt: "<command per confirm_before_run setting above>"
+)
+```
+
+**With `CronCreate`:**
 ```
 CronCreate:
   name: "tars-daily-briefing"
-  schedule: "{configured_time} {configured_tz}"  # e.g., "0 7 30 * * *" for 7:30am
-  command: "Run daily briefing"
-  description: "Generate morning briefing with schedule, tasks, and context"
+  schedule: "<cron_expression>"
+  command: "<command per confirm_before_run setting above>"
+  description: "TARS daily briefing"
 ```
 
-### Weekly briefing (standard mode only)
+#### Weekly briefing
+
+Register with the same scheduler type as `daily_briefing`. Never mix schedulers across jobs — pick one and use it for all.
 
 ```
-CronCreate:
-  name: "tars-weekly-briefing"
-  schedule: "{configured_day} {configured_time}"  # e.g., Monday 8:00am
-  command: "Run weekly briefing"
-  description: "Generate weekly planning briefing with initiative health, upcoming meetings, and priorities"
+name: "tars-weekly-briefing"
+schedule: "<Monday HH:MM cron>"
+command: "<command per confirm_before_run>"
 ```
 
-### Weekly maintenance (standard mode only — new in v3.2)
-
-This is the single periodic job that backstops every staleness/drift/curator/rollup feature in TARS. It opens a session Sunday evening, runs `/maintain --weekly`, and writes a numbered review file to `inbox/pending/weekly-review-YYYY-MM-DD.md`. The user reviews on their next session.
+#### Weekly maintenance
 
 ```
-CronCreate:
-  name: "tars-weekly-maintenance"
-  schedule: "0 18 * * 0"   # Sunday 18:00 in user's local timezone
-  command: "Run /maintain --weekly"
-  description: "Telemetry rollup, backlog grouping, lint --actions queue, curator + drift proposals"
+name: "tars-weekly-maintenance"
+schedule: "0 18 * * 0"  # Sunday 18:00 local
+command: "<command per confirm_before_run>"
 ```
 
-Store returned job IDs:
+#### Nightly lint
+
+```
+name: "tars-nightly-lint"
+schedule: "0 2 * * *"   # 2:00am local
+command: "Run /lint --quiet"   # lint always auto-runs; confirm_before_run not applied
+```
+
+### Step 7e: Store job state
+
+After each successful registration, write to `_system/housekeeping-state.yaml` immediately (do not batch — if a later job fails, earlier ones are preserved):
+
 ```yaml
-# _system/housekeeping-state.yaml
 cron_jobs:
-  daily_briefing:        # always present; null if user opted out
-    id: "{job_id}"
-    schedule: "{cron}"
+  daily_briefing:
+    id: "{returned_job_id}"
+    scheduler_type: "{mcp__scheduled-tasks|CronCreate}"
+    schedule: "{cron_expression}"
     status: registered
-  weekly_briefing:       # standard mode only
-    id: "{job_id}"
-    schedule: "{cron}"
-    status: registered
-  weekly_maintenance:    # standard mode only — new in v3.2
-    id: "{job_id}"
-    schedule: "0 18 * * 0"
-    status: registered
+    confirm_before_run: {true|false}
+    auto_timeout_hours: {N}
+    auto_timeout_action: "{run|skip}"
+    cron_create_registered_at: "{ISO-8601}"  # only for CronCreate
+  weekly_briefing:
+    ...  # same fields; null if user declined during onboarding
 ```
 
-If CronCreate is not available in the environment:
-- Log that cron registration was skipped
-- Note that session-start housekeeping (core skill) serves as fallback
-- Inform user they can register jobs manually later
+Also update `_system/schedule.md` table row for each registered job (Scheduler column, Job ID column, Registered At column).
+
+Record the chosen scheduler type in `_system/install.yaml`:
+```yaml
+scheduler_type: "{mcp__scheduled-tasks|CronCreate}"
+```
+
+If no scheduler is available at all:
+- Log `status: not_registered` for all jobs
+- Inform user: "No scheduler available — briefings won't fire automatically. You can run them manually anytime."
+- Note that session-start housekeeping serves as the only trigger
+
+### Migration check (Step 7 tail)
+
+After recording job IDs, check whether any migrations are pending:
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
+```
+
+If pending migrations are found:
+1. Surface a notice: "N pending migration(s) need to run to bring your vault up to plugin version X.X.X."
+2. Offer to run them now: "Run migrations now? [Y/n — recommended for fresh onboarding]"
+3. If accepted: run `python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --dry-run`, show the plan, then confirm before `--apply`.
+4. On success, `plugin_version` in housekeeping-state.yaml advances automatically.
+5. If declined: remind user they can run `/maintain migrations` at any time.
+
+For an existing vault being re-onboarded (user ran /welcome --relocate or upgrade):
+- Always run the migration check — the vault may be multiple versions behind.
+- Apply migrations before completing onboarding so the vault is schema-current before first use.
 
 Update `_system/maturity.yaml`:
 ```yaml
 onboarding:
   cron_jobs: true  # or false if skipped
+  migrations_applied: true  # or false if skipped/deferred
 ```
 
 ---

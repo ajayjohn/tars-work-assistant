@@ -92,12 +92,12 @@ See `templates/brand-guidelines.md` for the content shape that a brand file shou
 
 Load relevant context via vault MCP tools. `.base` views replace `_index.md` files in v3.
 
-- Initiatives: `search_by_tag(tag="tars/initiative", limit=20)` + targeted `read_note` for those referenced.
-- Products:   `search_by_tag(tag="tars/product", limit=20)` + targeted `read_note`.
-- Decisions:  `search_by_tag(tag="tars/decision", query="<topic keywords>", limit=10)`.
-- People:     `read_note(file="<stakeholder name>")` for audience-specific adaptation.
-- Contexts:   `semantic_search(scope="contexts", query=…)` when prose-heavy; otherwise `search_by_tag` + targeted reads.
-- Journal:    recent via `search_by_tag(tag="tars/journal", frontmatter={"tars-date__gte": …})`.
+- Initiatives: `mcp__tars_vault__search_by_tag(tag="tars/initiative", limit=20)` + targeted `read_note` for those referenced.
+- Products:   `mcp__tars_vault__search_by_tag(tag="tars/product", limit=20)` + targeted `read_note`.
+- Decisions:  `mcp__tars_vault__search_by_tag(tag="tars/decision", query="<topic keywords>", limit=10)`.
+- People:     `mcp__tars_vault__read_note(file="<stakeholder name>")` for audience-specific adaptation.
+- Contexts:   `mcp__tars_vault__semantic_search(scope="contexts", query=…)` when prose-heavy; otherwise `search_by_tag` + targeted reads.
+- Journal:    recent via `mcp__tars_vault__search_by_tag(tag="tars/journal", frontmatter={"tars-date__gte": …})`.
 
 ### Data-backed claims (if content references metrics / KPIs / usage / design)
 

@@ -25,17 +25,43 @@ from _common import in_recursion, read_event, vault_path, write_output
 _TRIGGER = "pre-compact"
 
 
+def _existing_stub_for_session(vault: Path, session_id: str, today: str) -> bool:
+    """Return True if a stub with matching session_id and calendar day exists."""
+    if not session_id:
+        return False
+    pending = vault / "inbox" / "pending"
+    if not pending.is_dir():
+        return False
+    prefix = f"claude-session-{today}"
+    for candidate in pending.iterdir():
+        if not candidate.name.startswith(prefix) or not candidate.name.endswith(".md"):
+            continue
+        try:
+            head = candidate.read_text(encoding="utf-8")[:600]
+        except OSError:
+            continue
+        if f"tars-session-id: {session_id}" in head:
+            return True
+    return False
+
+
 def _write_session_stub(vault: Path, event: dict) -> Path | None:
     """Write a minimal session-summary stub. Returns the path written or None."""
     try:
         ts = datetime.now().astimezone()
         slug = ts.strftime("%Y-%m-%d-%H%M%S")
+        session_id = event.get("session_id") or ""
+        today = ts.strftime("%Y-%m-%d")
+
+        # Coalesce: skip if a stub for this (session_id, calendar_day) exists.
+        if _existing_stub_for_session(vault, session_id, today):
+            return None
+
         target = vault / "inbox" / "pending" / f"claude-session-{slug}.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
             return None  # avoid clobbering an existing stub for the same second
         transcript_path = event.get("transcript_path") or ""
-        session_id = event.get("session_id") or ""
         body = (
             f"---\n"
             f"tags: [tars/inbox, tars/claude-session]\n"

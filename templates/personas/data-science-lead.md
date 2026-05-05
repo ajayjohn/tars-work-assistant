@@ -2,7 +2,6 @@
 tars-persona-key: data-science-lead
 tars-persona-name: Data Science / Analytics Lead
 tars-persona-summary: Owns experiments, metrics, model performance, and analysis programs.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: medium
   tars-default-analysis-mode: D

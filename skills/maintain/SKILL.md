@@ -10,25 +10,42 @@ triggers:
   - "sync"
   - "check for gaps"
   - "archive sweep"
+  - "worktrees"
+  - "list worktrees"
 help:
   purpose: |-
     Vault maintenance scoped to ingest-adjacent workflows: inbox processing, calendar/task sync,
-    and archive sweep. Hygiene checks (broken links, orphans, schema violations, staleness,
-    contradictions, framework state drift) moved to `/lint` in v3.1.
+    archive sweep, worktree hygiene, and pending vault migrations. Hygiene checks (broken links,
+    orphans, schema violations, staleness, contradictions, framework state drift) moved to
+    `/lint` in v3.1.
   use_cases:
     - "Process my inbox"
     - "Sync tasks and calendar"
     - "Check for gaps"
     - "Archive stale notes"
     - "Run maintenance"
-  scope: maintenance,inbox,sync,archive,housekeeping
+    - "List worktrees"
+    - "Merge / prune worktrees"
+    - "Run pending migrations"
+  scope: maintenance,inbox,sync,archive,housekeeping,worktrees,migrations
 ---
 
 # Maintain skill: inbox, sync, and archive
 
-Three modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails). A fourth "maintenance" trigger runs all three in sequence.
+Modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
 
 Hygiene — broken wikilinks, orphans, schema violations, staleness banners, contradictions, framework self-state drift — moved to `/lint` in v3.1. Reference-update mode was retired (v2.1 artifact).
+
+## Relationship to `/lint`
+
+- **/maintain**: Workflow/ingest scope. Focuses on external boundary sync (inbox routing, calendar drift, task gap checks, git worktree hygiene).
+- **/lint**: Structural/hygiene scope. Focuses on intra-vault integrity (broken wikilinks, orphans, schema violations, staleness warnings).
+
+## Invocation contexts
+
+- **Interactive**: The user asks for a specific check (e.g., "process inbox") or the full pipeline ("run maintenance"). Results render directly in chat.
+- **Background (cron)**: `tars-weekly-maintenance` invokes `/maintain --weekly` silently. Nothing auto-applies; everything flows into a review queue note for the next session.
+- **Session startup**: The SessionStart hook may prompt the user to run maintenance if the `last_run` timestamp indicates it is due.
 
 All vault writes go through `mcp__tars_vault__*` tools. External integrations resolve via `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code provider names.
 
@@ -37,6 +54,9 @@ All vault writes go through `mcp__tars_vault__*` tools. External integrations re
 | Inbox | "process inbox" | Classify and route pending inbox items (multimodal) |
 | Sync | "sync", "check for gaps" | Calendar gaps, task drift, memory freshness |
 | Archive | "archive sweep" | Staleness archival with 90d backlink + active-task guardrails |
+| Worktrees | "list worktrees", `/maintain worktrees` | Discover, merge, and prune git worktrees |
+| Migrations | "run migrations", `/maintain migrations` | Apply pending schema/vault-structure migrations |
+| Re-register | "re-register jobs", `/maintain --re-register` | Switch or renew scheduler registrations with mutual exclusion |
 | Maintenance | "run maintenance", "housekeeping", cron | Archive + sync; inbox only if non-empty |
 
 **Automatic** (SessionStart): if `_system/housekeeping-state.yaml.last_run` is not today, the hook runs `archive --auto` + `sync --light` silently (surface-only; never applies without review). **Cron**: Friday 17:00 local by default (`_system/schedule.md`, registered via CronCreate in `/welcome`).
@@ -110,7 +130,7 @@ NEVER delete source files. The subsequent archive-sweep step (§below) moves `in
 
 ### Step 6: Summary
 
-Emit `inbox_processed` telemetry. PostToolUse hook writes the daily-note summary.
+Emit `inbox_processed` telemetry. Append an inbox-processing summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -167,7 +187,7 @@ Surface for user decision: update profile with recent insights (routes to `/lear
 
 (Telemetry rollup moved to `/lint` per the v3.1 boundary; the rollup script `scripts/telemetry-rollup.py` is the single source of truth and is consumed by `/briefing` weekly footer + `/maintain --weekly`. Source `.jsonl` retention is 90 days rolling — older files move to `_system/telemetry/archive/YYYY-MM.jsonl.gz` on the weekly maintenance run.)
 
-Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. PostToolUse hook writes the daily-note summary.
+Emit `sync_completed` with `{calendar_gaps, task_drift, stale_profiles}` counts. Append the sync summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -202,9 +222,154 @@ Archive all / select specific / skip
 
 ---
 
+## Worktrees mode (`/maintain worktrees`)
+
+Triggered by: "list worktrees", "worktree hygiene", "clean up worktrees", or explicitly `/maintain worktrees`.
+
+When Claude Code runs sessions in isolated git worktrees, stale branches accumulate over time. This mode surfaces them and lets the user merge or prune each one.
+
+### Step 1: Discover worktrees
+
+```bash
+git worktree list --porcelain
+```
+
+Parse the output into a list of `{path, branch, HEAD}` records. Skip the main worktree (first entry). For each non-main worktree:
+
+- Compute `commits_ahead` vs `main`: `git rev-list --count main..<branch>`
+- Check last-commit date: `git log -1 --format="%ci" <branch>`
+- Check if any TARS vault files were written in this worktree (look for new/modified `.md` files relative to `main`)
+
+### Step 2: Present inventory
+
+```
+Active worktrees (excluding main):
+  1. claude/feature-xyz  (3 commits ahead, last activity: 2026-04-28)
+     — 2 vault files modified (may need merge review)
+  2. claude/old-task     (0 commits ahead, last activity: 2026-03-10)
+     — nothing ahead of main; safe to prune
+
+Actions: [merge N] [prune N] [merge all safe] [prune all stale] [skip]
+```
+
+A worktree is **safe to prune** when it has 0 commits ahead of main and its last activity is older than 7 days.
+
+### Step 3: Execute user selection
+
+- **Merge N**: run `git merge <branch>` from the main worktree checkout, then offer to run `git worktree remove <path> --force` on success.
+- **Prune N**: run `git worktree remove <path> --force` (safe-to-prune only; confirm on others).
+- **Prune all stale**: batch-prune all 0-commits-ahead worktrees older than 7 days without additional confirmation.
+- After pruning: run `git worktree prune` to clean up stale admin files.
+
+### Step 4: Summary
+
+Report counts: merged, pruned, skipped. Log to `_system/changelog/YYYY-MM-DD.md` if any action was taken.
+
+### Constraints
+
+- NEVER merge without showing the commit delta first.
+- NEVER prune a worktree that has commits ahead of main without explicit user confirmation.
+- NEVER run destructive git operations (reset, force-push) — merge and worktree-remove only.
+
+---
+
+## Migrations mode (`/maintain migrations`)
+
+Triggered by: "run migrations", "run pending migrations", or as part of `/maintain --realign` (Phase 5).
+
+Applies pending schema and vault-structure migrations that ship with each plugin version. Migrations are idempotent Python scripts in `scripts/migrations/`.
+
+### Step 1: Check pending migrations
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
+```
+
+This compares `_system/housekeeping-state.yaml.plugin_version` against the available migration scripts and prints pending ones.
+
+### Step 2: Present the list
+
+```
+Pending migrations (vault is at v3.1.x; plugin is v3.3.0):
+  1. v3.2.0-add-tars-category       — backfill tars-category on 228 task notes
+  2. v3.3.0-backfill-journal-aliases — add aliases to 13+ journal files with slug mismatch
+
+Run all? [all / pick specific N,M / dry-run first / skip]
+```
+
+Always offer dry-run first. Never apply without user acknowledgement.
+
+### Step 3: Apply
+
+```bash
+python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --apply [--migration v3.2.0-add-tars-category]
+```
+
+Each migration writes a results summary. On success, `housekeeping-state.yaml.plugin_version` advances to match the plugin.
+
+### Constraints
+
+- NEVER apply migrations without showing the dry-run diff first.
+- Migrations are additive-only — they set missing fields, never delete or rename user content.
+- A failed migration leaves a partial results file in `journal/YYYY-MM/migration-<id>-FAILED.md` and does NOT advance the version.
+
+---
+
+## Re-register mode (`/maintain --re-register`)
+
+Triggered by: "re-register jobs", "switch scheduler", `/maintain --re-register`, or when the user wants to explicitly change which scheduler owns their TARS jobs.
+
+This is the ONLY supported path for switching a job from one scheduler to another. SessionStart and the weekly CronCreate renewal step never switch schedulers — they only maintain the current one.
+
+### Step 1: Show current state
+
+```
+Current scheduler registrations:
+  daily_briefing      → mcp__scheduled-tasks (job: abc-123)
+  weekly_briefing     → CronCreate (job: xyz-789, registered 2026-04-29 — expires in 5d)
+  weekly_maintenance  → CronCreate (job: xyz-790, registered 2026-04-29 — expires in 5d)
+  lint                → not_registered
+
+Available schedulers: mcp__scheduled-tasks (connected), CronCreate
+```
+
+Detect available schedulers using `mcp__tars_vault__resolve_capability(capability="scheduler")`.
+
+### Step 2: Present options
+
+```
+Re-register options:
+  [1] Switch all CronCreate jobs to mcp__scheduled-tasks (recommended — persistent)
+  [2] Switch all mcp__scheduled-tasks jobs to CronCreate
+  [3] Register unregistered jobs only
+  [4] Cancel all registrations (unregister everything)
+  [5] Cancel — keep current setup
+```
+
+### Step 3: Execute with mutual-exclusion enforcement
+
+For each job being re-registered:
+1. **Cancel the old registration first**, before creating the new one:
+   - `mcp__scheduled-tasks`: call the cancel/delete tool to remove the old job by stored ID.
+   - `CronCreate`: call `CronDelete` with the stored job ID.
+2. Create the new registration with the new scheduler, using the stored `schedule` value and the same `confirm_before_run` command form.
+3. Update `housekeeping-state.yaml`: `id`, `scheduler_type`, `cron_create_registered_at`, `status`.
+4. Update `_system/schedule.md` table row.
+5. Update `_system/install.yaml` `scheduler_type` if all jobs now share a single scheduler.
+
+**CRITICAL**: Always cancel the old job before creating the new one. Never leave both active simultaneously — even briefly — on a machine where both schedulers are accessible.
+
+### Constraints
+
+- NEVER register a new scheduler entry without cancelling the old one first.
+- If the old-job cancellation fails, abort the switch for that job and surface the error.
+- NEVER auto-switch schedulers during SessionStart or weekly maintenance — user consent required here.
+
+---
+
 ## Weekly mode (`/maintain --weekly`)
 
-Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user. Casual-mode installs do NOT register this cron; the mode still works on demand if invoked manually.
+Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user.
 
 Why this exists: Claude does not run in the background, so every periodic feature in TARS (telemetry rollup, backlog grouping, staleness/drift/curator proposals) needs a single trigger that opens a session and produces a persistent surface. The cron-fired session ends without a human present, so the only output is a numbered review file the user reads on their next session.
 
@@ -276,9 +441,18 @@ Pipeline:
      with reversibility notes.
    ```
 
-7. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for cooling-off windows: `last_run.archive_check` (7d), `last_run.persona_drift_check` (14d), and `last_run.pattern_scan` (any). All live under a new `last_run` block in `_system/housekeeping-state.yaml`; the SessionStart hook reads them when computing the cron-job notice (Phase 4).
+7. **CronCreate re-registration check (v3.3).** Read `_system/housekeeping-state.yaml` `cron_jobs` block. For each job where `scheduler_type == "CronCreate"`:
+   - Compute age from `cron_create_registered_at`.
+   - If age ≥ 5 days (within the 7-day TTL window), re-register with CronCreate using the stored `schedule` and the same `confirm_before_run` command form.
+   - Update `cron_create_registered_at` to today's ISO-8601 date after successful re-registration.
+   - Update the job row in `_system/schedule.md`.
+   - NEVER switch from CronCreate to `mcp__scheduled-tasks` here — use the same scheduler_type that was originally recorded.
+   - If re-registration fails (CronCreate not available in this session), log the failure to the weekly review file and do not change the housekeeping-state.
+   - Jobs with `scheduler_type == "mcp__scheduled-tasks"` are persistent — skip this step for them.
 
-8. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, curator_memory, curator_workflow, persona_drift_proposed, review_file_path}`.
+8. **Update housekeeping state.** Set `last_weekly_run: YYYY-MM-DD` so the SessionStart hook can detect when it last ran. Persist per-check `last-run` timestamps for cooling-off windows: `last_run.archive_check` (7d), `last_run.persona_drift_check` (14d), and `last_run.pattern_scan` (any). All live under a new `last_run` block in `_system/housekeeping-state.yaml`; the SessionStart hook reads them when computing the cron-job notice.
+
+9. **Telemetry.** Emit `maintain_weekly_run` with `{rollup_events, backlog_groups, lint_queue_size, curator_memory, curator_workflow, persona_drift_proposed, review_file_path, cron_reregistered}`.
 
 The cron-fired session ends here. The user reviews `inbox/pending/weekly-review-YYYY-MM-DD.md` on their next interactive session via the existing inbox-surfacing flow in `/maintain inbox`.
 
@@ -291,13 +465,22 @@ Triggered by: "run maintenance", "housekeeping", or cron.
 1. Check `_system/housekeeping-state.yaml.last_run`. If today and not a manual invocation, ask "Maintenance already ran today. Force re-run?"
 2. Run **archive** mode.
 3. Run **sync** mode (light — calendar gaps + task drift; skip memory freshness unless comprehensive flag set).
-4. If inbox has pending items, prompt: "N items in inbox. Process now? [Y/N]". Do NOT auto-process.
-5. Update `_system/housekeeping-state.yaml`:
+4. Run **wikilink heal** (v3.3):
+   ```bash
+   python3 scripts/heal-wikilinks.py --vault $TARS_VAULT_PATH --json --dry-run
+   ```
+   If auto-fixable links are found, apply them silently:
+   ```bash
+   python3 scripts/heal-wikilinks.py --vault $TARS_VAULT_PATH --apply
+   ```
+   Surface the count in the maintenance summary (e.g. "Auto-healed 13 wikilinks"). Distance-2 suggestions are NOT auto-applied — include them in the maintenance summary as a numbered list for the user to review on their next session. Skip this step entirely if `heal-wikilinks.py` is not present (graceful degradation).
+5. If inbox has pending items, prompt: "N items in inbox. Process now? [Y/N]". Do NOT auto-process.
+6. Update `_system/housekeeping-state.yaml`:
    ```
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_run",     value="YYYY-MM-DD")
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_success", value=true)
    ```
-6. Emit `maintenance_run` telemetry. PostToolUse hook writes daily-note summary.
+7. Emit `maintenance_run` telemetry. Append the maintenance summary to the daily note via `mcp__tars_vault__append_note`.
 
 ---
 
@@ -325,5 +508,5 @@ Triggered by: "run maintenance", "housekeeping", or cron.
 
 ### Universal
 - ALWAYS emit telemetry for every mode run (`inbox_processed`, `sync_completed`, `archive_swept`, `maintenance_run`).
-- ALWAYS use `mcp__tars_vault__*` tools for vault writes; PostToolUse hook handles changelog.
+- ALWAYS use `mcp__tars_vault__*` tools for vault writes. Append daily-note and changelog entries explicitly.
 - NEVER use direct file I/O for vault content.

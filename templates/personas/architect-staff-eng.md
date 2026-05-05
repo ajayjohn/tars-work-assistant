@@ -2,7 +2,6 @@
 tars-persona-key: architect-staff-eng
 tars-persona-name: Architect / Staff Engineer
 tars-persona-summary: Owns technical decisions, ADRs, system design, and cross-team RFCs.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: high
   tars-default-analysis-mode: A

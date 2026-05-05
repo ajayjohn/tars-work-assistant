@@ -247,6 +247,8 @@ mcp__tars_vault__create_note(
 )
 ```
 
+The server auto-adds a space-form alias (e.g. `"2026-05-04 Daily Briefing"`) to the `aliases` list so wikilinks like `[[2026-05-04 Daily Briefing]]` resolve correctly in Obsidian. No manual alias step is required.
+
 Display the full briefing directly to the user.
 
 ---
@@ -267,9 +269,9 @@ After generating the briefing, verify scheduled automation:
 
 ---
 
-## Step 9: Daily-note log (handled by PostToolUse hook)
+## Step 9: Daily-note log
 
-The `PostToolUse` hook appends the briefing-generation line to the daily note after `create_note` succeeds. No explicit append call is required. Emit telemetry event `briefing_generated` with `{meetings, tasks_due_today, overdue, unrecognized_people}` counts for the skill-activity view.
+The `PostToolUse` hook emits `vault_write` telemetry for each MCP write. Append the briefing-generation line to today's daily note explicitly via `mcp__tars_vault__append_note(file="journal/YYYY-MM-DD", content=…)`. Emit telemetry event `briefing_generated` with `{meetings, tasks_due_today, overdue, unrecognized_people}` counts for the skill-activity view.
 
 ---
 
@@ -534,9 +536,9 @@ Same as daily briefing Step 8. Verify all scheduled cron jobs are active, re-reg
 
 ---
 
-## Step 9: Daily-note log (handled by PostToolUse hook)
+## Step 9: Daily-note log
 
-The `PostToolUse` hook writes the daily-note line after the briefing create_note succeeds. Emit telemetry event `briefing_generated` with `{briefing_type: "weekly", meetings, tasks_due, overdue, stale_backlog, initiatives}` counts.
+The `PostToolUse` hook emits `vault_write` telemetry for each MCP write. Append the briefing-generation line to today's daily note explicitly via `mcp__tars_vault__append_note`. Emit telemetry event `briefing_generated` with `{briefing_type: "weekly", meetings, tasks_due, overdue, stale_backlog, initiatives}` counts.
 
 ---
 

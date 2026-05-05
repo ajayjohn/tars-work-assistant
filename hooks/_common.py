@@ -83,18 +83,14 @@ def read_install_config(vault: Path | None = None) -> dict[str, Any] | None:
     return _read_install_yaml(target)
 
 
-def install_mode(vault: Path | None = None) -> str:
-    """Return the engagement mode ('casual' or 'standard').
+def _is_unexpanded_var(value: str) -> bool:
+    """Return True if value looks like an unexpanded shell variable.
 
-    Defaults to 'standard' when install.yaml is missing or the field is unset.
-    Anything other than the two known values normalizes to 'standard' — we
-    never block on a typo.
+    Claude Code's MCP runtime does not perform shell variable expansion, so a
+    config entry like ``"TARS_VAULT_PATH": "${TARS_VAULT_PATH}"`` passes the
+    literal string through.  Detect both ``${VAR}`` and ``$VAR`` forms.
     """
-    config = read_install_config(vault)
-    if not config:
-        return "standard"
-    value = str(config.get("mode") or "standard").strip().lower()
-    return "casual" if value == "casual" else "standard"
+    return bool(re.search(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*", value))
 
 
 def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
@@ -102,6 +98,9 @@ def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
 
     Resolution order:
       1. ``TARS_VAULT_PATH`` env var (explicit override always wins).
+         If the value contains an unexpanded shell variable (e.g. ``${TARS_VAULT_PATH}``),
+         the env var is rejected and resolution continues to step 2 — the unexpanded
+         literal would create a mis-named directory and silently misroute writes.
       2. CWD if it contains ``_system/install.yaml``.
       3. CWD if it contains ``_system/config.md`` (legacy vault without
          install.yaml — works, but flagged so /welcome can offer to upgrade).
@@ -112,20 +111,31 @@ def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
       * ``source``: which step matched (env|cwd-install|cwd-config|install-file|none)
       * ``mismatch``: True if install.yaml.vault_path disagrees with CWD
       * ``install``: parsed install.yaml when one was located
+      * ``unexpanded_env``: True when TARS_VAULT_PATH contained an unexpanded variable
     """
-    status: dict[str, Any] = {"source": "none", "mismatch": False, "install": None}
+    status: dict[str, Any] = {
+        "source": "none",
+        "mismatch": False,
+        "install": None,
+        "unexpanded_env": False,
+    }
 
     env_value = os.environ.get("TARS_VAULT_PATH")
     if env_value:
-        env_path = Path(env_value).expanduser()
-        status["source"] = "env"
-        install = read_install_config(env_path)
-        if install:
-            status["install"] = install
-            stored = install.get("vault_path")
-            if stored and Path(str(stored)).expanduser().resolve() != env_path.resolve():
-                status["mismatch"] = True
-        return env_path, status
+        if _is_unexpanded_var(env_value):
+            # Record the problem but do NOT use this value — fall through to CWD.
+            status["unexpanded_env"] = True
+            status["raw_env_value"] = env_value
+        else:
+            env_path = Path(env_value).expanduser()
+            status["source"] = "env"
+            install = read_install_config(env_path)
+            if install:
+                status["install"] = install
+                stored = install.get("vault_path")
+                if stored and Path(str(stored)).expanduser().resolve() != env_path.resolve():
+                    status["mismatch"] = True
+            return env_path, status
 
     cwd = Path.cwd()
     if _candidate_has_install(cwd):

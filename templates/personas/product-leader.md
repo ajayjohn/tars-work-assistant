@@ -2,7 +2,6 @@
 tars-persona-key: product-leader
 tars-persona-name: Product Leader
 tars-persona-summary: Owns roadmap, customer signals, and feature decisions across one or more product lines.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: high
   tars-default-analysis-mode: B
