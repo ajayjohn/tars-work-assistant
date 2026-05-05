@@ -29,7 +29,7 @@ Do NOT jump to conclusions. Do NOT output a recommendation without completing al
 
 ### MANDATORY: Framework selection
 
-Before beginning, select 1-2 frameworks from the decision frameworks skill (auto-loaded) and state:
+Before beginning, select 1-2 frameworks from the decision frameworks catalog in `skills/think/manifesto.md` and state:
 "I am approaching this using [Framework] because [Reason]."
 
 ---
