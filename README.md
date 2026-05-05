@@ -100,7 +100,7 @@ Start here depending on what you need:
 - [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](CHANGELOG.md) for release history
 - [docs/CATALOG.md](docs/CATALOG.md) for the product and adoption overview
-- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration (v3.0 → v3.1; v3.1 → v3.2 needs no migration)
+- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for vault migration (v3.0 → v3.1; v3.1 → v3.3 handled via automated hook)
 - [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) for Claude Remote Control on mobile
 
 ## License

@@ -13,7 +13,7 @@ You need:
 - Claude Code or Claude Cowork with the TARS framework installed
 - a vault location dedicated to your TARS workspace
 
-If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 → v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 → v3.2 has no breaking changes; reopen the vault and `/welcome` will offer to write the new `_system/install.yaml` install record on first session.
+If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 → v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 → v3.3 migrations are handled automatically; reopen the vault and `/welcome` or `/maintain migrations` will surface any pending changes.
 
 ## Installation
 
