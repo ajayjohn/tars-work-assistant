@@ -333,17 +333,53 @@ Every workflow must:
    ```
 2. **Write changelog entry** to `_system/changelog/YYYY-MM-DD.md` with batch_id for rollback
 
-### Self-evaluation (Issue 9)
+### Session self-evaluation
 
-**When errors occur** during any workflow:
-1. Check `_system/backlog/issues/` for existing issue with same error signature
-2. If exists: increment `tars-occurrence-count`, update `tars-last-seen`
-3. If new: create issue note using issue template in `_system/backlog/issues/`
-4. NEVER duplicate. Always check first.
+TARS monitors every session for errors, dissatisfaction signals, and improvement ideas. **No backlog item is ever written without explicit user confirmation.** Detection never interrupts the active task — it surfaces once as a brief closing question after the primary output is complete. If the session ends without a natural closing moment, skip silently.
 
-**When user suggests improvements**:
-- Capture as idea note in `_system/backlog/ideas/` using idea template
-- Set `tars-status: proposed`
+#### Detection during the session (queue in working memory only)
+
+Do NOT write to vault mid-session. Queue signals for the closing question.
+
+**Error signals** — any of:
+- Tool call failure, MCP error, write rejection from hook
+- Script exits non-zero or prints a traceback
+- Schema validation failure surfaced by the MCP server
+- Circuit-breaker trip (>3 consecutive obsidian-cli errors)
+- `mcp__tars_vault__*` call returns an error field
+
+**Dissatisfaction signals** — any of:
+- User corrects with "that's wrong", "you missed", "that's not what I meant", "undo that"
+- User re-states the same request with a correction after TARS produces output
+- User uses "bug", "broken", "error", or "this shouldn't" in reference to TARS behavior (not general conversation)
+- User expresses frustration: "this is frustrating", "why did you...", "that shouldn't have happened"
+- User asks TARS to start over because the output missed the intent entirely
+
+**Improvement signals** — any of:
+- User says "you should", "it would be better if", "I wish you could", "can you add", "why don't you"
+- User describes a workflow or preference that TARS currently can't support
+- User explicitly says "feature request" or "suggestion"
+
+#### Closing question (end of task, once per session)
+
+After delivering the primary task output — never before, never mid-workflow, never more than once per session:
+
+1. Pick the **single most significant** queued signal. Do not list all detections.
+2. Surface one concise closing question:
+   > "One quick note: [one sentence describing what was detected]. Want me to log this for future improvement? [Yes / No / Tell me more] — Logged items can also be shared with AJ for inclusion in future TARS updates."
+
+3. **If Yes** (or user provides more context): write the backlog item.
+   - **Errors**: call `mcp__tars_vault__search_by_tag(tag="tars/issue", query="<error stem>")` first. If an existing issue matches: call `mcp__tars_vault__update_frontmatter` to increment `tars-occurrence-count` and update `tars-last-seen`. If new: `mcp__tars_vault__create_note(template="backlog-item", path="_system/backlog/issues/…", frontmatter={tars-backlog-type: issue, tars-status: open, …})`.
+   - **Ideas / dissatisfaction**: `mcp__tars_vault__create_note(template="backlog-item", path="_system/backlog/ideas/…", frontmatter={tars-backlog-type: idea, tars-status: proposed, …})`.
+   - Confirm to user: "Logged to `_system/backlog/`. You can share that folder's contents with AJ for future TARS framework improvements."
+
+4. **If No** or user ignores: drop all queued signals. Do not re-ask this session.
+
+5. **If Tell me more**: ask one follow-up question, then proceed to logging or dropping based on the response.
+
+#### Deduplication (mandatory)
+
+Before creating any new backlog note, search for existing ones with the same signature. Increment occurrence count on duplicates — never create two notes for the same root issue.
 
 ### Scheduled job execution protocol (confirm-before-run)
 
@@ -422,7 +458,7 @@ This ordering ensures wikilinks always resolve. A link target must exist before 
 |-----------|--------|
 | >20 files modified in single workflow | Pause, show summary, ask user to confirm before continuing |
 | Memory file would exceed 200 lines | Suggest archival/restructuring first |
-| >3 consecutive obsidian-cli errors | Stop, report status to user, log issue to backlog |
+| >3 consecutive obsidian-cli errors | Stop, report status to user, queue issue for closing confirmation |
 | Name resolution confidence <70% | Do not proceed with that name, ask user |
 | Transcript >15,000 words | Chunk into segments, process sequentially |
 

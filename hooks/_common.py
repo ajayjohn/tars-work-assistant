@@ -83,20 +83,6 @@ def read_install_config(vault: Path | None = None) -> dict[str, Any] | None:
     return _read_install_yaml(target)
 
 
-def install_mode(vault: Path | None = None) -> str:
-    """Return the engagement mode ('casual' or 'standard').
-
-    Defaults to 'standard' when install.yaml is missing or the field is unset.
-    Anything other than the two known values normalizes to 'standard' — we
-    never block on a typo.
-    """
-    config = read_install_config(vault)
-    if not config:
-        return "standard"
-    value = str(config.get("mode") or "standard").strip().lower()
-    return "casual" if value == "casual" else "standard"
-
-
 def _is_unexpanded_var(value: str) -> bool:
     """Return True if value looks like an unexpanded shell variable.
 
