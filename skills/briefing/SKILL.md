@@ -247,6 +247,8 @@ mcp__tars_vault__create_note(
 )
 ```
 
+The server auto-adds a space-form alias (e.g. `"2026-05-04 Daily Briefing"`) to the `aliases` list so wikilinks like `[[2026-05-04 Daily Briefing]]` resolve correctly in Obsidian. No manual alias step is required.
+
 Display the full briefing directly to the user.
 
 ---

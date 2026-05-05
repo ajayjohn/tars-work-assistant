@@ -392,13 +392,22 @@ Triggered by: "run maintenance", "housekeeping", or cron.
 1. Check `_system/housekeeping-state.yaml.last_run`. If today and not a manual invocation, ask "Maintenance already ran today. Force re-run?"
 2. Run **archive** mode.
 3. Run **sync** mode (light — calendar gaps + task drift; skip memory freshness unless comprehensive flag set).
-4. If inbox has pending items, prompt: "N items in inbox. Process now? [Y/N]". Do NOT auto-process.
-5. Update `_system/housekeeping-state.yaml`:
+4. Run **wikilink heal** (v3.3):
+   ```bash
+   python3 scripts/heal-wikilinks.py --vault $TARS_VAULT_PATH --json --dry-run
+   ```
+   If auto-fixable links are found, apply them silently:
+   ```bash
+   python3 scripts/heal-wikilinks.py --vault $TARS_VAULT_PATH --apply
+   ```
+   Surface the count in the maintenance summary (e.g. "Auto-healed 13 wikilinks"). Distance-2 suggestions are NOT auto-applied — include them in the maintenance summary as a numbered list for the user to review on their next session. Skip this step entirely if `heal-wikilinks.py` is not present (graceful degradation).
+5. If inbox has pending items, prompt: "N items in inbox. Process now? [Y/N]". Do NOT auto-process.
+6. Update `_system/housekeeping-state.yaml`:
    ```
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_run",     value="YYYY-MM-DD")
    mcp__tars_vault__update_frontmatter(file="housekeeping-state", property="last_success", value=true)
    ```
-6. Emit `maintenance_run` telemetry. PostToolUse hook writes daily-note summary.
+7. Emit `maintenance_run` telemetry. PostToolUse hook writes daily-note summary.
 
 ---
 

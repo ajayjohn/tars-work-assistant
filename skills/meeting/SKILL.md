@@ -510,6 +510,12 @@ Append the structured report from Step 7 to the journal entry body:
 
 When the calendar title differs from the transcript header, keep `tars-calendar-title` in frontmatter for reference.
 
+### Auto-alias (v3.3)
+
+The `tars-vault` MCP server automatically adds a space-form alias (e.g. `"2026-04-06 Gba Ai Panel Prep"`) to the `aliases` list whenever a note is created under `journal/` with a `YYYY-MM-DD-slug` filename. This means wikilinks of the form `[[2026-04-06 GBA AI Panel Prep]]` resolve in Obsidian without any manual alias step.
+
+You do NOT need to add `aliases` manually in Step 8 — the server handles it. The returned `aliases_added` field confirms what was injected. If you supply your own `aliases` list in frontmatter, the server extends it rather than overwriting it.
+
 ---
 
 ## Step 9: Archive transcript (Issue 6)

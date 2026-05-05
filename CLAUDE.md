@@ -169,6 +169,7 @@ scripts/                    Deterministic Python validators (stdlib-only; try/ex
   migrate-integrations-v2.py Integrations v3.0 → v3.1 config migration
   discover-mcp-tools.py     SessionStart tool discovery
   capability-classifier.py  Tool→capability classifier (yaml defaults)
+  heal-wikilinks.py         Fuzzy broken-link healer — slug-normalization + alias-registry + Levenshtein ≤2
   run-migrations.py         Migration runner — applies pending scripts/migrations/*.py
   migrate-stranded-vault-files.py  Relocate files mis-written under an unexpanded ${TARS_VAULT_PATH}
   migrations/               Per-version migration scripts (run via run-migrations.py)

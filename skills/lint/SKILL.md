@@ -58,7 +58,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 
 | Check | Source | Auto-fixable | Action on fail |
 |-------|--------|-------------:|----------------|
-| Broken wikilinks | `mcp__tars_vault__search_by_tag` over all `[[…]]` patterns + `resolve_alias` | No | Propose: fix via alias registry / create stub / flag unverified |
+| Broken wikilinks | `scripts/health-check.py` (exact match) + `scripts/heal-wikilinks.py` (fuzzy, v3.3) | Partial (distance≤1 auto-fix; distance=2 suggest; distance>2 none) | Auto-apply distance≤1 fixes with `--apply`; surface distance=2 suggestions as numbered options; unresolvable → propose create-stub or flag |
 | Quadruple-bracket artifacts (`[[[[Name]]|Alias]]`, `[[[[Name]]]]`) | regex via `scripts/fix-wikilinks.py --json` | Yes | Auto-fix with confirmation |
 | Orphan notes (0 backlinks, not referenced from a `.base` view) | link graph from `search_by_tag` | No | Propose archive or tag `tars/orphan` |
 | Missing backlinks (A links B; B doesn't reflect A) | graph | Partial | Informational; offer to insert a reference when source is memory |
@@ -93,15 +93,24 @@ Determine which checks to run based on the mode trigger. For the default "all" m
 Call Python scripts in parallel where independent, collect JSON results:
 
 ```
-scripts/validate-schema.py --vault <TARS_VAULT_PATH> --json
-scripts/scan-secrets.py    --vault <TARS_VAULT_PATH> --json
-scripts/health-check.py    --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
-scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
-scripts/fix-wikilinks.py   --vault <TARS_VAULT_PATH> --json --repair-broken
-                                  # broken-link scan; classifies into
-                                  # auto_safe / needs_review / unresolvable.
-                                  # --apply only acts on auto_safe; the
-                                  # other buckets surface as /lint actions.
+scripts/validate-schema.py  --vault <TARS_VAULT_PATH> --json
+scripts/scan-secrets.py     --vault <TARS_VAULT_PATH> --json
+scripts/health-check.py     --vault <TARS_VAULT_PATH> --json   (includes flagged_content sub-block — §7.4 merge)
+scripts/fix-wikilinks.py    --vault <TARS_VAULT_PATH> --json   (detect only; applies with --apply)
+scripts/fix-wikilinks.py    --vault <TARS_VAULT_PATH> --json --repair-broken
+                                   # broken-link scan; classifies into
+                                   # auto_safe / needs_review / unresolvable.
+                                   # --apply only acts on auto_safe; the
+                                   # other buckets surface as /lint actions.
+scripts/heal-wikilinks.py   --vault <TARS_VAULT_PATH> --json --dry-run
+                                   # fuzzy broken-link healer (v3.3).
+                                   # Three-stage pipeline: slug-normalization →
+                                   # alias-registry → Levenshtein ≤2.
+                                   # distance ≤ 1 → auto_fix bucket (safe to apply).
+                                   # distance = 2 → suggest bucket (surface to user).
+                                   # distance > 2 → unresolvable.
+                                   # Run AFTER fix-wikilinks.py so artifact-bracket
+                                   # repairs are already applied.
 ```
 
 ### Step 3: Run MCP-backed checks
@@ -196,7 +205,9 @@ When invoked as `lint --actions` (or `lint --actions <subset>`), do not present 
    - **/maintain --weekly** — render the queue as a markdown section and append to `inbox/pending/weekly-review-YYYY-MM-DD.md`. Do not auto-apply anything. The user reviews on next session.
 
 5. Subset selectors filter to a single check class:
-   - `lint --actions wikilinks` → broken-link / artifact rows only (Phase 2)
+   - `lint --actions wikilinks` → broken-link / artifact rows only. Sources:
+     (a) `scripts/fix-wikilinks.py --repair-broken --json` — bracket-artifact repairs (auto_safe auto-applied; needs_review surfaced).
+     (b) `scripts/heal-wikilinks.py --json --dry-run` — fuzzy broken-link repairs. distance≤1 rows become auto-fixable entries; distance=2 rows become suggestion entries. Apply auto-fix bucket by running `scripts/heal-wikilinks.py --apply`; apply is logged to `_system/changelog/`. Never auto-apply suggestion bucket — present to user with the ranked candidates.
    - `lint --actions patterns` → user-model + workflow proposals only. Sources its candidate list from `/learn --review-patterns` (Phase 6); no telemetry re-aggregation here. Each proposal renders as `kind=user-model field=<f> before=<v> after=<v> evidence=<count>×<window>` or `kind=workflow id=<id> trigger="…" steps=[…]`. Selection: `accept all`, `accept N`, `review each`, `skip`. (Phase 6)
    - `lint --actions curator` → memory-staleness / workflow-staleness / persona-drift rows only. Source: `scripts/archive.py --vault $TARS_VAULT_PATH --json --check all` plus the persona-drift check described in `skills/maintain/SKILL.md` weekly mode step 5. Each row labels its kind (`memory:<file>`, `workflow:<id>`, `persona:<from>→<to>`) plus age and the protection set for memory items. Selection: `archive all`, `archive N,M`, `review each`, `skip`. On "archive", call `mcp__tars_vault__archive_note(file=…)`. Workflow items become `workflows.yaml` edits via `mcp__tars_vault__write_note_from_content`. Persona-switch acceptance updates `_system/install.yaml` `persona:` field via `mcp__tars_vault__update_frontmatter`. Every action logs to `_system/changelog/YYYY-MM-DD.md` with `{action: archive|workflow-retire|persona-switch, target, reversibility: <how to undo>, batch_id}`. (Phase 7)
    - `lint --actions` (no subset) → all of the above plus schema, framework, dedupe, sparse, telemetry-lint surfaces.

@@ -9,14 +9,25 @@ Arguments (all via kwargs):
   overwrite:     optional bool (default false). If true, allows replacing
                  an existing note (still writes a .bak).
 
+Auto-alias behavior (v3.3):
+  When the path stem matches the pattern YYYY-MM-DD-<slug>, the server
+  automatically adds a space-form alias ("YYYY-MM-DD Slug Title") to the
+  `aliases` list if one is not already present.  This ensures that wikilinks
+  of the form [[YYYY-MM-DD Meeting Title]] resolve correctly in Obsidian
+  regardless of whether the underlying file uses a hyphen-slug name.
+
+  The auto-alias fires for notes under journal/ and archive/transcripts/ only.
+  It can be suppressed by passing `auto_alias=false`.
+
 Writes `_system/telemetry/<date>.jsonl` vault_write event on success.
 
 Returns:
-  {status: ok, path: "...", bytes: N}
+  {status: ok, path: "...", bytes: N, aliases_added: [...]}
   {status: error, reason: "..."}
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,12 +36,59 @@ from ..telemetry import append_event
 from ..validators import validate_no_bad_wikilinks
 
 
+# Paths under these vault-relative prefixes receive auto-alias treatment.
+_JOURNAL_PREFIXES = ("journal/", "archive/transcripts/")
+
+# YYYY-MM-DD-<slug> filename pattern (with optional extension).
+_DATE_SLUG_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-(.+?)(?:\.md)?$")
+
+
+def _derive_space_title(stem: str) -> str | None:
+    """Return the space-form title from a YYYY-MM-DD-slug stem, or None.
+
+    Example: "2026-04-06-gba-ai-panel-prep" → "2026-04-06 Gba Ai Panel Prep"
+
+    Title-casing is intentionally simple — Obsidian's alias matching is
+    case-insensitive, so "Gba Ai Panel Prep" resolves [[GBA AI Panel Prep]].
+    """
+    m = _DATE_SLUG_RE.match(stem)
+    if not m:
+        return None
+    date_str = m.group(1)
+    slug = m.group(2)
+    words = [w.capitalize() for w in slug.split("-") if w]
+    return f"{date_str} {' '.join(words)}"
+
+
+def _is_journal_path(vault_relative: str) -> bool:
+    norm = vault_relative.replace("\\", "/")
+    return any(norm.startswith(p) for p in _JOURNAL_PREFIXES)
+
+
+def _ensure_alias(frontmatter: dict[str, Any], alias: str) -> tuple[dict[str, Any], bool]:
+    """Return (updated_frontmatter, was_added).
+
+    Adds ``alias`` to the ``aliases`` list if not already present
+    (case-insensitive comparison).  Mutates a copy, never the original.
+    """
+    fm = dict(frontmatter)
+    existing = fm.get("aliases") or []
+    if not isinstance(existing, list):
+        existing = [str(existing)] if existing else []
+    lower_existing = {str(a).lower() for a in existing}
+    if alias.lower() in lower_existing:
+        return fm, False
+    fm["aliases"] = existing + [alias]
+    return fm, True
+
+
 def create_note(**kwargs: Any) -> dict:
     vault = kwargs.get("vault")
     path = kwargs.get("path")
     frontmatter = kwargs.get("frontmatter")
     body = kwargs.get("body", "")
     overwrite = bool(kwargs.get("overwrite", False))
+    auto_alias = kwargs.get("auto_alias", True)  # default on
 
     if not vault:
         return _common.error("missing 'vault' path")
@@ -77,6 +135,18 @@ def create_note(**kwargs: Any) -> dict:
                 "Obsidian key; pass allow_user_properties=true to permit"
             )
 
+    # Auto-alias: derive the space-form title and add it to aliases when the
+    # note lives under journal/ or archive/transcripts/ and has a slug stem.
+    aliases_added: list[str] = []
+    if auto_alias:
+        rel_str = str(note_p.relative_to(vault_p)).replace("\\", "/")
+        if _is_journal_path(rel_str):
+            space_title = _derive_space_title(note_p.stem)
+            if space_title:
+                frontmatter, was_added = _ensure_alias(frontmatter, space_title)
+                if was_added:
+                    aliases_added.append(space_title)
+
     text = _common.build_note_text(frontmatter, body)
     try:
         _common.write_note_text(note_p, text, backup=bool(note_p.exists()))
@@ -87,6 +157,12 @@ def create_note(**kwargs: Any) -> dict:
     size = len(text.encode("utf-8"))
     append_event(
         Path(vault_p),
-        {"event": "vault_write", "tool": "create_note", "file": rel, "bytes": size},
+        {
+            "event": "vault_write",
+            "tool": "create_note",
+            "file": rel,
+            "bytes": size,
+            "aliases_added": aliases_added,
+        },
     )
-    return _common.ok(path=rel, bytes=size)
+    return _common.ok(path=rel, bytes=size, aliases_added=aliases_added)
