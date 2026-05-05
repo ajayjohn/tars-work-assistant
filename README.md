@@ -14,7 +14,7 @@ TARS is built around a few core ideas:
 - Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
 - Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and vault filing.
 - Tasks and durable memory always go through review before persistence.
-- Cold-start friction is addressed by seven onboarding personas; light-touch users (decks/drafts/brainstorms only) are first-class via a casual engagement mode.
+- Cold-start friction is addressed by seven onboarding personas; TARS works out of the box regardless of which integrations are connected and gains richer capabilities as integrations are added.
 - Wikilink hygiene is centralized: every `[[…]]` flows through `format_wikilink`; smart-quote and Obsidian-illegal links are rejected at the write side; legacy broken links can be repaired in bulk.
 - Periodic work runs only via cron jobs registered during `/welcome` — Claude does not run in the background, so every staleness, drift, and rollup feature is bound to a single `tars-weekly-maintenance` job that opens a session and writes a numbered review queue for next time.
 

@@ -2,7 +2,6 @@
 tars-persona-key: delivery-pm
 tars-persona-name: Delivery / Project Manager
 tars-persona-summary: Owns schedule, scope, dependencies, and RAID across one or more programs.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: medium
   tars-default-analysis-mode: C

@@ -175,6 +175,7 @@ scripts/                    Deterministic Python validators (stdlib-only; try/ex
   migrations/               Per-version migration scripts (run via run-migrations.py)
     v3.2.0-add-tars-category.py     Backfill tars-category on pre-3.2.0 task notes
     v3.3.0-backfill-journal-aliases.py  Add aliases to journal notes with slug/title mismatch
+    v3.3.0-remove-casual-mode.py        Remove the obsolete `mode:` field from _system/install.yaml
 ```
 
 ---

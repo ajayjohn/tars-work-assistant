@@ -358,7 +358,7 @@ For each job being re-registered:
 
 ## Weekly mode (`/maintain --weekly`)
 
-Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user. Casual-mode installs do NOT register this cron; the mode still works on demand if invoked manually.
+Triggered by: the `tars-weekly-maintenance` cron job (Sunday 18:00 by default; registered in `/welcome` Step 7) or by an explicit `/maintain --weekly` from the user.
 
 Why this exists: Claude does not run in the background, so every periodic feature in TARS (telemetry rollup, backlog grouping, staleness/drift/curator proposals) needs a single trigger that opens a session and produces a persistent surface. The cron-fired session ends without a human present, so the only output is a numbered review file the user reads on their next session.
 

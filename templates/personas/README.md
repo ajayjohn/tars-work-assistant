@@ -22,7 +22,6 @@ Persona frontmatter must include:
 | `tars-config-defaults` | Map of `tars-*` keys → default values applied to `_system/config.md` |
 | `tars-taxonomy-tags` | List of role-relevant tag suggestions appended to `_system/taxonomy.md` |
 | `tars-briefing-sections` | Ordered list of sections the daily briefing should include for this role |
-| `tars-default-mode` | `casual` or `standard`; the wizard still asks the user, this is just a hint |
 
 Valid `tars-config-defaults` keys (subset; extend as needed):
 

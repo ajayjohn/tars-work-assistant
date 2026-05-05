@@ -2,7 +2,6 @@
 tars-persona-key: support-ops-lead
 tars-persona-name: Support / Operations Lead
 tars-persona-summary: Owns incidents, SLAs, customer escalations, runbooks, and on-call.
-tars-default-mode: standard
 tars-config-defaults:
   tars-bluf-level: high
   tars-default-analysis-mode: B

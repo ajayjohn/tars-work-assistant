@@ -70,20 +70,27 @@ Populated during onboarding (`/welcome`). Read from `_system/config.md`.
 - **Company**: {company}
 - **Industry**: {industry}
 
-### Persona + engagement mode
+### Persona
 
-`_system/install.yaml` carries two fields that subtly shape every other skill:
+`_system/install.yaml` carries one field that seeds defaults for every other skill:
 
 - `persona`: one of `product-leader`, `sales-customer-facing`, `delivery-pm`, `data-science-lead`, `architect-staff-eng`, `support-ops-lead`, `engineering-manager`, or empty. Seeds `tars-bluf-level`, `tars-default-analysis-mode`, `tars-review-gate-strictness`, `tars-briefing-style`, and `tars-briefing-sections` in `_system/config.md` during onboarding. Skills should read those derived `tars-*` keys from `config.md` rather than re-deriving from the persona — the persona is the seed, not the running config.
-- `mode`: `standard` (default) or `casual`. In casual mode the router and write-side skills should:
-  - Skip review gates for low-stakes byproducts of `/create`, `/communicate`, `/think` (entity mentions, draft auto-files). High-stakes writes (people, decisions, performance, tasks) still confirm.
-  - Suppress staleness/drift/curator proposals on session start. The user opted out of the weekly cron; surfacing the same noise on every session would defeat the point.
-  - Auto-file `/create` outputs to `contexts/artifacts/YYYY-MM/` and `/communicate` drafts to `journal/YYYY-MM/` without companion files or schema review.
 - `scheduler_type`: which scheduler was used for job registration (`mcp__scheduled-tasks` | `CronCreate` | empty). Skills and hooks use this for mutual-exclusion checks — never register with a second scheduler while this field is set to a different one.
 
 Scheduled-job behavior is governed by the per-job `confirm_before_run`, `auto_timeout_hours`, and `auto_timeout_action` fields in `_system/housekeeping-state.yaml` `cron_jobs`. See "Scheduled job execution protocol" below.
 
-All fields are loaded at session start by hooks; skills can read via `mcp__tars_vault__read_note(file="install")` and consult `frontmatter.mode`.
+### Graceful-degradation tiers
+
+TARS works out of the box regardless of which integrations are connected. Capabilities expand automatically as integrations are added — no mode switching, no re-configuration.
+
+| Tier | Integrations | What's available |
+|------|-------------|-----------------|
+| **0** | None | All skills work: `/meeting`, `/learn`, `/think`, `/communicate`, `/create`, `/tasks` (vault-only), `/briefing` (vault-only). Full review gates, tasks, and memory on everything. |
+| **1** | Calendar | Briefings gain schedule context and next-meeting preview. Sync gains calendar-gap detection. |
+| **2** | Calendar + tasks | Task creation writes to the external task system. Sync gains task-drift detection. |
+| **3** | Calendar + tasks + meeting recording | `/maintain inbox` auto-routes transcripts. Briefing surfaces unprocessed meetings. Full pipeline active. |
+
+Skills check integration availability via `mcp__tars_vault__resolve_capability(capability=…)` before each use. When a capability returns `{status: "unavailable"}`, the skill degrades gracefully: it skips the integration step and notes the gap rather than blocking. The full weekly pipeline (briefings, maintenance, lint cron) is offered to every user — jobs that touch unavailable integrations simply degrade within their pipeline step rather than being skipped entirely.
 
 ### Integrations — provider-agnostic resolver
 

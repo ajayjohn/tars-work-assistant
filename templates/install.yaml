@@ -21,11 +21,6 @@ installation_id: ""
 # support-ops-lead, engineering-manager. Empty until /welcome runs.
 persona: ""
 
-# Engagement mode. 'standard' enables weekly maintenance, drift checks, and
-# review queues. 'casual' skips weekly cron registration and review prompts
-# for low-stakes auto-captured artifacts. Default is 'standard'.
-mode: standard
-
 # Plugin version that wrote this file; helps lint detect stale installs that
 # need migration.
 plugin_version: ""
