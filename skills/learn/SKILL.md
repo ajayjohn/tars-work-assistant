@@ -19,7 +19,7 @@ help:
 
 Two complementary modes for building TARS's knowledge base. Memory mode persists durable facts from conversations. Wisdom mode extracts insights from learning content.
 
-All vault writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). The server runs the auto-wikilink pass (§3.3) before every body write — ambiguous names surface for batched review, never silent link insertion. **Form every wikilink in generated content via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
+All workspace writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). The server runs the auto-wikilink pass (§3.3) before every body write — ambiguous names surface for batched review, never silent link insertion. **Form every wikilink in generated content via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
 ---
 

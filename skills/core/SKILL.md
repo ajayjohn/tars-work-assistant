@@ -45,7 +45,7 @@ Scripts (Python) are deterministic validators that read the filesystem directly 
 
 TARS operates on three verbs:
 - **ingest**: `/meeting`, `/learn`, `/maintain inbox` — turn raw input into reviewed, structured, typed notes.
-- **query**: `/answer`, `/briefing`, `/think` — synthesize answers from vault with citations.
+- **query**: `/answer`, `/briefing`, `/think` — synthesize answers from workspace context with citations.
 - **lint**: `/lint`, `/maintain` — maintain consistency, hygiene, and health.
 
 ### Write interface — `tars-vault` MCP tools
@@ -94,7 +94,7 @@ TARS works out of the box regardless of which integrations are connected. Capabi
 
 | Tier | Integrations | What's available |
 |------|-------------|-----------------|
-| **0** | None | All skills work: `/meeting`, `/learn`, `/think`, `/communicate`, `/create`, `/tasks` (vault-only), `/briefing` (vault-only). Full review gates, tasks, and memory on everything. |
+| **0** | None | All skills work: `/meeting`, `/learn`, `/think`, `/communicate`, `/create`, `/tasks` (workspace-only), `/briefing` (workspace-only). Full review gates, tasks, and memory on everything. |
 | **1** | Calendar | Briefings gain schedule context and next-meeting preview. Sync gains calendar-gap detection. |
 | **2** | Calendar + tasks | Task creation writes to the external task system. Sync gains task-drift detection. |
 | **3** | Calendar + tasks + meeting recording | `/maintain inbox` auto-routes transcripts. Briefing surfaces unprocessed meetings. Full pipeline active. |
@@ -199,11 +199,12 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 | Initiative status, health check | `skills/initiative/` (status) | `/initiative status` |
 | KPIs, performance, team metrics | `skills/initiative/` (performance) | `/initiative performance` |
 | Presentation, deck, speech, narrative | `skills/create/` | `/create` |
-| "Lint vault", "check hygiene", broken links, orphans, schema drift | `skills/lint/` | `/lint` |
+| "Lint workspace", "check hygiene", broken links, orphans, schema drift | `skills/lint/` | `/lint` |
 | "Health check", "run maintenance" | `skills/maintain/` | `/maintain` |
 | "Process inbox", "check inbox" | `skills/maintain/` (inbox) | `/maintain inbox` |
 | `/start`, "try TARS", "quick demo", first session with no `_system/config.md` | `skills/start/` | `/start` |
 | "Setup", "get started", "configure TARS", "onboard" | `skills/welcome/` | `/welcome` |
+| "Continue TARS setup", "finish setup", `/welcome --continue-setup` | `skills/welcome/` (continue setup) | `/welcome --continue-setup` |
 | User corrects a fact, shares org context | `skills/learn/` (memory) | Proactive: offer to persist |
 
 ### Routing rules
@@ -229,12 +230,12 @@ Rules:
 - Prefer multiple-choice questions (numbered list with options)
 - Batch questions (max 3-4 per round)
 - Always include a skip/escape option
-- Always check the vault before asking. Never ask what TARS could find itself
+- Always check the workspace before asking. Never ask what TARS could find itself
 - Never ask open-ended "What would you like?" questions
 
 ### Check before writing (Issue 7)
 
-Before any persistence operation, check what the vault already knows.
+Before any persistence operation, check what the workspace already knows.
 
 | Classification | Action |
 |---------------|--------|
@@ -355,7 +356,7 @@ TARS monitors every session for errors, dissatisfaction signals, and improvement
 
 #### Detection during the session (queue in working memory only)
 
-Do NOT write to vault mid-session. Queue signals for the closing question.
+Do NOT write to the workspace mid-session. Queue signals for the closing question.
 
 **Error signals** — any of:
 - Tool call failure, MCP error, write rejection from hook
@@ -457,7 +458,7 @@ If `auto_timeout_action: run` and no user response was received, run the jobs si
 
 ### Write ordering
 
-ALWAYS follow this order for vault mutations within a workflow:
+ALWAYS follow this order for workspace mutations within a workflow:
 
 1. **Create entity notes first** (people, initiatives, these are link targets)
 2. **Update memory notes** (reference entities created in step 1)
@@ -543,7 +544,7 @@ When answering questions, search these sources in order. Stop when the answer is
 | 3 | Journal entries | High | Summaries of meetings, briefings, analyses |
 | 4 | Transcript archives | Medium | Verbatim fallback when summaries lack detail |
 | 5 | Integration sources | Medium | Calendar, project tracker, task system |
-| 6 | Web search | Lowest | Flag explicitly: "From web search, not vault" |
+| 6 | Web search | Lowest | Flag explicitly: "From web search, not workspace" |
 
 ### Transcript fallback logic
 
@@ -626,6 +627,7 @@ State lives in `_system/maturity.yaml` under `coaching`:
 - `dismissed_tips`: tip ids the user has hidden.
 - `last_tip_shown` and `last_tip_context`: prevent repeats.
 - `completed_milestones` and `counters`: lightweight maturity signals.
+- `deferred_setup`: setup modules still available after fast setup.
 
 Surface coaching only in these places:
 - Daily or weekly briefing: at most one `## Next useful thing` suggestion.
@@ -637,6 +639,7 @@ Rules:
 - Avoid coaching during active high-focus work. If useful, place it in the final summary.
 - Honor user controls: "hide tips for now", "show fewer tips", and "turn coaching off".
 - If `workspace_type: headless` and the workspace is growing, one later tip may suggest `/welcome --enable-obsidian` for browsing. Do not repeat it after dismissal.
+- If `deferred_setup.completed: false`, prioritize one reminder to run `/welcome --continue-setup` or say "continue TARS setup". Do not show it more than once per day, and stop after dismissal.
 
 Example suggestions:
 - "Calendar not connected and you have run several briefings. Connect calendar in `/welcome` when you want schedule-aware prep."
@@ -666,6 +669,10 @@ When users ask "what can you do?", "help", "show me commands", or similar:
 | Maintain | `/lint`, `/maintain` |
 | Set up | `/start`, `/welcome` |
 
+If `_system/maturity.yaml` shows deferred setup incomplete, the recommended next workflow is:
+
+> Continue setup: run `/welcome --continue-setup` or say "continue TARS setup" to add people, initiatives, integrations, schedules, brand context, maintenance, or optional Obsidian browsing.
+
 ### Skill inventory (for help responses)
 
 | Skill | Purpose |
@@ -682,4 +689,4 @@ When users ask "what can you do?", "help", "show me commands", or similar:
 | `/create` | Artifact creation (decks, narratives, documents) |
 | `/lint` | Workspace hygiene: broken links, orphans, schema violations, staleness, contradictions |
 | `/maintain` | Inbox processing, sync, archive sweep, housekeeping |
-| `/welcome` | Progressive setup, mode switching, and workspace configuration |
+| `/welcome` | Progressive setup, deferred setup continuation, mode switching, and workspace configuration |

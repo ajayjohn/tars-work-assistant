@@ -20,7 +20,7 @@ help:
 
 The highest-value workflow in TARS. Transforms raw meeting transcripts into structured journal entries, actionable tasks, and durable memory updates through a 14-step pipeline (plus a 7b nuance-capture sub-step) with mandatory user review gates.
 
-All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation. **Wikilinks must be formed via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` containing smart quotes or illegal characters is rejected at the MCP and hook layers.**
+All workspace writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation. **Wikilinks must be formed via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` containing smart quotes or illegal characters is rejected at the MCP and hook layers.**
 
 When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
 
@@ -208,7 +208,7 @@ NEVER use generic speaker labels ("Speaker 1", "Unknown") in any output.
 
 ## Step 5: Knowledge inventory (Issue 7)
 
-Before extracting anything, check what the vault already knows about the entities and topics in this transcript.
+Before extracting anything, check what the workspace already knows about the entities and topics in this transcript.
 
 ### Vault scan
 
@@ -247,7 +247,7 @@ This is transcript 2 of 5. Later transcripts will supersede earlier ones on over
 
 ## Step 6: Secret scan
 
-Run the secrets scanner against transcript content BEFORE any vault writes.
+Run the secrets scanner against transcript content BEFORE any workspace writes.
 
 ```
 mcp__tars_vault__scan_secrets(content="<transcript_content>")

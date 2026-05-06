@@ -22,6 +22,7 @@ writes that bypass the MCP):
      `allow_user_properties=true` (Phase 4).
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -119,7 +120,7 @@ def _check_payload_size(tool_name: str, tool_input: dict) -> str:
     n = len(body.encode("utf-8"))
     if n > _BODY_BYTE_LIMIT:
         return (
-            f"Refusing vault write: body is {n:,} bytes which exceeds the "
+            f"Refusing workspace write: body is {n:,} bytes which exceeds the "
             f"{_BODY_BYTE_LIMIT:,}-byte cap on {tool_name.split('__')[-1]}. "
             "Use mcp__tars_vault__append_note (chunked) for large content, or "
             "split the write across multiple notes."
@@ -144,7 +145,7 @@ def _check_prefix(tool_name: str, tool_input: dict) -> str:
         ]
         if bad:
             return (
-                f"Refusing vault write: frontmatter keys "
+                f"Refusing workspace write: frontmatter keys "
                 f"{', '.join(repr(k) for k in bad)} are not tars-prefixed and "
                 "not reserved (tags, aliases). Pass allow_user_properties=true "
                 "to permit user-owned keys."
@@ -182,6 +183,32 @@ def _deny(reason: str) -> None:
     )
 
 
+def _under_claude_home(path: Path) -> bool:
+    try:
+        return path.expanduser().resolve().is_relative_to((Path.home() / ".claude").resolve())
+    except Exception:
+        return False
+
+
+def _claude_home_write_reason(vault: Path | None, tool_input: dict) -> str:
+    """Block fresh workspace writes under ~/.claude unless explicitly installed."""
+    candidate = vault
+    raw = tool_input.get("vault") if isinstance(tool_input, dict) else None
+    if raw and isinstance(raw, str):
+        candidate = Path(raw).expanduser()
+    if candidate is None or not _under_claude_home(candidate):
+        return ""
+    install = candidate / "_system" / "install.yaml"
+    if install.is_file():
+        return ""
+    return (
+        "Refusing workspace write: the active workspace resolves under ~/.claude, "
+        "which is usually application state rather than a transparent TARS workspace. "
+        "Set TARS_VAULT_PATH to a folder such as ~/Documents/TARS Workspace and rerun "
+        "/welcome, or run scripts/doctor.py to inspect the path."
+    )
+
+
 def main() -> int:
     event = read_event()
     tool_name = str(event.get("tool_name") or "")
@@ -192,6 +219,12 @@ def main() -> int:
 
     # Rule 1: install.yaml mismatch.
     _vault, status = resolve_vault()
+    ti = tool_input if isinstance(tool_input, dict) else {}
+    claude_home_reason = _claude_home_write_reason(_vault, ti)
+    if claude_home_reason:
+        _deny(claude_home_reason)
+        return 0
+
     if status.get("mismatch"):
         install = status.get("install") or {}
         stored = install.get("workspace_path") or install.get("vault_path") or "(unset)"
@@ -202,15 +235,13 @@ def main() -> int:
         )
         return 0
 
-    ti = tool_input if isinstance(tool_input, dict) else {}
-
     # Rule 2: bad wikilinks in content payload.
     findings: list[str] = []
     for chunk in _content_fields(tool_name, ti):
         findings.extend(_scan_bad_wikilinks(chunk))
     if findings:
         _deny(
-            "Refusing vault write: wikilink validation failed. "
+            "Refusing workspace write: wikilink validation failed. "
             "Use mcp__tars_vault__format_wikilink to form links. Findings: "
             + "; ".join(findings)
         )

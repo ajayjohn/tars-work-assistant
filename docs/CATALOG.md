@@ -13,6 +13,8 @@ TARS addresses three chronic problems in modern knowledge work:
 
 TARS solves those problems by treating the workspace as a structured operating system rather than a pile of notes. It combines durable memory, transcript-backed retrieval, task review gates, optional live views, and maintenance workflows so the assistant stays useful over time instead of becoming another capture layer that drifts out of date.
 
+For Obsidian users, the same workspace can be opened as a vault. The product term remains workspace because headless and Obsidian users share the same files and data model.
+
 ## What makes TARS different
 
 TARS is intentionally opinionated about how a long-lived assistant should work:
@@ -20,6 +22,7 @@ TARS is intentionally opinionated about how a long-lived assistant should work:
 - `tars-vault` is the write path for managed workspace changes
 - `.base` files are optional Obsidian views over the same workspace
 - transcript archives are first-class retrieval assets
+- `inbox/pending/` is the bulk intake surface for transcripts, PDFs, decks, docs, screenshots, exports, and rough notes
 - tasks and memory go through explicit review before persistence
 - schemas, guardrails, aliasing, and maintenance state live in `_system/`
 
@@ -45,6 +48,10 @@ TARS turns a meeting transcript into:
 - proposed durable memory updates
 - preserved transcript notes linked to the journal record
 
+### Inbox-to-memory pipeline
+
+TARS also works when the input is not a clean meeting transcript. Users can drop many files into `inbox/pending/` and say "process inbox" or run `/maintain inbox`. TARS inventories the folder, classifies each item, routes transcripts to meeting processing, routes docs and articles to wisdom/context extraction, routes task-heavy notes to task review, and keeps source records in `inbox/processed/` or archive paths. If the active Claude environment cannot read a file type directly, TARS keeps a companion note and asks for extracted text instead of pretending the file was processed.
+
 ### Persistent memory
 
 TARS maintains structured notes for:
@@ -67,6 +74,8 @@ TARS supports structured strategic analysis, stakeholder-aware drafting, initiat
 ### Persona-driven cold start (v3.2)
 
 Onboarding is built around seven role personas — Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Engineer, Support / Ops Lead, Engineering Manager. Each persona seeds role-aware briefing layout, BLUF level, default analysis mode, review-gate strictness, and starter taxonomy tags so the day-1 briefing is useful instead of empty.
+
+Fast setup captures only the essentials. Deferred setup can be resumed with `/welcome --continue-setup` or "continue TARS setup" and is also suggested in the Daily Digest/help until completed or dismissed.
 
 ### Wikilink discipline (v3.2)
 

@@ -282,11 +282,15 @@ def main():
     if os.path.isfile(integrations):
         validate_integrations(integrations, errors, warnings)
 
-    getting_started = os.path.join(PLUGIN_ROOT, "GETTING-STARTED.md")
-    if os.path.isfile(getting_started):
+    getting_started_candidates = [
+        os.path.join(PLUGIN_ROOT, "docs", "GETTING-STARTED.md"),
+        os.path.join(PLUGIN_ROOT, "GETTING-STARTED.md"),
+    ]
+    getting_started = next((p for p in getting_started_candidates if os.path.isfile(p)), None)
+    if getting_started:
         validate_getting_started(getting_started, errors, warnings)
     else:
-        errors.append("MISSING: GETTING-STARTED.md (should be in root)")
+        errors.append("MISSING: GETTING-STARTED.md (expected docs/GETTING-STARTED.md)")
 
     workflows = os.path.join(REFERENCE_DIR, "workflows.md")
     if os.path.isfile(workflows):
