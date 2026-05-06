@@ -91,6 +91,8 @@ class ToolTests(unittest.TestCase):
         self.assertIn("persona: \"product-leader\"", install)
         for rel in ("knowledge", "projects", "research", "_views"):
             self.assertFalse((workspace / rel).exists(), rel)
+        for rel in ("INBOX.md", "MEMORY.md", "PEOPLE.md", "INITIATIVES.md", "inbox.md"):
+            self.assertFalse((workspace / rel).exists(), rel)
 
     def test_scaffold_workspace_obsidian_adds_views_only(self) -> None:
         workspace = self.vault / "fresh-obsidian"

@@ -49,6 +49,7 @@ CANONICAL_DIRS = {
 }
 
 GENERIC_DIRS = {"knowledge", "projects", "research"}
+FORBIDDEN_WORKSPACE_FILES = {"INBOX.md", "MEMORY.md", "PEOPLE.md", "INITIATIVES.md", "inbox.md"}
 
 
 def pass_(message: str) -> None:
@@ -117,6 +118,9 @@ def validate_workspace(workspace: Path, *, obsidian: bool) -> None:
     for rel in GENERIC_DIRS:
         if (workspace / rel).exists():
             fail(f"generic workspace directory should not exist: {rel}")
+    for rel in FORBIDDEN_WORKSPACE_FILES:
+        if (workspace / rel).exists():
+            fail(f"root inbox/memory index file should not exist: {rel}")
 
     index = workspace / "index.md"
     install = workspace / "_system" / "install.yaml"
@@ -131,6 +135,7 @@ def validate_workspace(workspace: Path, *, obsidian: bool) -> None:
         "Process everything in my inbox",
         "inbox/pending/",
         "Paste a transcript",
+        "not a single `INBOX.md` note",
     ):
         if needle not in text:
             fail(f"index.md missing first-user guidance: {needle}")

@@ -69,6 +69,8 @@ class FreshInstallSmokeTests(unittest.TestCase):
             self.assertTrue((self.workspace / rel).is_dir(), rel)
         for rel in ("knowledge", "projects", "research"):
             self.assertFalse((self.workspace / rel).exists(), rel)
+        for rel in ("INBOX.md", "MEMORY.md", "PEOPLE.md", "INITIATIVES.md", "inbox.md"):
+            self.assertFalse((self.workspace / rel).exists(), rel)
         self.assertFalse((self.workspace / "_views").exists())
 
         index = self.workspace / "index.md"

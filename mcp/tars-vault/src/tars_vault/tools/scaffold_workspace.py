@@ -116,7 +116,7 @@ Slash commands are optional shortcuts. You can type natural-language requests an
 
 ## Inbox
 
-Drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/`, then say "process inbox". TARS can process the pending folder in bulk and will ask before persisting memory or tasks.
+The inbox is a folder workflow, not a single `INBOX.md` note. Drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/`, then say "process inbox". TARS can process the pending folder in bulk and will ask before persisting memory or tasks.
 
 ## First demo
 

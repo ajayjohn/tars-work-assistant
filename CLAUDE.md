@@ -15,9 +15,8 @@ If the active workspace does not contain `_system/config.md` and
 Do not invent a generic workspace. Do not create `knowledge/`, `projects/`, or
 `research/` folders. Those are not TARS runtime folders.
 
-For best setup quality, recommend Sonnet or a higher model. Haiku is supported
-for setup, but it may need more explicit user inputs. Keep first-run prompts
-short, concrete, and multiple-choice where possible.
+Use Sonnet or a stronger model for setup and normal TARS workflows. Keep
+first-run prompts short, concrete, and multiple-choice where possible.
 
 ## Canonical Workspace Layout
 

@@ -1,6 +1,6 @@
 ---
 name: welcome
-description: Haiku-safe first-run setup contract for the TARS Markdown workspace, with optional Obsidian mode and deferred setup continuation
+description: Deterministic first-run setup contract for the TARS Markdown workspace, with optional Obsidian mode and deferred setup continuation
 user-invocable: true
 triggers:
   - first run
@@ -28,12 +28,9 @@ help:
 
 # Welcome
 
-This skill is the only first-run setup path for TARS. It must be safe for
-Haiku-class models: short prompts, deterministic tool calls, explicit
+This skill is the only first-run setup path for TARS. Setup is designed for
+Sonnet or a stronger model: short prompts, deterministic tool calls, explicit
 verification, and no architectural improvisation.
-
-For best setup quality, recommend Sonnet or a higher model. Haiku is supported
-for setup, but it may need more explicit user inputs.
 
 ## Canonical Workspace Contract
 
@@ -60,6 +57,11 @@ Obsidian mode may also create `_views/`. It must use the same workspace folder.
 Never create generic product-management folders. Never say setup is complete if
 `index.md`, `_system/install.yaml`, `_system/config.md`, `memory/`, or
 `inbox/pending/` is missing.
+
+The inbox is the `inbox/pending/` folder. Do not create or tell users to edit
+`INBOX.md` or `inbox.md`. Durable records must be stored in the `memory/`
+subfolders, not in root files like `MEMORY.md`, `PEOPLE.md`, or
+`INITIATIVES.md`.
 
 ## First-Run Setup
 
@@ -197,9 +199,6 @@ I will preview what TARS can extract before saving anything.
 
 Or drop files into `inbox/pending/` and say: "process inbox".
 
-For best setup quality, use Sonnet or a higher model. Haiku is supported, but
-it may need more explicit inputs.
-
 You can continue setup later with `/welcome --continue-setup` or by saying
 "continue TARS setup".
 ```
@@ -315,6 +314,8 @@ journal, integrations, or scheduled jobs.
 - Ask when path confidence is below 80%.
 - Never create workspace files outside the selected workspace.
 - Never create generic product-management folders.
+- Never create root index-like files named `INBOX.md`, `MEMORY.md`,
+  `PEOPLE.md`, or `INITIATIVES.md`.
 - Never auto-persist memory or tasks during the first demo.
 - Always offer the first demo after setup.
 - Always treat slash commands as shortcuts, not requirements.
