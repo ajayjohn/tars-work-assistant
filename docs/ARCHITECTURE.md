@@ -6,29 +6,29 @@ This document describes the current framework architecture as of v3.3, which bui
 
 **Version**: 3.3.0  
 **Release**: 2026-05-05 — see `CHANGELOG.md`  
-**Model**: Framework repository plus deployed Obsidian vault runtime
+**Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
 ## Three operations (Karpathy framing)
 
 TARS v3.2 makes the three-operations pattern explicit:
 
 - **Ingest** — meetings, transcripts, inbox items, manual learning. Skills: `/meeting`, `/learn`, `/maintain`, SessionEnd / PreCompact hooks.
-- **Query** — retrieval from vault memory + journal + transcripts + integrations. Skills: `/answer`, `/briefing`, `/think`, `/initiative`.
-- **Lint** — deterministic and LLM-assisted consistency checks over the vault and its own telemetry. Skill: `/lint`. Runs nightly.
+- **Query** — retrieval from workspace memory + journal + transcripts + integrations. Skills: `/answer`, `/briefing`, `/think`, `/initiative`.
+- **Lint** — deterministic and LLM-assisted consistency checks over the workspace and its own telemetry. Skill: `/lint`. Runs nightly.
 
 ## System model
 
-TARS 3.2 operates directly on an Obsidian vault and treats that vault as the persistent runtime state.
+TARS operates directly on a local Markdown workspace and treats that workspace as the persistent runtime state. Obsidian can be enabled as an enhanced browser over the same files.
 
 At a high level:
 - the repository is the framework source, packaging logic, and documentation
-- the vault is the live operating environment where memory, journal entries, transcripts, and context live
-- the `tars-vault` MCP server is the canonical write interface for vault mutations; skills call `mcp__tars_vault__*` tools and never raw `obsidian-cli`
+- the workspace is the live operating environment where memory, journal entries, transcripts, and context live
+- the `tars-vault` MCP server is the canonical write interface for workspace mutations; skills call `mcp__tars_vault__*` tools and never raw file writes
 - TARS-managed notes use schema-validated `tars-` properties and `tars/` tags
-- Obsidian Bases provide live query surfaces instead of hand-maintained index notes
+- Obsidian Bases provide optional live query surfaces instead of hand-maintained index notes
 - Hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`) enforce write discipline, capture telemetry, and route Claude Code session transcripts into `inbox/pending/` for later `/meeting`-style review
 
-Only skill metadata loads eagerly at session start. With 13 skills, the lightweight baseline is roughly 52 tokens before deeper instructions are loaded on demand.
+Only skill metadata loads eagerly at session start. With 14 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
 
 ## Repository layout
 
@@ -41,7 +41,7 @@ tars/
 ├── .mcp.json                 Project defaults for MCP servers (incl. tars-vault)
 ├── mcp/tars-vault/           Write-interface MCP server (Python)
 ├── hooks/                    SessionStart / *ToolUse / PreCompact / SessionEnd scripts
-├── skills/                   TARS protocol skills (13)
+├── skills/                   TARS protocol skills (14)
 ├── commands/                 Slash-command wrappers + README mapping
 ├── _system/                  Canonical v3.1 system files and defaults
 ├── _views/                   Obsidian `.base` query definitions
@@ -59,13 +59,13 @@ tars/
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 13 skills, 13 commands, and 12 scripts.
+The framework currently ships 14 skills, 14 commands, and deterministic scripts.
 
 Some older directories remain in the repository for compatibility, migration context, or packaging history. They should not be treated as the active TARS 3.0 runtime architecture unless a specific document says otherwise.
 
-## Deployed vault layout
+## Deployed workspace layout
 
-`/welcome` or a migration process should produce a vault with this shape:
+`/welcome` or a migration process should produce a workspace with this shape:
 
 ```text
 _system/
@@ -145,11 +145,11 @@ The framework uses one core skill and twelve user-invocable skills (the `/lint` 
 
 ### Write interface layer
 
-The `mcp/tars-vault/` Python MCP server sits between every skill and the vault. It exposes `mcp__tars_vault__*` tools that:
+The `mcp/tars-vault/` Python MCP server sits between every skill and the workspace. It exposes `mcp__tars_vault__*` tools that:
 - enforce the `tars-` frontmatter prefix and `_system/schemas.yaml` validation on every write
 - chunk appends at 40KB so large transcripts land cleanly
 - maintain an in-process alias-registry cache with mtime invalidation
-- run the auto-wikilink pass before writes
+- validate wikilinks before writes
 - move notes while preserving wikilinks (Organization Engine primitive)
 - wrap `scripts/scan-secrets.py` for pre-write secret classification
 - classify files and detect near-duplicates for the Organization Engine
@@ -159,9 +159,9 @@ The `mcp/tars-vault/` Python MCP server sits between every skill and the vault. 
 ### Hooks layer
 
 Hooks under `hooks/` are stdlib-only Python scripts wired via `hooks/hooks.json` and `.claude/settings.json`:
-- `SessionStart` — load housekeeping state, refresh `_system/tools-registry.yaml`, inject vault-state summary into the session
+- `SessionStart` — load housekeeping state, refresh `_system/tools-registry.yaml`, inject workspace-state summary into the session
 - `PreToolUse` — observability for MCP writes (frontmatter prefix enforcement is owned by the MCP server; this hook captures shape)
-- `PostToolUse` — emit `vault_write` telemetry events
+- `PostToolUse` — emit workspace-write telemetry events
 - `PreCompact` + `SessionEnd` — drop the Claude Code session transcript into `inbox/pending/` so `/meeting` can ingest it later
 - `InstructionsLoaded` — telemetry on skill load
 
@@ -188,7 +188,7 @@ Every skill resolves integrations through `mcp__tars_vault__resolve_capability(c
 2. brand pointer passing (path to a `tars-brand: true` note)
 3. data-source resolution via integrations
 4. companion-note creation (`mcp__tars_vault__create_note` after render completes)
-5. vault filing under `contexts/artifacts/YYYY-MM/`
+5. workspace filing under `contexts/artifacts/YYYY-MM/`
 6. telemetry (`artifact_generated`)
 
 TARS ships zero office-rendering Python libraries. The `templates/office/` folder holds structural outlines only.
@@ -202,11 +202,11 @@ TARS ships zero office-rendering Python libraries. The `templates/office/` folde
 - `tools-registry.yaml` is the auto-discovered live tool roster (24h TTL)
 - `guardrails.yaml` drives secret and negative-sentiment scans
 - `housekeeping-state.yaml` + `maturity.yaml` track maintenance cadence and live hydration counts
-- `telemetry/YYYY-MM-DD.jsonl` captures skill invocations, vault writes, retrieval hits, durability / accountability signals
+- `telemetry/YYYY-MM-DD.jsonl` captures skill invocations, workspace writes, retrieval hits, durability / accountability signals
 - `backlog/` stores framework issues and user improvement ideas
 - `search-index-state.json` + `search.db` hold the hybrid retrieval state
 
-These files are part of the vault state, not separate background documentation.
+These files are part of the workspace state, not separate background documentation.
 
 ### View layer
 
@@ -240,41 +240,41 @@ Not every script is a runtime dependency for end users. Some are maintainer tool
 
 ## Critical behavior changes in v3
 
-The Obsidian-native rebuild introduced the most important architectural changes in the framework:
-- live bases replace `_index.md` files
+The TARS v3 rebuild introduced the most important architectural changes in the framework:
+- live bases replace `_index.md` files when Obsidian mode is enabled
 - raw transcript text is preserved as part of the searchable system
 - tasks and durable memory are reviewed before persistence
-- name resolution uses aliases, vault search, and user confirmation instead of flat replacements only
+- name resolution uses aliases, workspace search, and user confirmation instead of flat replacements only
 - maintenance state, schemas, and guardrails live in `_system/`
-- the active runtime structure is centered on the vault, not a copied `reference/` bundle
+- the active runtime structure is centered on the workspace, not a copied `reference/` bundle
 
 ## What's new in v3.2
 
-- **Persistent install record (`_system/install.yaml`)** — vault-specific record carrying `vault_path`, `installation_id`, `persona`, `mode`, `plugin_version`, and timestamps. Hooks consult it on every session start; install/CWD mismatch refuses silent writes via the pre-tool-use hook.
+- **Persistent install record (`_system/install.yaml`)** — workspace-specific record carrying `workspace_type`, `workspace_path`, backward-compatible `vault_path`, `obsidian_enabled`, `obsidian_vault_path`, `installation_id`, `persona`, `plugin_version`, and timestamps. Hooks consult it on every session start; install/CWD mismatch refuses silent writes via the pre-tool-use hook.
 - **Persona-driven cold start** — seven onboarding personas (`templates/personas/`) seed `_system/config.md` defaults, `_system/taxonomy.md` starter tags, and `_system/briefing-sections` so day-1 briefings are role-aware.
-- **Engagement modes (`standard` | `casual`) — removed in v3.3.** v3.2 introduced two engagement modes controlled by a `mode:` field in `_system/install.yaml`. v3.3 removed this distinction in favour of uniform graceful degradation — all vaults run the full pipeline and TARS adjusts automatically based on connected integrations.
-- **Wikilink discipline (forward + retroactive)** — new `mcp__tars_vault__format_wikilink(text, kind)` tool resolves raw text to an Obsidian-safe link via the alias registry + vault file lookup. Write tools and the pre-tool-use hook reject content with smart quotes or Obsidian-illegal characters. `scripts/fix-wikilinks.py --repair-broken` classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable` with apply-only-on-safe semantics.
+- **Workspace modes (`headless` | `obsidian`)** — headless mode uses the Markdown workspace through Claude. Obsidian mode uses the same files plus `.base` views and helper skills. This is a view/storage adapter, not a separate data model.
+- **Wikilink discipline (forward + retroactive)** — new `mcp__tars_vault__format_wikilink(text, kind)` tool resolves raw text to an Obsidian-safe link via the alias registry + workspace file lookup. Write tools and the pre-tool-use hook reject content with smart quotes or Obsidian-illegal characters. `scripts/fix-wikilinks.py --repair-broken` classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
 - **40 KB body cap + `tars-` prefix enforcement** at the hook layer for non-chunking write tools.
-- **SessionStart banner** — composes install-mismatch, legacy-vault, stale `tools-registry.yaml`, and unregistered-cron notices.
+- **SessionStart banner** — composes install-mismatch, legacy-workspace, stale `tools-registry.yaml`, and unregistered-cron notices.
 - **Active `/lint --actions`** — materializes fixable findings as a numbered review queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for cron-fired callers. Subsets: `wikilinks`, `patterns`, `curator`.
 - **Weekly maintenance job (`/maintain --weekly`)** — cron-fired Sunday 18:00 (registered by `/welcome` Step 7). Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
 - **Telemetry rollup script (`scripts/telemetry-rollup.py`)** — stdlib aggregator over `_system/telemetry/*.jsonl`. Same source feeds `/briefing` weekly footer (Mondays) and `/maintain --weekly`.
 - **Observed-preference user model (`_system/user-model.md`)** — single living note (~5 KB cap) capturing BLUF tolerance, decision speed, default skill, meeting cadence, recurring concerns, vendor sentiment, observed skill mix. Updated passively by `/learn` Mode C when patterns repeat ≥3× in 14 days.
-- **Workflows registry (`_system/workflows.yaml`)** — vault-owned saved multi-step routing aliases. Created only on user approval. `core` consults the registry before default routing.
-- **Vault-side staleness curator** — workflow-staleness (60 days unused) and memory-staleness (90 days, honoring `tars-pinned: true`) checks in `scripts/archive.py --check workflows`. Always archive, never delete.
+- **Workflows registry (`_system/workflows.yaml`)** — workspace-owned saved multi-step routing aliases. Created only on user approval. `core` consults the registry before default routing.
+- **Workspace-side staleness curator** — workflow-staleness (60 days unused) and memory-staleness (90 days, honoring `tars-pinned: true`) checks in `scripts/archive.py --check workflows`. Always archive, never delete.
 - **Persona-drift detection** — runs inside `/maintain --weekly` only when ≥30 days of telemetry exist and the 14-day cooling-off has elapsed. Compares observed skill-mix against persona expectations.
 
 ## What was new in v3.1
 
 - **Hook-based enforcement** replaces duplicated prompt-level reminders. SessionStart, PreCompact, SessionEnd, PreToolUse, PostToolUse all go through stdlib-only Python scripts under `hooks/`.
-- **`tars-vault` MCP server** centralizes writes, validation, chunking, alias resolution, and secret scanning. Skills call `mcp__tars_vault__*` tools; raw `obsidian-cli` is retained only for edge cases.
+- **`tars-vault` MCP server** centralizes filesystem writes, validation, chunking, alias resolution, and secret scanning. Skills call `mcp__tars_vault__*` tools.
 - **Integration Registry 2.0** — capability-preference map (`_system/integrations.md` v2) plus auto-discovered `_system/tools-registry.yaml` with a 24h TTL. Skills resolve via `resolve_capability` and work interchangeably across Apple, Microsoft 365, Minutes.app, Figma, Snowflake, Pendo, etc.
 - **Hybrid retrieval** — FTS5 for structured memory + FastEmbed + sqlite-vec semantic search for prose. Directly fixes the retrieval-nuance pain point from v3.0 feedback.
 - **Meeting nuance pass** — a Haiku sub-step after summarization preserves contrarian views, notable phrases, specific quotes, unusual terms, missed numbers and dates. Lands in the journal as `## Notable phrases & perspectives`.
-- **`/lint` skill** — first-class daily vault lint; `/maintain` slims down to inbox + sync + archive sweep.
+- **`/lint` skill** — first-class daily workspace lint; `/maintain` slims down to inbox + sync + archive sweep.
 - **`/create` office-output orchestration** — delegates rendering to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` / `web-artifacts-builder` skills. Zero office-rendering code or dependencies in TARS.
 - **Cross-session continuity** — PreCompact and SessionEnd hooks route Claude Code session transcripts into `inbox/pending/` for `/meeting`-style review, without violating review gates.
-- **Telemetry + reflection** — every skill invocation, vault write, durability decision, accountability decision, and retrieval hit appends to `_system/telemetry/YYYY-MM-DD.jsonl`. `/lint` uses the log to surface memories saved but never re-read, tasks created but never transitioned, etc.
+- **Telemetry + reflection** — every skill invocation, workspace write, durability decision, accountability decision, and retrieval hit appends to `_system/telemetry/YYYY-MM-DD.jsonl`. `/lint` uses the log to surface memories saved but never re-read, tasks created but never transitioned, etc.
 - **Archival policy** — scale target is 3× current (600 journal, 360 people). Notes unreferenced for 90+ days archive unless durable.
 - **Self-state fixes** — `scripts/sync.py --hydration` computes live counts; `/briefing` stops inventing "Level N" artifacts; `/lint` reconciles `maturity.yaml` drift.
 
@@ -282,7 +282,7 @@ The Obsidian-native rebuild introduced the most important architectural changes 
 
 ### Onboarding
 
-`/welcome` scaffolds the vault, checks Obsidian connectivity, installs helper skills, writes system files, captures user context, and configures schedules.
+`/welcome` scaffolds the workspace, optionally enables Obsidian views, writes system files, captures user context, and configures schedules.
 
 ### Meeting processing
 
@@ -297,7 +297,7 @@ The Obsidian-native rebuild introduced the most important architectural changes 
 
 `/answer` searches in this order:
 1. memory — keyword (`mcp__tars_vault__fts_search`) over `memory/**`
-2. FTS5 over vault (Tier A)
+2. FTS5 over workspace (Tier A)
 3. tasks
 4. journal + transcripts — semantic + FTS hybrid (`mcp__tars_vault__semantic_search`)
 5. transcript archive fallback (raw transcript text when summaries lack detail)

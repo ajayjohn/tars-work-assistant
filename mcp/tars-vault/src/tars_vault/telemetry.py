@@ -1,4 +1,4 @@
-"""jsonl telemetry helper (PRD §26.11). Skeleton."""
+"""jsonl telemetry helper."""
 import json, os
 from datetime import datetime
 from pathlib import Path

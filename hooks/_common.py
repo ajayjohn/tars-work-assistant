@@ -28,7 +28,7 @@ def write_output(output: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Vault-path resolution (Phase 1, plan R2)
+# Workspace-path resolution
 # ---------------------------------------------------------------------------
 
 def _candidate_has_install(path: Path) -> bool:
@@ -104,7 +104,7 @@ def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
       2. CWD if it contains ``_system/install.yaml``.
       3. CWD if it contains ``_system/config.md`` (legacy vault without
          install.yaml — works, but flagged so /welcome can offer to upgrade).
-      4. install.yaml.vault_path on a previously known install if reachable.
+      4. install.yaml.workspace_path / vault_path on a previously known install if reachable.
       5. None.
 
     Returns (path_or_none, status). ``status`` includes:
@@ -132,7 +132,7 @@ def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
             install = read_install_config(env_path)
             if install:
                 status["install"] = install
-                stored = install.get("vault_path")
+                stored = install.get("workspace_path") or install.get("vault_path")
                 if stored and Path(str(stored)).expanduser().resolve() != env_path.resolve():
                     status["mismatch"] = True
             return env_path, status
@@ -142,7 +142,7 @@ def resolve_vault() -> tuple[Path | None, dict[str, Any]]:
         install = read_install_config(cwd)
         status["source"] = "cwd-install"
         status["install"] = install
-        stored = install.get("vault_path") if install else None
+        stored = (install.get("workspace_path") or install.get("vault_path")) if install else None
         if stored:
             stored_path = Path(str(stored)).expanduser().resolve()
             if stored_path != cwd.resolve():

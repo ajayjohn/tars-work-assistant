@@ -5,7 +5,10 @@ onboarding:
   completed: false
   completed_date: null
   steps:
+    workspace_scaffold: false
     vault_scaffold: false
+    workspace_type_selected: false
+    obsidian_enabled: false
     integrations_configured: false
     initial_people: false
     initial_initiatives: false
@@ -27,3 +30,21 @@ maturity_level: new  # new | developing | established | mature
 # developing: 5-20 people, 2-5 initiatives, first briefing done
 # established: 20-50 people, 5+ initiatives, weekly briefings active
 # mature: 50+ people, regular maintenance, full workflow usage
+
+coaching:
+  enabled: true
+  frequency: restrained  # restrained | fewer | off
+  last_tip_shown: null
+  last_tip_context: null
+  dismissed_tips: []
+  completed_milestones:
+    first_meeting_processed: false
+    first_memory_saved: false
+    first_answer_lookup: false
+    third_briefing: false
+    obsidian_prompt_seen: false
+  counters:
+    briefing_count: 0
+    meeting_count: 0
+    memory_write_count: 0
+    failed_lookup_count: 0

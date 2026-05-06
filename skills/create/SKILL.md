@@ -18,6 +18,8 @@ help:
 
 Vault reads/writes use `mcp__tars_vault__*` tools (see `skills/core/SKILL.md`). Data-source integrations (KPI, analytics, design, project tracker, documentation) resolve via `mcp__tars_vault__resolve_capability(capability=…)`.
 
+When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
+
 ---
 
 ## Pipeline overview

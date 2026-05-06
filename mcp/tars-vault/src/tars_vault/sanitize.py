@@ -1,4 +1,4 @@
-"""Sanitization helpers for Obsidian-safe text and wikilink targets.
+r"""Sanitization helpers for Obsidian-safe text and wikilink targets.
 
 Single source of truth for two things:
 

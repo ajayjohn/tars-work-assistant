@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "tars-marketplace",
-  "description": "Obsidian-native persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications",
+  "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications",
   "owner": {
     "name": "Ajay John",
     "email": "example@ajayjohn.com"
@@ -9,14 +9,14 @@
   "plugins": [
     {
       "name": "tars",
-      "description": "Obsidian-native persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses obsidian-cli as the write interface with schema-validated frontmatter, live .base views, and scheduled maintenance.",
+      "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian .base views, and scheduled maintenance.",
       "category": "productivity",
       "source": {
         "source": "url",
         "url": "https://github.com/ajayjohn/tars-work-assistant.git"
       },
       "homepage": "https://github.com/ajayjohn/tars-work-assistant",
-      "version": "3.3.0"
+      "version": "3.4.0"
     }
   ]
 }

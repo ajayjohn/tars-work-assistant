@@ -12,7 +12,7 @@ def main() -> int:
     parser.add_argument(
         "--vault",
         default=os.environ.get("TARS_VAULT_PATH"),
-        help="Absolute path to the Obsidian vault (or set TARS_VAULT_PATH).",
+        help="Absolute path to the TARS Markdown workspace (or set TARS_VAULT_PATH).",
     )
     args = parser.parse_args()
     if not args.vault:

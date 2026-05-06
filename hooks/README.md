@@ -3,9 +3,9 @@
 Claude Code lifecycle hooks. Wired in via `.claude/settings.json` (plugin-level)
 and enforced by the Claude Code harness at the correct lifecycle events.
 
-Status: **skeleton (Phase 1a)**. Side-effects (telemetry writes, inbox routing,
-changelog append) land in later phases per PRD §10. In skeleton form they read
-stdin, validate the environment, and exit 0 without writing.
+Status: active. Hooks read stdin events, enforce workspace-write guardrails,
+emit telemetry where appropriate, route session transcripts into the inbox, and
+exit 0 for observability-only lifecycle events.
 
 | Hook | Lifecycle | Purpose |
 |------|-----------|---------|

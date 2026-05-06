@@ -1,6 +1,6 @@
 ---
 name: welcome
-description: Onboarding wizard that scaffolds the vault structure, installs obsidian-skills, configures integrations, gathers user context, registers scheduled jobs, and initializes git
+description: Progressive onboarding wizard that scaffolds a local Markdown workspace, optionally enables Obsidian views, configures integrations, and supports mode switching
 user-invocable: true
 triggers:
   - first run (no _system/config.md)
@@ -11,22 +11,36 @@ triggers:
   - "bootstrap"
 help:
   purpose: |-
-    Interactive first-run workspace setup. Creates vault scaffolding, installs obsidian-skills,
-    configures integrations, gathers user context progressively, registers cron jobs for
-    briefings and maintenance, and initializes git.
+    Interactive first-run workspace setup. Creates a local Markdown workspace, records
+    user identity and persona, optionally enables Obsidian views, configures integrations
+    progressively, registers cron jobs for briefings and maintenance, and initializes git.
   use_cases:
     - "Set up TARS"
     - "Bootstrap my workspace"
     - "Initialize TARS"
     - "Run onboarding"
+    - "Enable Obsidian later: `/welcome --enable-obsidian`"
+    - "Disable Obsidian dependency: `/welcome --disable-obsidian`"
+    - "Relocate a moved workspace: `/welcome --relocate`"
+    - "Change persona later: `/welcome --change-persona`"
   scope: setup,bootstrap,onboarding,welcome,initialize
 ---
 
 # Welcome: onboarding wizard
 
-Interactive first-run setup for TARS v3. Creates the full vault structure, installs obsidian-skills,
-configures integrations, gathers user context progressively, registers scheduled jobs, and
-initializes git. This skill replaces both `install.sh` and the legacy `/welcome` command.
+Interactive first-run setup for TARS v3. Creates a local Markdown workspace first, then
+adds optional Obsidian views and deeper integrations as the user is ready. This skill
+replaces both `install.sh` and the legacy `/welcome` command.
+
+Fast setup must take about a minute when the user accepts defaults:
+
+1. Choose or confirm a local folder.
+2. Capture name and role.
+3. Pick the closest persona.
+4. Choose workspace type: `headless` or `obsidian`.
+
+Deferred setup covers key people, initiatives, calendar/tasks, schedules, brand, maintenance,
+and Obsidian helper skills. Do not block first value on these items.
 
 ### v3.1 pre-flight additions
 
@@ -43,12 +57,14 @@ initializes git. This skill replaces both `install.sh` and the legacy `/welcome`
 
 | Step | Name | Purpose |
 |------|------|---------|
-| 1 | Pre-flight check | Detect existing vault, offer resume or fresh start |
+| 1 | Pre-flight check | Detect existing workspace, offer resume, health check, or fast setup |
 | 1.5 | Pick a persona | Seed role-appropriate defaults for briefings and analysis |
-| 2 | Create vault structure | All folders, _system files (incl. `install.yaml` with persona), templates, _views, scripts |
-| 3 | Install obsidian-skills | Copy/verify skills into .claude/skills/ |
-| 4 | Configure integrations | Calendar provider, task manager selection |
-| 5 | Initial context gathering | Progressive user profiling (4 rounds) |
+| 1.6 | Choose workspace type | `headless` by default, or `obsidian` if the user wants Obsidian views now |
+| 1.7 | Mode switching | `--enable-obsidian`, `--disable-obsidian`, `--relocate`, `--change-persona` |
+| 2 | Create workspace structure | Folders, _system files, templates, scripts, and optional _views |
+| 3 | Install Obsidian helper skills | Only in `obsidian` mode |
+| 4 | Configure integrations | Deferred calendar provider and task manager selection |
+| 5 | Initial context gathering | Fast identity first, optional people and initiatives later |
 | 6 | Configure schedule | Briefing times and maintenance window |
 | 7 | Register cron jobs | Daily briefing, weekly briefing, weekly maintenance |
 | 8 | Initialize git | Repo init, .gitignore, initial commit |
@@ -58,7 +74,7 @@ initializes git. This skill replaces both `install.sh` and the legacy `/welcome`
 
 ## Step 1: Pre-flight check
 
-Check whether the vault has already been set up.
+Check whether the workspace has already been set up.
 
 **Detection**: Read `_system/config.md`. If it exists and contains a filled `tars-user-name` property:
 
@@ -70,6 +86,14 @@ Check whether the vault has already been set up.
   - **Cancel**: Exit.
 
 If `_system/config.md` does not exist or has no user profile, proceed to Step 1.5.
+
+For first-time setup, keep the first round to the essential questions only:
+
+> "Where should TARS store its local Markdown workspace? [current folder / choose folder]"
+
+> "What name and role should TARS use for you?"
+
+Everything else is deferred unless the user asks for full setup now.
 
 ---
 
@@ -97,13 +121,100 @@ For the chosen persona, read the corresponding file under `templates/personas/<k
 
 Cache the chosen `tars-persona-key` in skill state for use in Step 2b.
 
-If the user picked option 8 ("None of these match"), skip persona-defaults application. The vault scaffolds with stock defaults.
+If the user picked option 8 ("None of these match"), skip persona-defaults application. The workspace scaffolds with stock defaults.
+
+---
+
+## Step 1.6: Choose workspace type
+
+Ask one question:
+
+> "How do you want to use this workspace now?
+> 1. Headless Markdown workspace in Claude (recommended)
+> 2. Obsidian workspace with live views"
+
+Default to option 1. Record the result in skill state:
+
+```yaml
+workspace_type: headless | obsidian
+obsidian_enabled: false | true
+obsidian_vault_path: ""
+```
+
+Headless setup is fully functional for `/start`, `/meeting`, `/learn`, `/answer`, `/briefing`, `/think`, `/communicate`, `/create`, `/tasks`, `/lint`, and `/maintain`. Obsidian mode uses the same files and adds `.base` views plus optional helper skills.
+
+---
+
+## Step 1.7: Mode switching and focused maintenance
+
+These modes do not run full onboarding unless explicitly stated. They do not overwrite memory, journal, context, integrations, or schedules.
+
+### `/welcome --enable-obsidian`
+
+Use when a headless user wants to browse the same workspace in Obsidian.
+
+1. Read `_system/install.yaml`.
+2. Confirm or collect `obsidian_vault_path`. Default to `workspace_path`.
+3. Verify the path exists and contains the active workspace files.
+4. Create or refresh `_views/*.base` files from the repo templates.
+5. Copy or verify Obsidian helper skills in `.claude/skills/`.
+6. Update `_system/install.yaml`:
+   ```yaml
+   workspace_type: obsidian
+   obsidian_enabled: true
+   obsidian_vault_path: "<confirmed path>"
+   vault_path: "<workspace_path>"
+   last_session_at: "<now>"
+   ```
+7. Exit with: "Obsidian enabled for this workspace. Existing memory, journal, schedules, and integrations were left untouched."
+
+### `/welcome --disable-obsidian`
+
+Use when an Obsidian user wants Claude-first operation.
+
+1. Read `_system/install.yaml`.
+2. Update only:
+   ```yaml
+   workspace_type: headless
+   obsidian_enabled: false
+   last_session_at: "<now>"
+   ```
+3. Leave existing `_views/*.base` files and Obsidian metadata untouched.
+4. Exit with: "TARS is now headless. Existing data remains in the same workspace."
+
+### `/welcome --relocate`
+
+Use when the workspace folder has moved.
+
+1. Read `_system/install.yaml`.
+2. Compute the current workspace root from `TARS_VAULT_PATH`, the MCP server path, or the current folder.
+3. Show old versus new `workspace_path` and `vault_path`.
+4. Ask for confirmation.
+5. Update only `workspace_path`, `vault_path`, and `last_session_at`. If `obsidian_enabled: true`, ask whether `obsidian_vault_path` should also be updated.
+6. Run the pending migration check from the Step 7 tail.
+7. Exit with a one-line success summary.
+
+Do not re-scaffold the workspace. Do not ask onboarding questions. Do not rewrite `_system/config.md`.
+
+### `/welcome --change-persona`
+
+Use when the user wants a different role default.
+
+1. Read current `persona` from `_system/install.yaml`.
+2. Show the seven persona menu from Step 1.5, marking the current selection.
+3. On selection, update only:
+   - `_system/install.yaml` `persona`
+   - `_system/config.md` persona-derived keys: `tars-bluf-level`, `tars-default-analysis-mode`, `tars-review-gate-strictness`, `tars-briefing-style`, `tars-briefing-sections`
+4. Append one line to `_system/changelog/YYYY-MM-DD.md`.
+5. Confirm: "Persona changed from X to Y. Existing identity, memory, schedule, and integrations were left untouched."
+
+Do not touch `tars-user-name`, `tars-user-title`, `tars-user-company`, memory, journal, integrations, or scheduled jobs.
 
 ---
 
 ## Step 2: Create vault structure
 
-Create the complete vault directory tree. Use `mcp__tars_vault__create_note` for all note creation (the server wraps obsidian-cli). Use filesystem tools only for creating empty directories.
+Create the complete workspace directory tree. Use `mcp__tars_vault__create_note` for all note creation. Use filesystem tools only for creating empty directories.
 
 ### 2a: Directories
 
@@ -213,7 +324,10 @@ Provider-agnostic integration configuration.
 **_system/maturity.yaml**
 ```yaml
 onboarding:
+  workspace_scaffold: false
   vault_structure: false
+  workspace_type_selected: false
+  obsidian_enabled: false
   obsidian_skills: false
   integrations: false
   user_profile: false
@@ -223,6 +337,23 @@ onboarding:
   completed: false
   completed_date: null
 last_updated: null
+coaching:
+  enabled: true
+  frequency: restrained
+  last_tip_shown: null
+  last_tip_context: null
+  dismissed_tips: []
+  completed_milestones:
+    first_meeting_processed: false
+    first_memory_saved: false
+    first_answer_lookup: false
+    third_briefing: false
+    obsidian_prompt_seen: false
+  counters:
+    briefing_count: 0
+    meeting_count: 0
+    memory_write_count: 0
+    failed_lookup_count: 0
 ```
 
 **_system/housekeeping-state.yaml**
@@ -241,8 +372,12 @@ plugin_version: "3.0.0"
 
 **_system/schemas.yaml** -- Frontmatter validation schemas for all entity types (person, vendor, competitor, product, initiative, decision, org-context, journal, task, transcript, companion). Each schema lists required and optional properties with types.
 
-**_system/install.yaml** -- Vault-specific install record. Use the `templates/install.yaml` shape and fill in:
-- `vault_path`: the absolute path to this vault (the folder we just scaffolded). Hooks use this on every session start to detect a moved/duplicated vault and refuse silent writes from a stale folder.
+**_system/install.yaml** -- Workspace-specific install record. Use the `templates/install.yaml` shape and fill in:
+- `workspace_type`: `headless` or `obsidian`.
+- `workspace_path`: the absolute path to this workspace (the folder we just scaffolded). Hooks use this on every session start to detect a moved/duplicated workspace and refuse silent writes from a stale folder.
+- `vault_path`: same value as `workspace_path` for backward compatibility.
+- `obsidian_enabled`: true only when Obsidian is enabled.
+- `obsidian_vault_path`: the Obsidian vault path when enabled, otherwise empty.
 - `installation_id`: a UUID generated once per install (use `python3 -c "import uuid; print(uuid.uuid4())"` via Bash, or any equivalent generator). Travels with telemetry events.
 - `persona`: the `tars-persona-key` from Step 1.5, or empty string if the user picked "None of these match".
 - `plugin_version`: read from `.claude-plugin/plugin.json` so /lint can detect stale installs that need migration.
@@ -276,7 +411,7 @@ Each template should include the full frontmatter block with placeholder values 
 
 ### 2d: _views base files
 
-Create `.base` files in `_views/`. Each .base file is a YAML-formatted Obsidian Bases live query.
+Create `.base` files in `_views/` only when `workspace_type: obsidian` or when running `/welcome --enable-obsidian`. In headless mode, skip this step and mark `_system/maturity.yaml` `onboarding.obsidian_enabled: false`. Each .base file is a YAML-formatted Obsidian Bases live query.
 
 | Base file | Query filter | Columns |
 |-----------|-------------|---------|
@@ -315,23 +450,25 @@ Each script should:
 - Output JSON to stdout
 - Exit 0 on success, 1 on error
 - Read configuration from `_system/` files
-- Never modify files directly (output recommendations for the agent to apply via obsidian-cli)
+- Never modify files directly (output recommendations for the agent to apply via `mcp__tars_vault__*`)
 
 After creating all structure, update `_system/maturity.yaml`:
 ```yaml
 onboarding:
+  workspace_scaffold: true
   vault_structure: true
+  workspace_type_selected: true
 ```
 
 ---
 
-## Step 3: Install obsidian-skills
+## Step 3: Install Obsidian helper skills
 
-Copy or verify the following obsidian-skills are present in `.claude/skills/`:
+Skip this step in `headless` mode. Copy or verify the following Obsidian helper skills are present in `.claude/skills/` only in `obsidian` mode:
 
 | Skill | Path | Contents |
 |-------|------|----------|
-| obsidian-cli | `.claude/skills/obsidian-cli/SKILL.md` | CLI tool for all vault writes |
+| obsidian-cli | `.claude/skills/obsidian-cli/SKILL.md` | Optional Obsidian administration helper |
 | obsidian-bases | `.claude/skills/obsidian-bases/SKILL.md` + `references/` | .base file creation and querying |
 | obsidian-markdown | `.claude/skills/obsidian-markdown/SKILL.md` + `references/` | Markdown and frontmatter conventions |
 | json-canvas | `.claude/skills/json-canvas/SKILL.md` + `references/` | Canvas file creation |
@@ -353,7 +490,7 @@ onboarding:
 
 ## Step 4: Configure integrations
 
-Present integration choices using multiple-choice questions. Ask both in a single interaction round.
+This is deferred setup. Offer it after fast setup, in Daily Digest coaching, or when the user explicitly asks for richer briefings. Present integration choices using multiple-choice questions. Ask both in a single interaction round.
 
 ### Calendar provider
 
@@ -462,7 +599,7 @@ Save to `_system/config.md`: `tars-user-company`, `tars-user-industry`, `tars-us
 
 Create `memory/org-context/` note for the organization using the org-context template.
 
-### Round 3: Key people
+### Round 3: Key people (deferred)
 
 > "Name 3-5 people you work with most. For each, give their name and role (e.g., 'Sarah Chen, VP Engineering')."
 
@@ -480,7 +617,7 @@ For each person mentioned:
 3. Add aliases if nicknames are mentioned.
 4. The MCP server adds the entry to `_system/alias-registry.md` automatically on `create_note`.
 
-### Round 4: Active initiatives
+### Round 4: Active initiatives (deferred)
 
 > "What are your main projects or initiatives right now? (Name and one-line description for each)"
 
@@ -772,7 +909,7 @@ Display a comprehensive summary of what was configured.
 - archive/: ready
 
 ### Obsidian skills
-- obsidian-cli: {installed | verified | missing}
+- Obsidian helper skills: {installed | verified | skipped in headless mode}
 - obsidian-bases: {installed | verified | missing}
 - obsidian-markdown: {installed | verified | missing}
 - json-canvas: {installed | verified | missing}
@@ -823,7 +960,7 @@ last_updated: YYYY-MM-DD
 | Failure | Recovery |
 |---------|----------|
 | Directory creation fails | Log error, continue with remaining directories, report at end |
-| obsidian-cli not available | Fall back to direct file creation with warning that Obsidian cache may be stale |
+| Obsidian not available | Continue in headless mode and offer `/welcome --enable-obsidian` later |
 | MCP server not responding | Mark integration as "error", continue setup, user can re-run later |
 | CronCreate unavailable | Skip cron registration, rely on session-start fallback |
 | Git init fails | Log error, continue, user can initialize manually |
@@ -846,7 +983,7 @@ If the user runs "setup" after a partial completion:
 - NEVER persist user data without confirmation
 - NEVER create task integration entries without verified connectivity
 - NEVER commit sensitive data (.env, API keys) to git
-- ALWAYS use obsidian-cli for note creation when available
+- ALWAYS use `mcp__tars_vault__*` tools for note creation
 - ALWAYS validate integration connectivity before marking as "connected"
 - ALWAYS save progress to maturity.yaml after each step
 - ALWAYS use bounded questions (multiple-choice, max 3-4 per round)

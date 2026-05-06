@@ -38,6 +38,7 @@ Answer questions by searching across TARS information sources in priority order.
 
 **Key rules**:
 - Never answer internal questions from web search alone. Exhaust internal sources first.
+- When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
 - If answering from LLM knowledge with no source, confidence is **Low** — flag explicitly.
 - Cite with wikilinks + chunk indices for Tier-B hits (e.g., `[[2026-03-10 CSI Onsite Day 1]]#chunk-14`). Citations point at canonical filenames returned by retrieval; if you need to construct a link from a name (rather than reuse one returned by search), call `mcp__tars_vault__format_wikilink` first — see core → "Wikilink discipline".
 - Emit telemetry `answer_delivered` with `source_hit_tier` array covering which priorities contributed.
@@ -168,6 +169,12 @@ Follow the full hierarchy:
 4. Contexts: `mcp__tars_vault__semantic_search(scope="contexts", query="<keywords>", limit=5)`.
 5. Transcripts: if none of the above has the answer (see Step 3).
 6. Web: only if explicitly external information.
+
+Before the first `mcp__tars_vault__semantic_search` call in a session, check whether `_system/embedding-cache/` exists in the workspace. If it does not, emit this line once:
+
+> "First semantic search this session. Downloading embedding model (~80MB, one-time, takes ~30-60s)."
+
+Cache a working-memory flag so the warning is not repeated in the same session.
 
 ---
 
@@ -329,6 +336,23 @@ Suggestions:
 
 Never fabricate an answer. Never hallucinate memory that doesn't exist. Never claim certainty when the source is ambiguous.
 
+### Empty-workspace response
+
+When all internal tiers return zero results and the user appears new (`_system/config.md` `tars-user-name` is empty, or `memory/` has fewer than three entity files), respond with:
+
+```markdown
+Your workspace is new. I don't have stored context yet.
+
+Three quick ways to seed it:
+1. Paste a meeting transcript and run `/meeting`
+2. Tell me a fact to remember: `/learn Sarah is the new VP Engineering`
+3. Run `/briefing` to see what's set up so far
+
+Or run `/start` for a no-setup demo of what TARS does with a paste.
+```
+
+Do not present this block when the user asked an external or general-knowledge question.
+
 ### Partial answers
 
 If some parts of the question can be answered but others cannot:
@@ -422,7 +446,7 @@ If any errors occur during lookup:
 
 - NEVER answer internal questions from web search alone — exhaust internal sources first
 - NEVER hallucinate or fabricate memory, journal entries, or transcript content
-- NEVER claim calendar access is unavailable — TARS has calendar access. If integration fails, report the specific error.
+- NEVER claim calendar access is guaranteed. If the integration is unavailable or fails, report the specific connection state and continue with workspace sources.
 - NEVER skip alias checking when an entity is not found by primary name
 - NEVER present information without source citation
 - NEVER present LLM general knowledge as vault-sourced fact — always flag confidence level

@@ -1,16 +1,30 @@
-# TARS install state — vault-specific configuration written by /welcome.
+# TARS install state - workspace-specific configuration written by /welcome.
 #
-# This file lives at _system/install.yaml inside the user's vault. It records
-# which folder TARS believes is the active vault (vault_path) plus per-install
+# This file lives at _system/install.yaml inside the user's workspace. It records
+# which folder TARS believes is active (workspace_path) plus per-install
 # preferences. Hooks consult it on every session start to detect a moved or
-# duplicated vault before any write happens.
+# duplicated workspace before any write happens.
 #
 # Edit only via /welcome or /lint --actions; manual edits may be overwritten.
-# If you need to relocate the vault, run /welcome --relocate.
+# If you need to relocate the workspace, run /welcome --relocate.
 
-# Absolute path to the vault. Hooks compare this against the current working
-# directory; a mismatch triggers a loud warning and refuses silent writes.
+# Storage mode. Headless is a plain Markdown folder driven through Claude.
+# Obsidian uses the same folder plus optional Obsidian views and helper skills.
+workspace_type: "headless"
+
+# Absolute path to the active Markdown workspace. Hooks compare this against the
+# current working directory; a mismatch triggers a loud warning and refuses
+# silent writes.
+workspace_path: ""
+
+# Backward-compatible alias for older hooks and vaults. Keep equal to
+# workspace_path until all deployed installs have migrated.
 vault_path: ""
+
+# Obsidian is optional. When enabled, obsidian_vault_path is usually the same as
+# workspace_path, but may differ if the user stores TARS in a subfolder.
+obsidian_enabled: false
+obsidian_vault_path: ""
 
 # Stable identifier for this install. Used by telemetry to disambiguate vaults
 # across machines without leaking the path.

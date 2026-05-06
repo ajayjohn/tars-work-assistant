@@ -555,7 +555,7 @@ Saved: `journal/YYYY-MM/YYYY-MM-DD-wisdom-topic-slug.md`
 |-----------|--------|
 | >10 memory updates in a single invocation | Pause. Ask user to confirm batch. |
 | Name resolution confidence <70% | Do not persist. Ask user. |
-| >3 consecutive obsidian-cli errors | Stop all operations. Report status. Log to `_system/backlog/issues/`. |
+| >3 consecutive MCP write errors | Stop all operations. Report status. Log to `_system/backlog/issues/`. |
 | Contradicting existing memory | Do not auto-resolve. Ask user explicitly. |
 
 ## Self-evaluation — Issue 9

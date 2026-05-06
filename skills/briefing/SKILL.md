@@ -20,6 +20,8 @@ Unified protocol for daily and weekly briefings. Mode is determined by the reque
 
 All integration calls (calendar, tasks) resolve through `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code `mcp__apple_calendar__*` or `mcp__microsoft_365_*`. Vault reads/writes use `mcp__tars_vault__*` tools. See `skills/core/SKILL.md` → "Write interface" for the full tool list. **Form every wikilink in the briefing body via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
+When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
+
 | Signal | Mode |
 |--------|------|
 | "daily briefing", "what's my day look like?", "morning briefing" | Daily |
@@ -203,6 +205,9 @@ After all three sub-agents complete:
 - Inbox: 3 items pending
 - Last housekeeping: 2026-03-18
 
+## Next useful thing
+- Add your three closest collaborators with `/learn` so future briefings can prep relationship context.
+
 ---
 *Data freshness: 4 meetings, 8 tasks, 12 memory files queried.*
 *Stale: [[Tom Richards]] not updated in 65 days.*
@@ -212,6 +217,26 @@ After all three sub-agents complete:
 `scripts/sync.py --hydration` run, not from `_system/maturity.yaml` (which drifts
 and is repaired by `/lint`'s framework-self-state check — §5.2). The numbers above
 are illustrative; the skill always pulls actual counts at briefing generation time.
+
+### Empty-briefing coaching
+
+When calendar, tasks, memory, initiatives, inbox, and schedule all return empty, do not produce a blank report. Show:
+
+```markdown
+# Daily Briefing — YYYY-MM-DD
+
+Your workspace is new. I don't have enough stored context for a real briefing yet.
+
+Three useful next actions:
+1. Paste a recent meeting transcript and run `/meeting`
+2. Save one durable fact with `/learn`
+3. Run `/start` with an example from `examples/` to preview the full workflow
+
+## Next useful thing
+- Add your role, closest collaborators, and one active initiative in `/welcome` so tomorrow's briefing has useful context.
+```
+
+The `## Next useful thing` section is the only coaching slot in a briefing. Show at most one suggestion, respect `_system/maturity.yaml` coaching settings, and omit it when `coaching.enabled: false` or `frequency: off`.
 
 ---
 

@@ -5,8 +5,8 @@ Each handler is a synchronous `(**kwargs) -> dict` function; this module
 translates MCP's `CallToolRequest` into keyword arguments and the returned
 dict back into a TextContent payload.
 
-The TARS_VAULT_PATH env var (or --vault) is injected into every tool call so
-individual skills don't have to pass it explicitly.
+The TARS_VAULT_PATH env var (or --vault) points at the local Markdown workspace
+and is injected into every tool call so individual skills don't have to pass it.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ TOOL_REGISTRY: dict[str, Any] = {
 # Tool schemas (JSON Schema fragments for the MCP list_tools response)
 # ---------------------------------------------------------------------------
 
-_COMMON_VAULT = {"vault": {"type": "string", "description": "Absolute vault path (auto-injected by server if omitted)."}}
+_COMMON_VAULT = {"vault": {"type": "string", "description": "Absolute workspace path (auto-injected by server if omitted)."}}
 
 
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
@@ -105,12 +105,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
     },
     "search_by_tag": {
-        "description": "Find notes whose frontmatter `tags:` contains a given tag.",
+        "description": "Find notes whose frontmatter `tags:` contains a given tag, with optional text and frontmatter filters.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 **_COMMON_VAULT,
                 "tag": {"type": "string"},
+                "query": {"type": "string"},
+                "frontmatter": {"type": "object"},
                 "limit": {"type": "integer"},
                 "prefix_match": {"type": "boolean"},
             },
@@ -126,6 +128,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "file": {"type": "string"},
                 "reason": {"type": "string"},
                 "force": {"type": "boolean"},
+                "dry_run": {"type": "boolean"},
             },
             "required": ["file"],
         },
@@ -303,14 +306,15 @@ def _check_install_record(vault_path: str) -> None:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-            m = re.match(r"^vault_path\s*:\s*(.*?)\s*$", line)
+            m = re.match(r"^(workspace_path|vault_path)\s*:\s*(.*?)\s*$", line)
             if m:
-                stored = m.group(1).strip().strip('"').strip("'")
-                break
+                stored = m.group(2).strip().strip('"').strip("'")
+                if m.group(1) == "workspace_path":
+                    break
         if stored and Path(stored).expanduser().resolve() != vault:
             print(
-                f"tars-vault: install.yaml vault_path={stored} disagrees with "
-                f"server vault={vault}. Hooks should be denying mutations; "
+                f"tars-vault: install.yaml workspace_path={stored} disagrees with "
+                f"server workspace={vault}. Hooks should be denying mutations; "
                 "run /welcome --relocate to reconcile.",
                 file=sys.stderr,
             )

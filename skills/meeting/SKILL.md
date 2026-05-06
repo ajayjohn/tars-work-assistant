@@ -22,7 +22,9 @@ The highest-value workflow in TARS. Transforms raw meeting transcripts into stru
 
 All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). All integration calls resolve via `mcp__tars_vault__resolve_capability` — never hard-code `mcp__apple_*` or `mcp__microsoft_365_*`. All names use canonical forms from the alias registry. All persistence requires user confirmation. **Wikilinks must be formed via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` containing smart quotes or illegal characters is rejected at the MCP and hook layers.**
 
-**Hooks now enforce** `tars-` prefix, content chunking, alias-registry load, changelog writes, and telemetry. The pipeline body below describes intent; the MCP server handles validation and logging. Legacy `obsidian-cli` examples map 1:1 to the `mcp__tars_vault__*` tools in the core skill's write-interface table.
+When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
+
+**Hooks now enforce** `tars-` prefix, content chunking, alias-registry load, changelog writes, and telemetry. The pipeline body below describes intent; the MCP server handles validation and logging.
 
 ---
 
@@ -800,7 +802,7 @@ Emit at minimum: `meeting_processed`, `tasks_proposed`, `memory_proposed`.
 
 ## Step 14: Self-evaluation (Issue 9)
 
-If any errors occurred during the pipeline (failed calendar lookup, obsidian-cli error, script failure, unresolved ambiguity):
+If any errors occurred during the pipeline (failed calendar lookup, MCP write error, script failure, unresolved ambiguity):
 
 ### Check for existing issue
 

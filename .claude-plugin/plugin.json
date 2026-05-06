@@ -1,7 +1,7 @@
 {
   "name": "tars",
-  "version": "3.3.0",
-  "description": "Obsidian-native persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses obsidian-cli as the write interface with schema-validated frontmatter, live .base views, and scheduled maintenance.",
+  "version": "3.4.0",
+  "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian .base views, and scheduled maintenance.",
   "author": {
     "name": "Ajay John",
     "email": "ajay.john@example.com"
