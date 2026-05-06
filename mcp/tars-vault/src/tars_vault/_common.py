@@ -30,13 +30,20 @@ def resolve_note_path(vault: Path, file_or_path: str) -> Path:
 
     Accepts:
       * vault-relative path with or without .md extension
+      * vault-relative system/config paths with explicit non-md extensions
       * bare filename (resolves to first match under memory/ or journal/)
     """
     vault = Path(vault)
-    candidate = file_or_path
-    if not candidate.endswith(".md"):
+    raw = str(file_or_path)
+    candidate = raw
+    explicit_suffix = bool(Path(raw).suffix)
+    if not explicit_suffix:
         candidate = candidate + ".md"
     p = (vault / candidate).resolve()
+    if explicit_suffix and not p.exists() and Path(raw).suffix != ".md":
+        alt = (vault / f"{raw}.md").resolve()
+        if alt.exists():
+            p = alt
     # Must stay inside the vault
     try:
         p.relative_to(vault)

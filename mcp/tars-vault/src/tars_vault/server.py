@@ -200,6 +200,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["content"],
         },
     },
+    "scaffold_workspace": {
+        "description": "Create the deterministic first-run TARS workspace directory tree and starter files.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "workspace_type": {"type": "string", "enum": ["headless", "obsidian"]},
+                "user_name": {"type": "string"},
+                "user_role": {"type": "string"},
+                "company": {"type": "string"},
+                "persona": {"type": "string"},
+                "overwrite": {"type": "boolean"},
+                "allow_claude_home": {"type": "boolean"},
+            },
+        },
+    },
     "fts_search": {
         "description": "SQLite FTS5 keyword search over the vault search index.",
         "inputSchema": {

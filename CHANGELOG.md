@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.4.2 (2026-05-06)
+
+### Fixed
+
+- **Fresh setup now creates the real workspace.** `/welcome` now calls a deterministic MCP scaffold tool so `inbox/`, `memory/`, `journal/`, `archive/`, `_system/`, and root `index.md` are created in the selected workspace instead of relying on model-only folder creation.
+- **First-run onboarding asks essential questions again.** The welcome flow captures name, role/title, company/team, first use case, persona, and workspace type before scaffolding, then offers a guided first demo with a transcript, report, email thread, or inbox file.
+- **Plugin installs without an explicit `TARS_VAULT_PATH` no longer drift silently.** The MCP server now falls back to the Claude-selected working folder when the env var is unset or passed through as a literal shell variable.
+- **Install records can be verified through MCP.** `_system/install.yaml` and other explicit non-Markdown system files can now be read through the shared MCP path resolver.
+- **TARS path-qualified wikilinks work again.** The wikilink validator now allows TARS links such as `[[memory/people/alex]]` while still rejecting illegal characters inside each path segment.
+
+### Added
+
+- **Real-world smoke tests.** `tests/test_real_world_smoke.py` now validates fresh headless setup, Obsidian-mode setup, inbox/memory/index creation, MCP read/write/search, task references, archive guardrails, duplicate detection, secret scanning, FTS indexing, and semantic-search fallback behavior.
+
 ## v3.4.1 (2026-05-05)
 
 ### Added

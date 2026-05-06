@@ -74,34 +74,7 @@ else:
     print(f"⚠ .claude-plugin/marketplace.json not found - skipping sync")
 PYTHON_SCRIPT
 
-cat > tars-cowork-plugin/README.md << 'EOF'
-# TARS 3.0 — Persistent Executive Assistant for Obsidian
-
-**Obsidian-native executive assistant framework with memory continuity, meeting processing, task accountability, transcript-backed retrieval, strategic analysis, and stakeholder communications.**
-
-## Installation
-1. Claude Code → Install from marketplace or folder
-2. Select: `tars-cowork-plugin/`
-3. Run: `/welcome` to set up your vault
-
-## Quick Start
-```
-/welcome          # Set up vault and integrations
-/briefing         # Daily briefing
-/meeting          # Process a meeting transcript
-/tasks            # Extract or manage tasks
-/think "topic"    # Strategic analysis
-```
-
-## Requirements
-- Obsidian desktop app running
-- obsidian-cli installed (`brew install kepano/tap/obsidian-cli`)
-- An Obsidian vault for TARS to use
-
-Full docs: https://github.com/ajayjohn/tars-work-assistant
-
-License: PolyForm Noncommercial 1.0.0
-EOF
+cp README.md tars-cowork-plugin/README.md
 
 cd tars-cowork-plugin
 zip -q -r Archive.zip . -x "*.DS_Store" -x "__pycache__/*"

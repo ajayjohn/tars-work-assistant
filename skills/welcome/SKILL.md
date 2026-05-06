@@ -33,12 +33,15 @@ Interactive first-run setup for TARS v3. Creates a local Markdown workspace, the
 adds optional Obsidian views and deeper integrations as the user is ready. This skill
 replaces both `install.sh` and the legacy `/welcome` command.
 
-Fast setup must take about a minute when the user accepts defaults:
+Fast setup should stay compact, but it must not feel empty. A little friction is
+worth it when it gives TARS enough context to be useful on day 1:
 
 1. Choose or confirm a local folder.
-2. Capture name and role.
+2. Capture name, role/title, company/team, and the user's main first use case.
 3. Pick the closest persona.
 4. Choose workspace type: `headless` or `obsidian`.
+5. Create the full workspace structure and root `index.md` cheat sheet.
+6. Offer a guided first demo with a transcript, document, report, or inbox file.
 
 Deferred setup covers key people, initiatives, calendar/tasks, schedules, brand, maintenance,
 and Obsidian helper skills. Do not block first value on these items.
@@ -112,9 +115,16 @@ If the active path is under `~/.claude` and there is no existing `_system/instal
 
 > "This resolves under `~/.claude`, which is usually Claude app state, not a transparent TARS workspace. I recommend `~/Documents/TARS Workspace`."
 
-> "What name and role should TARS use for you?"
+Ask one compact identity/use-case question:
 
-Everything else is deferred unless the user asks for full setup now.
+> "What should TARS know to personalize the workspace?
+> - Your name:
+> - Role/title:
+> - Company or team:
+> - First thing you want TARS to help with: meetings, inbox/documents, tasks, briefings, strategic thinking, stakeholder communication, or something else"
+
+These fields are essential and should be captured before scaffolding. Everything
+else is deferred unless the user asks for full setup now.
 
 ---
 
@@ -272,11 +282,35 @@ and confirm: "Deferred setup is complete. You can still change persona, integrat
 
 ## Step 2: Create workspace structure
 
-Create the complete workspace directory tree. Use `mcp__tars_vault__create_note` for all note creation. Use filesystem tools only for creating empty directories.
+Create the complete workspace directory tree with the deterministic MCP scaffold
+tool. Do not rely on ad hoc model-created folders.
+
+Call:
+
+```text
+mcp__tars_vault__scaffold_workspace(
+  workspace_type="<headless|obsidian>",
+  user_name="<name from Step 1>",
+  user_role="<role/title from Step 1>",
+  company="<company/team from Step 1>",
+  persona="<persona key from Step 1.5>",
+  overwrite=false
+)
+```
+
+The tool must return `status: ok`, `index_path: "index.md"`, `inbox_path:
+"inbox/pending"`, and `memory_path: "memory"`. If it returns an error, stop and
+surface the reason. Do not claim setup is complete.
+
+After the tool succeeds, read back `index.md`, `_system/config.md`, and
+`_system/install.yaml` with `mcp__tars_vault__read_note` to verify they exist.
+If any read fails, stop and say setup is incomplete.
+
+The expected full workspace structure is listed below for auditability.
 
 ### 2a: Directories
 
-Create every directory in the workspace structure:
+`scaffold_workspace` creates every directory in the workspace structure:
 
 ```
 _system/
@@ -309,11 +343,12 @@ skills/
 .claude/skills/
 ```
 
-For each directory, check if it already exists before creating. Report skipped directories.
+For each directory, the tool checks if it already exists before creating and
+reports skipped directories.
 
 ### 2b: _system files
 
-Create the following system files with default content:
+`scaffold_workspace` creates these first-run system files with default content:
 
 **_system/config.md**
 ```yaml
@@ -429,7 +464,7 @@ coaching:
     failed_lookup_count: 0
 ```
 
-**index.md** -- Workspace cheat sheet created at the workspace root. It must say slash commands are shortcuts, not requirements, and include natural-language examples.
+**index.md** -- Workspace cheat sheet created at the workspace root. It must say slash commands are shortcuts, not requirements, and include natural-language examples. Always link it in the chat summary after setup.
 
 ```markdown
 # TARS workspace
@@ -556,7 +591,7 @@ Each script should:
 - Read configuration from `_system/` files
 - Never modify files directly (output recommendations for the agent to apply via `mcp__tars_vault__*`)
 
-After creating all structure, update `_system/maturity.yaml`:
+After creating all structure, `scaffold_workspace` updates `_system/maturity.yaml`:
 ```yaml
 onboarding:
   workspace_scaffold: true
@@ -1061,6 +1096,21 @@ Display a comprehensive summary of what was configured.
 4. Ask "help" to see all available TARS capabilities. Slash commands are shortcuts; natural-language requests work too.
 5. Add more people and context as you use TARS. Reviewed self-learning proposals appear through `/learn --review-patterns` and weekly maintenance; nothing is auto-applied.
 ```
+
+After the summary, link the cheat sheet and offer a guided first demo. Do not
+leave the user on their own.
+
+> "Your cheat sheet is `index.md` in the workspace root. Slash commands are optional; you can ask in natural language."
+
+Ask:
+
+> "Want to see TARS do something useful right now? Paste a transcript, report,
+> PDF/deck excerpt, customer call notes, email thread, or rough notes. I’ll
+> preview what TARS would extract before saving anything. If you already have
+> files, drop them in `inbox/pending/` and say 'process inbox'."
+
+If the user has nothing handy, offer the three example files from `examples/`
+and route them through `/start` preview-only.
 
 Update `_system/maturity.yaml`:
 ```yaml

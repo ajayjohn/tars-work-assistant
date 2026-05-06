@@ -98,10 +98,14 @@ _WIKILINK_RE = re.compile(r"\[\[([^\[\]\n]+?)\]\]")
 
 
 def _split_target(raw: str) -> tuple[str, str | None, str | None]:
-    """Split a wikilink target into (basename, heading, display).
+    """Split a wikilink target into (target, heading, display).
 
     `Foo#Bar|baz` → ("Foo", "Bar", "baz"). `Foo` → ("Foo", None, None).
     Block IDs (`Foo#^abc`) come back as headings starting with `^`.
+
+    TARS intentionally allows path-qualified wikilinks such as
+    `memory/people/alex`; validate each path segment as an Obsidian-safe
+    basename instead of rejecting the slash separator itself.
     """
     body = raw
     display: str | None = None
@@ -111,6 +115,14 @@ def _split_target(raw: str) -> tuple[str, str | None, str | None]:
     if "#" in body:
         body, heading = body.split("#", 1)
     return body, heading, display
+
+
+def _target_has_illegal_filename_chars(target: str) -> bool:
+    inline_forbidden = FORBIDDEN_FN_CHARS - {"#", "|", "[", "]", "/"}
+    parts = [p for p in target.split("/") if p]
+    if not parts:
+        return True
+    return any(any(ch in inline_forbidden for ch in part) for part in parts)
 
 
 def scan_wikilinks(content: str) -> list[dict[str, str]]:
@@ -138,9 +150,8 @@ def scan_wikilinks(content: str) -> list[dict[str, str]]:
             issue = "smart_quote"
         else:
             # Restrict the forbidden-set to chars that are illegal *inside*
-            # the basename (not # or | which separate heading/display).
-            inline_forbidden = FORBIDDEN_FN_CHARS - {"#", "|", "[", "]"}
-            if any(ch in inline_forbidden for ch in basename):
+            # each path segment. Slash is allowed as a TARS path qualifier.
+            if _target_has_illegal_filename_chars(basename):
                 issue = "illegal_char"
         out.append({"raw": raw, "basename": basename, "issue": issue})
     return out

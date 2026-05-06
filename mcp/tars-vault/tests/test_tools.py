@@ -28,6 +28,7 @@ from tars_vault.tools.move_note import move_note
 from tars_vault.tools.read_note import read_note
 from tars_vault.tools.resolve_capability import resolve_capability
 from tars_vault.tools.scan_secrets import scan_secrets
+from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.search_by_tag import search_by_tag
 from tars_vault.tools.update_frontmatter import update_frontmatter
 from tars_vault.tools.write_note_from_content import write_note_from_content
@@ -58,6 +59,36 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(r["status"], "ok")
         self.assertEqual(r["frontmatter"]["tars-name"], "Alice")
         self.assertIn("Alice", r["body"])
+
+    def test_scaffold_workspace_creates_first_run_structure(self) -> None:
+        workspace = self.vault / "fresh"
+        r = scaffold_workspace(
+            vault=str(workspace),
+            workspace_type="headless",
+            user_name="Ajay",
+            user_role="Product",
+            company="Acme",
+            persona="product-leader",
+        )
+        self.assertEqual(r["status"], "ok")
+        for rel in [
+            "inbox/pending",
+            "inbox/processed",
+            "memory/people",
+            "memory/initiatives",
+            "journal",
+            "archive/transcripts",
+        ]:
+            self.assertTrue((workspace / rel).is_dir(), rel)
+        self.assertTrue((workspace / "index.md").is_file())
+        index = (workspace / "index.md").read_text()
+        self.assertIn("Slash commands are optional shortcuts", index)
+        self.assertIn("Process everything in my inbox", index)
+        config = (workspace / "_system" / "config.md").read_text()
+        self.assertIn("tars-user-name: Ajay", config)
+        install = (workspace / "_system" / "install.yaml").read_text()
+        self.assertIn("workspace_type: headless", install)
+        self.assertIn("persona: \"product-leader\"", install)
 
     def test_create_rejects_existing_without_overwrite(self) -> None:
         p = self.vault / "memory" / "people" / "bob.md"

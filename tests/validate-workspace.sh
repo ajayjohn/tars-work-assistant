@@ -28,6 +28,10 @@ grep -q "workspace_path" templates/install.yaml && pass "install has workspace_p
 grep -q "obsidian_enabled" templates/install.yaml && pass "install has obsidian flag" || fail "install missing obsidian flag"
 grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" || fail "hooks not workspace-aware"
 grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
+grep -q "scaffold_workspace" mcp/tars-vault/src/tars_vault/server.py && pass "server exposes scaffold_workspace" || fail "scaffold_workspace schema missing"
+grep -q "mcp__tars_vault__scaffold_workspace" skills/welcome/SKILL.md && pass "welcome uses deterministic scaffold" || fail "welcome does not use scaffold tool"
+grep -q "What should TARS know to personalize" skills/welcome/SKILL.md && pass "welcome asks identity and use case" || fail "welcome identity/use-case prompt missing"
+grep -q "Want to see TARS do something useful right now" skills/welcome/SKILL.md && pass "welcome offers guided first demo" || fail "welcome guided demo missing"
 grep -q "claude_home" hooks/pre-tool-use.py && pass "pre-tool blocks accidental ~/.claude writes" || fail "pre-tool ~/.claude guard missing"
 grep -q "TARS Workspace" hooks/session-start.py skills/welcome/SKILL.md docs/GETTING-STARTED.md && pass "Documents workspace default documented" || fail "Documents workspace default missing"
 [ -f scripts/migrate-install-record.py ] && pass "existing-user migration script exists" || fail "migration script missing"
@@ -117,6 +121,10 @@ if [ -d mcp/tars-vault/tests ]; then
       || fail "MCP stdlib tests failed"
   fi
 fi
+
+python3 tests/test_real_world_smoke.py \
+  && pass "real-world fresh install smoke green" \
+  || fail "real-world fresh install smoke failed"
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then
