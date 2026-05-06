@@ -16,8 +16,8 @@ grep -qi "Do not write" skills/start/SKILL.md && pass "/start forbids default wr
 grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
 grep -q "skills/start/" skills/core/SKILL.md && pass "/start routed" || fail "/start route missing"
 grep -q -- "--continue-setup" skills/welcome/SKILL.md && pass "welcome continue setup documented" || fail "welcome continue setup missing"
-grep -q "Natural-language example" skills/welcome/SKILL.md && pass "generated index natural-language examples" || fail "index natural-language examples missing"
-grep -qi "process everything in my inbox" skills/welcome/SKILL.md commands/README.md && pass "inbox natural-language example" || fail "inbox natural-language example missing"
+grep -q "Natural-language example" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && pass "generated index natural-language examples" || fail "index natural-language examples missing"
+grep -qi "process everything in my inbox" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py commands/README.md && pass "inbox natural-language example" || fail "inbox natural-language example missing"
 
 for f in examples/pm-customer-call.md examples/eng-design-discussion.md examples/sales-discovery-call.md examples/README.md; do
   [ -f "$f" ] && pass "example exists: $f" || fail "missing example: $f"
@@ -31,7 +31,9 @@ grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server
 grep -q "scaffold_workspace" mcp/tars-vault/src/tars_vault/server.py && pass "server exposes scaffold_workspace" || fail "scaffold_workspace schema missing"
 grep -q "mcp__tars_vault__scaffold_workspace" skills/welcome/SKILL.md && pass "welcome uses deterministic scaffold" || fail "welcome does not use scaffold tool"
 grep -q "What should TARS know to personalize" skills/welcome/SKILL.md && pass "welcome asks identity and use case" || fail "welcome identity/use-case prompt missing"
-grep -q "Want to see TARS do something useful right now" skills/welcome/SKILL.md && pass "welcome offers guided first demo" || fail "welcome guided demo missing"
+grep -q "Try this now" skills/welcome/SKILL.md && pass "welcome offers guided first demo" || fail "welcome guided demo missing"
+grep -q "Never create generic product-management folders" skills/welcome/SKILL.md && pass "welcome forbids generic workspace folders" || fail "welcome generic-folder guard missing"
+grep -q "commands/welcome.md" tests/validate-release-artifact.py && pass "artifact validation checks packaged commands" || fail "artifact command validation missing"
 grep -q "claude_home" hooks/pre-tool-use.py && pass "pre-tool blocks accidental ~/.claude writes" || fail "pre-tool ~/.claude guard missing"
 grep -q "TARS Workspace" hooks/session-start.py skills/welcome/SKILL.md docs/GETTING-STARTED.md && pass "Documents workspace default documented" || fail "Documents workspace default missing"
 [ -f scripts/migrate-install-record.py ] && pass "existing-user migration script exists" || fail "migration script missing"
@@ -125,6 +127,14 @@ fi
 python3 tests/test_real_world_smoke.py \
   && pass "real-world fresh install smoke green" \
   || fail "real-world fresh install smoke failed"
+
+if [ -f tars-cowork-plugin/Archive.zip ]; then
+  python3 tests/validate-release-artifact.py tars-cowork-plugin/Archive.zip \
+    && pass "release artifact validation green" \
+    || fail "release artifact validation failed"
+else
+  echo "SKIP  release artifact validation (run ./build-plugin.sh first)"
+fi
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

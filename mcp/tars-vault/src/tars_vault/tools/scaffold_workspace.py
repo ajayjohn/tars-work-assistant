@@ -44,6 +44,10 @@ DIRECTORIES = [
     "skills",
 ]
 
+OBSIDIAN_DIRECTORIES = [
+    "_views",
+]
+
 
 def _is_under_claude_home(path: Path) -> bool:
     try:
@@ -120,6 +124,32 @@ Paste a transcript, report, email thread, or rough notes and say "show me what T
 """
 
 
+def _obsidian_view_files() -> dict[str, str]:
+    """Return Obsidian `.base` templates available from source or package."""
+    repo_or_plugin_root = Path(__file__).resolve().parents[5]
+    candidates = [
+        repo_or_plugin_root / "templates" / "views",
+        repo_or_plugin_root / "_views",
+    ]
+    for directory in candidates:
+        if not directory.is_dir():
+            continue
+        files: dict[str, str] = {}
+        for path in sorted(directory.glob("*.base")):
+            try:
+                files[path.name] = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+        if files:
+            return files
+
+    return {
+        "inbox-pending.base": 'filters:\n  file.inFolder("inbox/pending")\n\nviews:\n  - type: table\n    name: "Pending Items"\n',
+        "all-people.base": 'filters:\n  file.hasTag("tars/person")\n\nviews:\n  - type: table\n    name: "All People"\n',
+        "all-initiatives.base": 'filters:\n  file.hasTag("tars/initiative")\n\nviews:\n  - type: table\n    name: "All Initiatives"\n',
+    }
+
+
 def _install_yaml(
     workspace: Path,
     workspace_type: str,
@@ -134,7 +164,7 @@ obsidian_enabled: {"true" if obsidian_enabled else "false"}
 obsidian_vault_path: "{workspace if obsidian_enabled else ""}"
 installation_id: "{uuid.uuid4()}"
 persona: "{persona}"
-plugin_version: "3.4.2"
+plugin_version: "3.4.3"
 created: "{now}"
 last_session_at: "{now}"
 """
@@ -199,6 +229,7 @@ def scaffold_workspace(**kwargs: Any) -> dict:
     workspace_type = str(kwargs.get("workspace_type") or "headless").strip()
     if workspace_type not in {"headless", "obsidian"}:
         return _common.error("workspace_type must be 'headless' or 'obsidian'")
+    obsidian_enabled = workspace_type == "obsidian"
     overwrite = bool(kwargs.get("overwrite", False))
     allow_claude_home = bool(kwargs.get("allow_claude_home", False))
     user_name = str(kwargs.get("user_name") or "").strip()
@@ -217,7 +248,8 @@ def scaffold_workspace(**kwargs: Any) -> dict:
     skipped_dirs: list[str] = []
     try:
         workspace.mkdir(parents=True, exist_ok=True)
-        for rel in DIRECTORIES:
+        directories = DIRECTORIES + (OBSIDIAN_DIRECTORIES if obsidian_enabled else [])
+        for rel in directories:
             target = workspace / rel
             if target.exists():
                 skipped_dirs.append(rel)
@@ -229,7 +261,6 @@ def scaffold_workspace(**kwargs: Any) -> dict:
 
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     now_date = now[:10]
-    obsidian_enabled = workspace_type == "obsidian"
 
     files = {
         "_system/config.md": _config_md(now_date, user_name, user_role, company),
@@ -244,9 +275,12 @@ def scaffold_workspace(**kwargs: Any) -> dict:
         "_system/kpis.md": "# KPIs\n\nAdd team, product, and initiative metrics here when useful.\n",
         "_system/schedule.md": "# Schedule\n\nRecurring and one-time TARS schedules.\n",
         "_system/guardrails.yaml": "blocked_patterns:\n  - ssn\n  - credit_card\n  - api_key\nwarn_patterns:\n  - salary\n  - compensation\n  - performance_rating\n",
-        "_system/housekeeping-state.yaml": "last_run: null\nlast_success: null\nrun_count: 0\npending_inbox_count: 0\ncron_jobs:\n  daily_briefing: null\n  weekly_briefing: null\n  maintenance: null\nplugin_version: \"3.4.2\"\n",
+        "_system/housekeeping-state.yaml": "last_run: null\nlast_success: null\nrun_count: 0\npending_inbox_count: 0\ncron_jobs:\n  daily_briefing: null\n  weekly_briefing: null\n  maintenance: null\nplugin_version: \"3.4.3\"\n",
         "index.md": _index_md(),
     }
+
+    if obsidian_enabled:
+        files.update({f"_views/{name}": text for name, text in _obsidian_view_files().items()})
 
     file_status: dict[str, str] = {}
     try:
@@ -269,4 +303,5 @@ def scaffold_workspace(**kwargs: Any) -> dict:
         index_path="index.md",
         inbox_path="inbox/pending",
         memory_path="memory",
+        views_path="_views" if obsidian_enabled else None,
     )

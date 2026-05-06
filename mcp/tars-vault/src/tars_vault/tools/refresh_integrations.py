@@ -1,7 +1,7 @@
 """refresh_integrations — Rebuild _system/tools-registry.yaml from .mcp.json.
 
 Delegates to scripts/discover-mcp-tools.py (v3.1.1 implementation). Invoked
-on SessionStart (via hook) or explicitly via /tars:maintain refresh-integrations.
+on SessionStart (via hook) or explicitly through the maintain workflow.
 
 Arguments:
   vault: required.

@@ -10,7 +10,7 @@ PLUGIN_JSON = os.path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json")
 
 REQUIRED_ROOT_FILES = [
     "LICENSE",
-    "ARCHITECTURE.md",
+    "docs/ARCHITECTURE.md",
     "CHANGELOG.md",
     "README.md",
 ]
@@ -65,7 +65,7 @@ def main():
         if "url" in author:
             warnings.append("plugin.json author contains 'url' field (should be omitted per spec)")
     else:
-        errors.append("plugin.json 'author' should be an object with 'name' and 'url'")
+        errors.append("plugin.json 'author' should be an object with 'name' and 'email'")
 
     # Version format check (optional)
     version = manifest.get("version", "")
@@ -106,8 +106,10 @@ def main():
         if not os.path.isdir(os.path.join(PLUGIN_ROOT, dname)):
             errors.append(f"MISSING ROOT DIRECTORY: {dname}/")
 
-    # --- 7. Optional but expected directories ---
-    optional_dirs = ["memory", "journal", "inbox", "archive", "tests"]
+    # --- 7. Optional but expected source directories ---
+    # Runtime workspace directories are created inside the user's selected
+    # workspace by /welcome, not at the framework repo root.
+    optional_dirs = ["tests"]
     for dname in optional_dirs:
         if not os.path.isdir(os.path.join(PLUGIN_ROOT, dname)):
             warnings.append(f"OPTIONAL DIRECTORY MISSING: {dname}/")
@@ -129,10 +131,13 @@ def main():
             if os.path.isfile(full):
                 warnings.append(f"UNEXPECTED FILE in skills/: {entry} (expected only directories)")
 
-    # --- 10. Verify .mcp.json exists ---
+    # --- 10. Verify MCP config exists ---
     mcp_json = os.path.join(PLUGIN_ROOT, ".mcp.json")
     if not os.path.isfile(mcp_json):
         warnings.append("MISSING: .mcp.json (MCP server configuration)")
+    shipped_mcp_json = os.path.join(PLUGIN_ROOT, ".claude-plugin", "mcp-servers.json")
+    if not os.path.isfile(shipped_mcp_json):
+        errors.append("MISSING: .claude-plugin/mcp-servers.json (plugin-shipped MCP configuration)")
 
     print_results(errors, warnings)
     return 1 if errors else 0

@@ -40,7 +40,7 @@ claude.ai/code on mobile controls a live Claude Code session running on your Mac
 
 ## Daily use
 
-From the phone, every `/tars:*` skill works exactly as on desktop:
+From the phone, every TARS workflow works exactly as on desktop:
 
 - `/briefing` — full daily briefing, delivered back on phone.
 - `/meeting` — paste or dictate a transcript; TARS runs the 14-step pipeline on the Mac.

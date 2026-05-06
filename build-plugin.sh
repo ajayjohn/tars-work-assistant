@@ -6,20 +6,24 @@ echo "Building TARS v3 plugin..."
 # Clean old build
 rm -rf tars-cowork-plugin
 
-# Create v3 distribution structure
-mkdir -p tars-cowork-plugin/{skills,scripts,templates,_system,_views,hooks,.claude-plugin,.claude/skills}
+# Create v3 distribution structure. The package contains framework assets, not
+# a fake user workspace. Runtime folders like _system/ and _views/ are created
+# inside the user's selected workspace by /welcome.
+mkdir -p tars-cowork-plugin/{skills,commands,scripts,templates,hooks,.claude-plugin,.claude/skills}
 mkdir -p tars-cowork-plugin/mcp/tars-vault
 
 # Copy v3 content from source
 cp -r skills/* tars-cowork-plugin/skills/
+cp -r commands/* tars-cowork-plugin/commands/
 cp -r scripts/*.py tars-cowork-plugin/scripts/
 cp -r templates/* tars-cowork-plugin/templates/
-cp -r _system/* tars-cowork-plugin/_system/
-cp -r _views/* tars-cowork-plugin/_views/
+mkdir -p tars-cowork-plugin/templates/views
+cp -r _views/* tars-cowork-plugin/templates/views/
 cp -r .claude/skills/* tars-cowork-plugin/.claude/skills/
 cp LICENSE CLAUDE.md requirements.txt tars-cowork-plugin/
+cp .claude-plugin/mcp-servers.json tars-cowork-plugin/.claude-plugin/
 
-# Copy the tars-vault MCP server (required for all /tars:* skill writes).
+# Copy the tars-vault MCP server (required for TARS workspace writes).
 # Excludes __pycache__ and tests/ — tests/ ships separately in the repo checkout.
 rsync -a --exclude '__pycache__' --exclude 'tests' mcp/tars-vault/ tars-cowork-plugin/mcp/tars-vault/
 

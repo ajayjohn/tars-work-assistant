@@ -89,6 +89,28 @@ class ToolTests(unittest.TestCase):
         install = (workspace / "_system" / "install.yaml").read_text()
         self.assertIn("workspace_type: headless", install)
         self.assertIn("persona: \"product-leader\"", install)
+        for rel in ("knowledge", "projects", "research", "_views"):
+            self.assertFalse((workspace / rel).exists(), rel)
+
+    def test_scaffold_workspace_obsidian_adds_views_only(self) -> None:
+        workspace = self.vault / "fresh-obsidian"
+        r = scaffold_workspace(
+            vault=str(workspace),
+            workspace_type="obsidian",
+            user_name="Ajay",
+            user_role="Product",
+            company="Acme",
+            persona="product-leader",
+        )
+        self.assertEqual(r["status"], "ok")
+        self.assertTrue((workspace / "memory").is_dir())
+        self.assertTrue((workspace / "inbox" / "pending").is_dir())
+        self.assertTrue((workspace / "_views" / "inbox-pending.base").is_file())
+        install = (workspace / "_system" / "install.yaml").read_text()
+        self.assertIn("workspace_type: obsidian", install)
+        self.assertIn("obsidian_enabled: true", install)
+        for rel in ("knowledge", "projects", "research"):
+            self.assertFalse((workspace / rel).exists(), rel)
 
     def test_create_rejects_existing_without_overwrite(self) -> None:
         p = self.vault / "memory" / "people" / "bob.md"
