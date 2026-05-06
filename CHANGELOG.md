@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.4.1 (2026-05-05)
+
+### Added
+
+- **Inbox-first onboarding.** Welcome, help, README, Getting Started, and Catalog now explain that users can drop transcripts, PDFs, decks, docs, screenshots, exports, and notes into `inbox/pending/` and ask TARS to process the inbox in bulk.
+- **Deferred setup continuation.** `/welcome --continue-setup` and the natural-language request "continue TARS setup" resume people, initiative, integration, schedule, brand, maintenance, and Obsidian setup after the one-minute path.
+- **Runtime doctor.** `scripts/doctor.py` checks Python, MCP importability, workspace path resolution, write permissions, and install-record consistency with cheap deterministic output.
+
+### Changed
+
+- **Natural-language-first cheat sheet.** The generated workspace `index.md` now states that slash commands are shortcuts and includes natural-language examples for every workflow.
+- **Workspace terminology.** User-facing setup and docs consistently call the working folder a workspace, with a clear note that an Obsidian-enabled workspace is also an Obsidian vault.
+- **Safer setup defaults.** Fresh setup now recommends `~/Documents/TARS Workspace`, shows the Claude-selected folder and active TARS workspace before scaffolding, and stops when the requested folder cannot be honored by the active MCP session.
+
+### Fixed
+
+- **Accidental `.claude` workspaces.** Hooks and doctor checks now warn or block fresh writes when the active workspace resolves under `~/.claude` without an explicit existing install record.
+- **Self-learning documentation.** Getting Started now describes the supported observed-preference review loop without implying that proposals are auto-applied.
+- **Stale index references.** Remaining user-facing `_index.md` guidance now points to search, `.base` views, or targeted workspace reads.
+
 ## v3.4.0 (2026-05-05)
 
 ### Added

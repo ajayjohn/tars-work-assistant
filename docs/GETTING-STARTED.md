@@ -9,7 +9,7 @@ TARS is a workspace-first executive assistant framework. The setup goal is strai
 You need:
 - Python 3.10+ available on the path
 - Claude Code or Claude Cowork with the TARS framework installed
-- a local folder dedicated to your TARS workspace
+- a local folder dedicated to your TARS workspace, recommended default: `~/Documents/TARS Workspace`
 - optional: Obsidian Desktop if you want live `.base` views and visual note browsing
 
 If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace first and then use this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
@@ -46,11 +46,20 @@ The repository root ships an `.mcp.json` declaring the `tars-vault` server. Set 
 
 The repository contains the framework source. The folder you point TARS at is the live runtime workspace.
 
+If setup behaves strangely, run the lightweight doctor from the framework checkout:
+
+```text
+python3 scripts/doctor.py --workspace ~/Documents/TARS\ Workspace
+```
+
+It checks Python, MCP importability, the resolved workspace path, write permissions, and install-record consistency. If Python itself is missing, install Python 3.10+ first, then rerun the check.
+
 ## First-run setup
 
 Run `/start` first if you want a no-setup demo with pasted content. Run `/welcome` when you are ready to create the workspace.
 
 The welcome flow:
+- shows the Claude-selected folder and active TARS workspace so files are not silently created somewhere else
 - asks for a workspace folder, your name/role, persona, and workspace type
 - asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
 - creates the TARS workspace structure
@@ -59,6 +68,14 @@ The welcome flow:
 - configures integration metadata
 - captures your initial profile and operating context
 - registers briefing and maintenance schedules when supported
+
+Fast setup intentionally stops there. Continue deeper setup later with:
+
+```text
+/welcome --continue-setup
+```
+
+or say "continue TARS setup." That deferred path covers key people, active initiatives, integrations, schedules, brand context, maintenance, and optional Obsidian browsing. TARS also reminds you lightly in Daily Digest/help until you finish, dismiss the reminder, or turn coaching off.
 
 After setup, the workspace should contain:
 
@@ -82,7 +99,7 @@ TARS now supports two workspace types:
 - `headless`: the default. Claude works against a local Markdown workspace.
 - `obsidian`: the same workspace plus optional Obsidian `.base` views and helper skills.
 
-Switch later with `/welcome --enable-obsidian` or `/welcome --disable-obsidian`. The switch does not move or rewrite memory, journal, schedules, or integrations.
+Switch later with `/welcome --enable-obsidian` or `/welcome --disable-obsidian`. The switch does not move or rewrite memory, journal, schedules, or integrations. In Obsidian mode, the TARS workspace is also the Obsidian vault.
 
 ## Integrations
 
@@ -94,7 +111,7 @@ Recommended setup rules:
 - connect calendar access so briefings and meeting matching can use real events
 - connect task access so reviewed tasks can sync into your external system
 - connect a meeting-recording provider (Minutes.app, Microsoft 365 with recordings, etc.) so `/meeting` can import transcripts directly instead of requiring paste
-- keep `.mcp.json` or equivalent integration configuration beside the vault or repository as appropriate for your environment
+- keep `.mcp.json` or equivalent integration configuration beside the workspace or repository as appropriate for your environment
 
 If integrations are not configured, TARS still works for local memory, journal, transcripts, strategic analysis, and communication drafting. Briefings and meeting processing simply lose some automation.
 
@@ -145,7 +162,7 @@ Use this for extraction, review, reprioritization, and completion. TARS does not
 
 TARS answers from memory first (FTS5 over `memory/**`), then tasks, then journal + transcripts via hybrid semantic-plus-FTS retrieval, then transcript-archive fallback, then integrations. Internal questions should not depend on web search.
 
-### Vault lint
+### Workspace lint
 
 ```text
 /lint
@@ -166,7 +183,7 @@ Use this for deeper analysis, challenge rounds, and structured decision support.
 TARS is designed to avoid dirty data.
 
 Before it writes:
-- it checks what the vault already knows
+- it checks what the workspace already knows
 - it resolves names through aliases and search
 - it asks when confidence is low
 - it routes content into the proper TARS schema and folder
@@ -184,9 +201,28 @@ Use `inbox/pending/` for raw intake that should be processed later in batch. Typ
 - raw meeting transcripts
 - notes exported from another system
 - screenshots or captured artifacts
-- documents to turn into context or wisdom notes
+- PDF reports, decks, docs, spreadsheets, or other documents to turn into context or wisdom notes
+- rough notes that contain a mix of facts, tasks, and decisions
+
+Then say:
+
+```text
+process inbox
+```
+
+or run:
+
+```text
+/maintain inbox
+```
+
+TARS inventories the pending folder, classifies each item, asks what to process, routes selected items through meeting, learn, tasks, or companion-note workflows, and moves finished items to `inbox/processed/`. This works in bulk. If a file type cannot be read directly by the active Claude environment, TARS creates a companion note and asks for extracted text or a converted copy rather than silently dropping the file.
 
 When transcripts are processed, the raw text should remain available through archived transcript notes in `archive/transcripts/YYYY-MM/`. Those notes are part of the retrieval model, not disposable temporary files.
+
+## Self-learning
+
+TARS has a reviewed self-learning loop. It watches lightweight telemetry and journal patterns for repeated behavior, then proposes updates to `_system/user-model.md` or `_system/workflows.yaml` through `/learn --review-patterns` and the weekly maintenance review queue. It does not auto-apply those proposals. You approve, skip, or edit them before anything changes.
 
 ## Operating habits that make TARS valuable
 

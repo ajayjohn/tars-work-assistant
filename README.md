@@ -11,6 +11,7 @@ TARS is built around a few core ideas:
 - Live Obsidian Bases are available in Obsidian mode; headless users can query the same files through Claude.
 - Retrieval combines SQLite FTS5 over structured memory with a local FastEmbed + sqlite-vec semantic layer over prose (journal, transcripts, contexts).
 - Meetings run a nuance-capture pass after summarization — contrarian views, quotes, numbers, unusual terms are preserved verbatim.
+- The inbox is a first-class intake path: drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/` and ask TARS to process the inbox in bulk.
 - Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
 - Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and workspace filing.
 - Tasks and durable memory always go through review before persistence.
@@ -38,16 +39,17 @@ No transcript handy? Try one of `examples/`.
 ## What you get over time
 
 - **Day 1**: useful structure from pasted meetings, emails, calls, and docs.
-- **Day 7**: memory, people, decisions, and tasks start showing up in `/answer` and `/briefing`.
+- **Day 7**: inbox files, memory, people, decisions, and tasks start showing up in `/answer` and `/briefing`.
 - **Day 30**: TARS becomes an operating layer for recurring work, follow-through, and organizational context.
 
 ## What ships in the framework
 
-The framework ships with 14 skills, 14 commands, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
+The framework ships with 14 skills, 15 commands, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
 
 Core user-facing capabilities:
 - Daily and weekly briefings with calendar, task, people, and initiative context (plus a Monday telemetry footer)
 - Meeting processing that links transcripts, journal notes, decisions, and follow-through — with nuance-capture pass
+- Inbox processing for bulk transcripts, PDFs, decks, docs, screenshots, exports, and raw notes
 - Task extraction with accountability testing, duplicate checks, age / escalation tracking
 - Durable memory capture for people, initiatives, decisions, products, vendors, competitors, and organizational context
 - Hybrid fast lookup — FTS5 over memory, semantic over journal + transcripts + contexts, plus integrations
@@ -83,6 +85,8 @@ inbox/processed/        Processed intake awaiting later maintenance
 archive/transcripts/    Preserved transcript notes with journal backlinks
 ```
 
+Put raw files in `inbox/pending/` and say "process inbox" or run `/maintain inbox`. TARS inventories the folder, classifies each item, routes it to the right workflow, proposes memory/tasks for review, writes durable context, and moves processed items to `inbox/processed/`.
+
 The plugin/workspace boundary is strict: plugin-shipped skills are read-only from a user's perspective, and any auto-created or user-tunable behavior lives in the workspace (`_system/install.yaml`, `_system/user-model.md`, `_system/workflows.yaml`).
 
 ## Quick start
@@ -91,7 +95,7 @@ The plugin/workspace boundary is strict: plugin-shipped skills are read-only fro
 2. Point TARS at a local folder for your Markdown workspace.
 3. Run `/start` to preview what TARS does with pasted content.
 4. Run `/welcome` to scaffold the workspace, pick a persona, and set your identity.
-5. Enable Obsidian later with `/welcome --enable-obsidian` if you want live views.
+5. Continue deeper setup later with `/welcome --continue-setup`; enable Obsidian with `/welcome --enable-obsidian` if you want live views.
 
 Examples:
 
@@ -101,9 +105,12 @@ Examples:
 /briefing
 /meeting
 /tasks
+/maintain inbox
 /answer What do I know about the platform rewrite?
 /think Stress-test this roadmap decision.
 ```
+
+Slash commands are shortcuts. Natural-language requests work too: "process everything in my inbox", "what should I focus on today", "remember Sarah owns onboarding", or "stress-test this roadmap".
 
 ## How TARS behaves
 

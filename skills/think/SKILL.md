@@ -249,8 +249,8 @@ Load full persona definitions from `skills/think/manifesto.md`.
 #### 1. Context loading (silent)
 
 Load awareness of:
-- Current initiatives (`memory/initiatives/_index.md` + targeted files)
-- Key stakeholders (`memory/people/_index.md` + targeted files)
+- Current initiatives (`search_by_tag(tag="tars/initiative")` + targeted files)
+- Key stakeholders (`search_by_tag(tag="tars/person")` + targeted files)
 
 #### 2. The debate (roundtable)
 
@@ -366,7 +366,8 @@ Spawn a Task sub-agent with the following prompt structure:
 You are running an executive council debate to refine a strategic recommendation.
 
 Read the strategic analysis at: {strategic_analysis_file_path}
-Read memory indexes: memory/initiatives/_index.md, memory/people/_index.md
+Read current initiative and people context using `mcp__tars_vault__search_by_tag`
+with tags `tars/initiative` and `tars/person`, then targeted file reads.
 Read persona definitions from: skills/think/manifesto.md
 
 Execute Mode C (executive-council):
@@ -541,8 +542,7 @@ After exit, route to the appropriate protocol based on what was discovered.
 If analysis yields durable strategic insights or decisions:
 1. Persist decisions to `memory/decisions/{slug}.md`
 2. Update initiatives in `memory/initiatives/{name}.md`
-3. Update relevant `_index.md` files
-4. Output memory updates section
+3. Output memory updates section
 
 ---
 
@@ -563,16 +563,16 @@ Tag each evidence point, assumption, and finding with its source tier:
 ## Context budgets
 
 **Strategic analysis mode:**
-- Memory: Read `_index.md` + up to 5 targeted files
-- Journal: Read current month `_index.md` + up to 2 relevant entries
+- Memory: Search tags + read up to 5 targeted files
+- Journal: Search current month + read up to 2 relevant entries
 - Reference: decision frameworks (from skill, already loaded)
 
 **Validation council mode:**
-- Memory: Read `_index.md` + up to 3 targeted files for context
+- Memory: Search tags + read up to 3 targeted files for context
 - Reference: decision frameworks (from skill, already loaded)
 
 **Executive council mode:**
-- Memory: Read `_index.md` for initiatives and people + up to 5 targeted files
+- Memory: Search initiatives and people + read up to 5 targeted files
 - Reference: `skills/think/manifesto.md`
 
 **Deep analysis mode:**
@@ -580,7 +580,7 @@ Tag each evidence point, assumption, and finding with its source tier:
 - Offload intermediate outputs to `journal/` to prevent context overflow
 
 **Discovery mode:**
-- Memory: Read `_index.md` for initiatives and people + up to 3 targeted files
+- Memory: Search initiatives and people + read up to 3 targeted files
 
 ---
 

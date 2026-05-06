@@ -1,6 +1,6 @@
 {
   "name": "tars",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian .base views, and scheduled maintenance.",
   "author": {
     "name": "Ajay John",

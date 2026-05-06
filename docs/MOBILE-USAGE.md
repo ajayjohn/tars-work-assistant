@@ -4,14 +4,14 @@ TARS is workspace-first and still desktop-run: the Markdown workspace lives on y
 
 ## What Remote Control does
 
-claude.ai/code on mobile controls a live Claude Code session running on your Mac. You type or speak requests on the phone; TARS runs on the Mac with full vault access; you get the results back on your phone.
+claude.ai/code on mobile controls a live Claude Code session running on your Mac. You type or speak requests on the phone; TARS runs on the Mac with full workspace access; you get the results back on your phone.
 
 ## Prerequisites
 
 - Anthropic Pro or Max plan (required for Remote Control).
 - Claude Code v2.1.51 or newer on the Mac.
 - Your Mac is powered on, awake, and online.
-- TARS plugin installed on the Mac; `tars-vault` MCP server reachable; vault open in Obsidian.
+- TARS plugin installed on the Mac; `tars-vault` MCP server reachable; workspace available locally. If Obsidian is enabled, the workspace can also be open as an Obsidian vault.
 - An iOS or Android device signed into the same Anthropic account.
 
 ## One-time desktop setup
@@ -46,7 +46,7 @@ From the phone, every `/tars:*` skill works exactly as on desktop:
 - `/meeting` — paste or dictate a transcript; TARS runs the 14-step pipeline on the Mac.
 - `/tasks` — numbered review lists render on the phone; confirm with normal selection syntax (`all`, `1,3`, `all except 4`).
 - `/answer` — fast lookup; hybrid retrieval runs on the Mac against the local index.
-- `/create` — office output delegates to Anthropic's rendering skills on the Mac; the artifact lands under `contexts/artifacts/YYYY-MM/` on the Mac and a companion note appears in the vault.
+- `/create` — office output delegates to Anthropic's rendering skills on the Mac; the artifact lands under `contexts/artifacts/YYYY-MM/` on the Mac and a companion note appears in the workspace.
 
 Voice input works well for meetings: hit the mic, describe what happened, and hand it off to `/meeting` for the full pipeline.
 
@@ -55,18 +55,18 @@ Voice input works well for meetings: hit the mic, describe what happened, and ha
 - **Mac sleeps mid-session.** Check `pmset -g` on the Mac. If sleep kicks in, keep the Mac awake with `caffeinate -imsu &`, or configure Energy Saver to keep the Mac active on AC power.
 - **Claude Code crashed.** The launchd keepalive restarts it automatically. If it doesn't, reload: `launchctl unload ~/Library/LaunchAgents/com.tars.keepalive.plist && launchctl load -w ~/Library/LaunchAgents/com.tars.keepalive.plist`.
 - **Latency spikes.** Check your Mac's network and Anthropic's status page (`status.anthropic.com`). Remote Control tunnels through Anthropic's infrastructure.
-- **Vault shows stale state.** Obsidian sometimes caches. On the Mac, Cmd+R the vault, or run `/lint` to force a re-scan.
+- **Workspace looks stale in Obsidian.** Obsidian sometimes caches. On the Mac, Cmd+R the Obsidian vault, or run `/lint` to force a re-scan.
 - **`tars-vault` MCP not reachable from mobile session.** The MCP server runs on the Mac — confirm `python3 -m tars_vault` starts cleanly with `TARS_VAULT_PATH` set. Mobile doesn't execute the MCP server itself.
 
 ## Security considerations
 
 - Remote Control traffic goes through Anthropic's infrastructure. Don't paste secrets (API keys, passwords, personal identifiers) into the mobile chat — session content is logged to your Anthropic account like any other.
-- `tars-vault`'s `scan_secrets` pre-write hook still runs on every vault mutation, so accidental paste of a secret into a journal would still be blocked before landing on disk. This is belt-and-braces, not license to get careless.
-- The Mac's Obsidian vault is the authoritative store. Remote Control does not create a separate copy on the phone.
+- `tars-vault`'s `scan_secrets` pre-write hook still runs on every workspace mutation, so accidental paste of a secret into a journal would still be blocked before landing on disk. This is belt-and-braces, not license to get careless.
+- The Mac's TARS workspace is the authoritative store. If Obsidian is enabled, that same folder is the Obsidian vault. Remote Control does not create a separate copy on the phone.
 
 ## What doesn't work on mobile
 
-- Direct editing of vault files in Obsidian on iOS / Android. The Obsidian mobile app does not participate in the Remote Control flow — you would need a separate sync path (Obsidian Sync, iCloud, etc.) to edit notes directly from mobile Obsidian, outside of TARS.
+- Direct editing of workspace files in Obsidian on iOS / Android. The Obsidian mobile app does not participate in the Remote Control flow — you would need a separate sync path (Obsidian Sync, iCloud, etc.) to edit notes directly from mobile Obsidian, outside of TARS.
 - Rich `/create` preview. The rendered `.pptx` / `.docx` / `.xlsx` lands on the Mac. Access from mobile requires a sync path (iCloud Drive, OneDrive, Dropbox) pointing at `contexts/artifacts/YYYY-MM/`.
 - Offline mode. Remote Control is online-only. When away from a network, TARS is desktop-only.
 

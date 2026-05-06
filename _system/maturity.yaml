@@ -17,6 +17,22 @@ onboarding:
     first_briefing: false
     first_meeting: false
 
+deferred_setup:
+  available: true
+  completed: false
+  dismissed: false
+  next_step: people
+  last_reminded: null
+  modules:
+    people: false
+    initiatives: false
+    integrations: false
+    schedule: false
+    cron_jobs: false
+    brand: false
+    maintenance: false
+    obsidian_browsing: false
+
 hydration:
   people_count: 0
   initiative_count: 0
