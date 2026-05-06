@@ -67,8 +67,8 @@ skills/           Behavioral and workflow protocols (14 skills)
 commands/         Thin slash-command wrappers into the skills
 hooks/            SessionStart / PreToolUse / PostToolUse / PreCompact / SessionEnd
 mcp/tars-vault/   Write-interface MCP server + retrieval + organization tools
-_system/          Runtime configuration, schemas, guardrails, telemetry, registries
-_views/           Optional Obsidian `.base` files for live queries
+_system/          Source defaults for scaffolded runtime config and schemas
+_views/           Source templates for optional Obsidian `.base` views
 templates/        Canonical TARS note templates (+ office content outlines)
 scripts/          Deterministic stdlib-only validators and maintenance utilities
 .claude/skills/   Obsidian-specific helper skills used by the agent
@@ -77,12 +77,16 @@ scripts/          Deterministic stdlib-only validators and maintenance utilities
 A deployed TARS workspace uses this runtime layout. These directories live in your **workspace**, not in this repository. The plugin scaffolds them on first `/welcome`:
 
 ```text
-memory/                 Durable knowledge graph
-journal/YYYY-MM/        Skill outputs and dated notes
-contexts/               Deep reference material and generated artifacts
-inbox/pending/          Raw intake waiting for processing (incl. weekly review queues)
-inbox/processed/        Processed intake awaiting later maintenance
-archive/transcripts/    Preserved transcript notes with journal backlinks
+_system/               Runtime config, install state, maturity, schemas, guardrails
+memory/                Durable knowledge graph
+journal/               Skill outputs and dated notes
+contexts/              Deep reference material and generated artifacts
+inbox/pending/         Raw intake waiting for processing (incl. weekly review queues)
+inbox/processed/       Processed intake awaiting later maintenance
+archive/               Preserved transcripts and archived material
+templates/             User-visible templates copied for portability
+scripts/               Workspace-local helper scripts
+index.md               Cheat sheet and natural-language workflow guide
 ```
 
 Put raw files in `inbox/pending/` and say "process inbox" or run `/maintain inbox`. TARS inventories the folder, classifies each item, routes it to the right workflow, proposes memory/tasks for review, writes durable context, and moves processed items to `inbox/processed/`.

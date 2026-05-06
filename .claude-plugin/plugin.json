@@ -1,10 +1,10 @@
 {
   "name": "tars",
-  "version": "3.4.2",
+  "version": "3.4.3",
   "description": "Persistent work assistant for Claude with meeting processing, durable memory, task accountability, briefings, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian views, and scheduled maintenance.",
   "author": {
     "name": "Ajay John",
-    "email": "ajay.john@example.com"
+    "email": "contact@ajayjohn.com"
   },
   "license": "PolyForm-Noncommercial-1.0.0"
 }

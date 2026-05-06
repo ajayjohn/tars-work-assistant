@@ -67,6 +67,11 @@ class FreshInstallSmokeTests(unittest.TestCase):
         ]
         for rel in expected_dirs:
             self.assertTrue((self.workspace / rel).is_dir(), rel)
+        for rel in ("knowledge", "projects", "research"):
+            self.assertFalse((self.workspace / rel).exists(), rel)
+        for rel in ("INBOX.md", "MEMORY.md", "PEOPLE.md", "INITIATIVES.md", "inbox.md"):
+            self.assertFalse((self.workspace / rel).exists(), rel)
+        self.assertFalse((self.workspace / "_views").exists())
 
         index = self.workspace / "index.md"
         self.assertTrue(index.is_file())
@@ -114,6 +119,10 @@ class FreshInstallSmokeTests(unittest.TestCase):
         self.assertTrue((self.workspace / "memory").is_dir())
         self.assertTrue((self.workspace / "inbox" / "pending").is_dir())
         self.assertTrue((self.workspace / "index.md").is_file())
+        self.assertTrue((self.workspace / "_views").is_dir())
+        self.assertTrue((self.workspace / "_views" / "inbox-pending.base").is_file())
+        for rel in ("knowledge", "projects", "research"):
+            self.assertFalse((self.workspace / rel).exists(), rel)
 
     def test_end_to_end_framework_plumbing(self) -> None:
         scaffold = scaffold_workspace(

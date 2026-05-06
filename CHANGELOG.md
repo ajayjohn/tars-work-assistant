@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.4.3 (2026-05-06)
+
+### Fixed
+
+- **Installed plugin now includes command wrappers and MCP metadata.** The release package now ships `commands/` and `.claude-plugin/mcp-servers.json` so `/welcome`, `/start`, and the rest of the command surface route into TARS reliably after marketplace-style install.
+- **Fresh setup is deterministic for Sonnet or stronger models.** `/welcome` is now a short setup contract that asks essential personalization questions, calls the deterministic scaffold tool, verifies `index.md`, `_system/install.yaml`, `_system/config.md`, `memory/`, and `inbox/pending/`, then offers an immediate demo with a transcript, report, email thread, or notes.
+- **The installed runtime contract no longer carries stale Obsidian assumptions.** Shipped `CLAUDE.md` now states that the Markdown workspace is authoritative, Obsidian is optional, writes go through `tars-vault`, and uninitialized workspaces must route to `/welcome`.
+- **Obsidian mode scaffolds views without changing the data model.** Headless setup creates the canonical portable workspace only; Obsidian setup creates the same workspace plus `_views/*.base`.
+- **Release validation now tests the artifact users install.** New artifact validation extracts the built zip, verifies required packaged files, runs scaffold from the extracted MCP server, rejects generic `knowledge/`, `projects/`, or `research/` setup folders, and checks the generated `index.md` for natural-language and inbox guidance.
+
 ## v3.4.2 (2026-05-06)
 
 ### Fixed
