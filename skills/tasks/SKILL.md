@@ -24,6 +24,8 @@ Extract commitments into actionable, accountable tasks from any input source, or
 
 All vault writes go through `mcp__tars_vault__*` tools (see `skills/core/SKILL.md` → "Write interface"). External task-system integration (Apple Reminders, Microsoft 365 Tasks, Todoist, etc.) resolves through `mcp__tars_vault__resolve_capability(capability="tasks")` — never hard-code specific server names. All names use canonical forms from the alias registry. Task creation always requires user confirmation via the numbered review list. **Form every wikilink in task notes via `mcp__tars_vault__format_wikilink` — see core → "Wikilink discipline". Hand-formed `[[...]]` is rejected at the MCP and hook layers.**
 
+When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
+
 ---
 
 ## Mode detection

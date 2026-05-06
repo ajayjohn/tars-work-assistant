@@ -2,18 +2,26 @@
 
 # Getting Started with TARS
 
-TARS is an Obsidian-native executive assistant framework. The setup goal is straightforward: connect TARS to a real Obsidian vault, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately.
+TARS is a workspace-first executive assistant framework. The setup goal is straightforward: point TARS at a local Markdown folder, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately. Obsidian is optional and can be enabled later.
 
 ## Before you install
 
 You need:
-- Obsidian Desktop running on the same machine
-- `obsidian-cli` installed and able to reach your target vault (used as the transport below the `tars-vault` MCP server)
 - Python 3.10+ available on the path
 - Claude Code or Claude Cowork with the TARS framework installed
-- a vault location dedicated to your TARS workspace
+- a local folder dedicated to your TARS workspace
+- optional: Obsidian Desktop if you want live `.base` views and visual note browsing
 
-If you are starting fresh, create an empty vault. If you are migrating from an earlier TARS setup, migrate the old workspace into a current TARS vault first and then use this guide. If you are upgrading from v3.0 → v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 → v3.3 migrations are handled automatically; reopen the vault and `/welcome` or `/maintain migrations` will surface any pending changes.
+If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace first and then use this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
+
+Existing Obsidian-first TARS users can backfill the new workspace fields without moving data:
+
+```text
+python3 scripts/migrate-workspace-first.py --vault /path/to/existing/vault
+python3 scripts/migrate-workspace-first.py --vault /path/to/existing/vault --apply
+```
+
+The script defaults legacy installs to `workspace_type: obsidian` so current users keep their existing views. Switch later with `/welcome --disable-obsidian` if you want Claude-first operation.
 
 ## Installation
 
@@ -34,24 +42,25 @@ pip install -r requirements.txt
 
 The pinned deps are minimal: `mcp`, `fastembed`, `sqlite-vec`. Nothing else. In particular TARS does NOT bundle any office-rendering libraries — office output in `/create` delegates to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills.
 
-The repository root ships an `.mcp.json` declaring the `tars-vault` server. Set `TARS_VAULT_PATH` in your shell or IDE environment to point at your vault before starting Claude Code, so the MCP server knows where to operate.
+The repository root ships an `.mcp.json` declaring the `tars-vault` server. Set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the MCP server knows where to operate.
 
-The repository contains the framework source. The vault you point TARS at is the live runtime workspace.
+The repository contains the framework source. The folder you point TARS at is the live runtime workspace.
 
 ## First-run setup
 
-Run `/welcome`.
+Run `/start` first if you want a no-setup demo with pasted content. Run `/welcome` when you are ready to create the workspace.
 
 The welcome flow:
+- asks for a workspace folder, your name/role, persona, and workspace type
 - asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
-- creates the TARS vault structure
+- creates the TARS workspace structure
 - writes `_system/` files (including the new `install.yaml` install record), templates, and live views
-- installs or verifies the Obsidian helper skills in `.claude/skills/`
+- installs or verifies Obsidian helper skills only when Obsidian mode is enabled
 - configures integration metadata
 - captures your initial profile and operating context
 - registers briefing and maintenance schedules when supported
 
-After setup, the vault should contain:
+After setup, the workspace should contain:
 
 ```text
 _system/
@@ -66,9 +75,14 @@ templates/
 scripts/
 ```
 
-## Engagement modes (removed in v3.3)
+## Workspace modes
 
-Prior to v3.3, TARS offered `standard` and `casual` engagement modes. In v3.3, this distinction was removed in favour of uniform graceful degradation — TARS works fully for all users and adjusts its pipeline automatically based on which integrations are connected and how the vault is configured. All users receive the same review gates, maintenance pipelines, and cron registrations.
+TARS now supports two workspace types:
+
+- `headless`: the default. Claude works against a local Markdown workspace.
+- `obsidian`: the same workspace plus optional Obsidian `.base` views and helper skills.
+
+Switch later with `/welcome --enable-obsidian` or `/welcome --disable-obsidian`. The switch does not move or rewrite memory, journal, schedules, or integrations.
 
 ## Integrations
 

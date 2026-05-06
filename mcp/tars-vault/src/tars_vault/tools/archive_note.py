@@ -17,9 +17,9 @@ Returns:
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from shutil import move
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from .. import _common
@@ -29,6 +29,71 @@ from .update_frontmatter import update_frontmatter
 
 
 DURABLE_TAGS = {"tars/decision", "tars/org-context"}
+SKIP_DIRS = {".git", ".obsidian", ".claude", "_system/embedding-cache"}
+
+
+def _tags(fm: dict[str, Any]) -> list[str]:
+    tags = fm.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        return []
+    return [str(t) for t in tags]
+
+
+def _note_targets(note_p: Path, fm: dict[str, Any], vault_p: Path) -> set[str]:
+    rel_no_ext = str(note_p.relative_to(vault_p).with_suffix("")).replace("\\", "/")
+    targets = {note_p.stem, rel_no_ext}
+    for alias in fm.get("aliases") or []:
+        targets.add(str(alias))
+    title = fm.get("title")
+    if title:
+        targets.add(str(title))
+    return {t for t in targets if t}
+
+
+def _contains_wikilink(text: str, targets: set[str]) -> bool:
+    for target in targets:
+        escaped = re.escape(target)
+        if re.search(r"\[\[" + escaped + r"(?:[#|\]]|\]\])", text):
+            return True
+    return False
+
+
+def _scan_guardrails(vault_p: Path, note_p: Path, fm: dict[str, Any]) -> list[dict[str, Any]]:
+    targets = _note_targets(note_p, fm, vault_p)
+    cutoff = datetime.now().astimezone() - timedelta(days=90)
+    findings: list[dict[str, Any]] = []
+    for md in vault_p.rglob("*.md"):
+        rel = md.relative_to(vault_p)
+        if md == note_p or any(str(rel).startswith(s) for s in SKIP_DIRS):
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+            other_fm, _other_body = _common.split_frontmatter(text)
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not _contains_wikilink(text, targets):
+            continue
+        try:
+            modified_at = datetime.fromtimestamp(md.stat().st_mtime).astimezone()
+        except OSError:
+            modified_at = datetime.now().astimezone()
+        if modified_at >= cutoff:
+            findings.append({
+                "type": "recent_backlink",
+                "file": str(rel),
+                "modified": modified_at.date().isoformat(),
+            })
+        other_tags = _tags(other_fm or {})
+        other_status = str((other_fm or {}).get("tars-status", "")).lower()
+        if "tars/task" in other_tags and other_status in ("", "open", "active"):
+            findings.append({
+                "type": "active_task_reference",
+                "file": str(rel),
+                "status": other_status or "open",
+            })
+    return findings
 
 
 def archive_note(**kwargs: Any) -> dict:
@@ -36,6 +101,7 @@ def archive_note(**kwargs: Any) -> dict:
     file_ = kwargs.get("file")
     reason = kwargs.get("reason", "")
     force = bool(kwargs.get("force", False))
+    dry_run = bool(kwargs.get("dry_run", False))
     if not vault:
         return _common.error("missing 'vault'")
     if not file_:
@@ -52,13 +118,19 @@ def archive_note(**kwargs: Any) -> dict:
     fm = fm or {}
     if fm.get("tars-archive-exempt") is True and not force:
         return _common.error("note has tars-archive-exempt=true (pass force=true to override)")
-    tags = fm.get("tags") or []
-    if isinstance(tags, str):
-        tags = [tags]
+    tags = _tags(fm)
     if any(t in DURABLE_TAGS for t in tags) and not force:
         return _common.error(
             f"note has durable tag {[t for t in tags if t in DURABLE_TAGS]}; "
             "refuse to archive (pass force=true to override)"
+        )
+    guardrail_findings = _scan_guardrails(vault_p, note_p, fm)
+    if guardrail_findings and not force:
+        return _common.error(
+            "archive guardrail blocked: "
+            + "; ".join(f"{f['type']} in {f['file']}" for f in guardrail_findings),
+            blocked=True,
+            guardrails=guardrail_findings,
         )
 
     # Determine target path: archive/YYYY-MM/<filename>
@@ -68,6 +140,15 @@ def archive_note(**kwargs: Any) -> dict:
     target_abs = vault_p / target_rel
     if target_abs.exists() and not force:
         return _common.error(f"archive target already exists: {target_rel}")
+
+    if dry_run:
+        return _common.ok(
+            from_path=str(note_p.relative_to(vault_p)),
+            to_path=target_rel,
+            blocked=False,
+            guardrails=[],
+            dry_run=True,
+        )
 
     # Tag frontmatter BEFORE move (so downstream views pick up the tag).
     new_tags = list(tags)

@@ -120,7 +120,7 @@ class ToolTests(unittest.TestCase):
 
     def test_search_by_tag(self) -> None:
         (self.vault / "memory" / "people" / "e.md").write_text(
-            "---\ntags: [tars/person, tars/vip]\n---\n"
+            "---\ntags: [tars/person, tars/vip]\ntars-role: Eng\n---\nAlice owns search.\n"
         )
         (self.vault / "memory" / "people" / "f.md").write_text(
             "---\ntags: [tars/vendor]\n---\n"
@@ -128,6 +128,34 @@ class ToolTests(unittest.TestCase):
         r = search_by_tag(vault=str(self.vault), tag="tars/person")
         self.assertEqual(r["status"], "ok")
         self.assertEqual(r["count"], 1)
+
+    def test_search_by_tag_query_and_frontmatter_filters(self) -> None:
+        (self.vault / "memory" / "initiatives").mkdir(parents=True)
+        (self.vault / "memory" / "initiatives" / "search.md").write_text(
+            "---\n"
+            "tags: [tars/initiative]\n"
+            "tars-status: active\n"
+            "tars-date: 2026-04-15\n"
+            "---\n"
+            "Search quality launch plan.\n"
+        )
+        (self.vault / "memory" / "initiatives" / "archive.md").write_text(
+            "---\n"
+            "tags: [tars/initiative]\n"
+            "tars-status: paused\n"
+            "tars-date: 2026-01-01\n"
+            "---\n"
+            "Legacy cleanup.\n"
+        )
+        r = search_by_tag(
+            vault=str(self.vault),
+            tag="tars/initiative",
+            query="quality",
+            frontmatter={"tars-status": "active", "tars-date__gte": "2026-04-01"},
+        )
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["count"], 1)
+        self.assertEqual(r["results"][0]["path"], "memory/initiatives/search.md")
 
     def test_classify_file_resume(self) -> None:
         (self.vault / "contexts").mkdir()
@@ -174,6 +202,24 @@ class ToolTests(unittest.TestCase):
         r = archive_note(vault=str(self.vault), file="memory/decisions/d.md")
         self.assertEqual(r["status"], "error")
         self.assertIn("durable tag", r["reason"])
+
+    def test_archive_note_refuses_recent_backlink_and_active_task(self) -> None:
+        (self.vault / "memory" / "people" / "ivy.md").write_text(
+            "---\ntags: [tars/person]\naliases: [Ivy]\n---\nbody\n"
+        )
+        (self.vault / "journal" / "2026-04" / "ref.md").write_text(
+            "---\ntags: [tars/journal]\n---\nDiscussed [[Ivy]].\n"
+        )
+        (self.vault / "memory" / "tasks").mkdir(parents=True)
+        (self.vault / "memory" / "tasks" / "task.md").write_text(
+            "---\ntags: [tars/task]\ntars-status: open\n---\nFollow up with [[Ivy]].\n"
+        )
+        r = archive_note(vault=str(self.vault), file="memory/people/ivy.md")
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+        types = {item["type"] for item in r["guardrails"]}
+        self.assertIn("recent_backlink", types)
+        self.assertIn("active_task_reference", types)
 
     # --- integrations ---
 

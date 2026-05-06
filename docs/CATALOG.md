@@ -2,7 +2,7 @@
 
 # TARS Catalog
 
-TARS is a persistent executive assistant framework built around an Obsidian vault. It is designed for senior knowledge workers who need continuity across meetings, decisions, tasks, stakeholder context, and long-running initiatives.
+TARS is a persistent executive assistant framework built around a local Markdown workspace. Obsidian is optional as a richer viewer. It is designed for senior knowledge workers who need continuity across meetings, decisions, tasks, stakeholder context, and long-running initiatives.
 
 ## Executive summary
 
@@ -11,19 +11,19 @@ TARS addresses three chronic problems in modern knowledge work:
 - meeting follow-through is inconsistent and hard to audit
 - strategic work is often detached from the evidence trail that produced it
 
-TARS solves those problems by treating the vault as a structured operating system rather than a pile of notes. It combines durable memory, transcript-backed retrieval, task review gates, live views, and maintenance workflows so the assistant stays useful over time instead of becoming another capture layer that drifts out of date.
+TARS solves those problems by treating the workspace as a structured operating system rather than a pile of notes. It combines durable memory, transcript-backed retrieval, task review gates, optional live views, and maintenance workflows so the assistant stays useful over time instead of becoming another capture layer that drifts out of date.
 
 ## What makes TARS different
 
 TARS is intentionally opinionated about how a long-lived assistant should work:
-- Obsidian is the native runtime, not a secondary destination
-- `obsidian-cli` is the write path for managed vault changes
-- `.base` files replace manual `_index.md` maintenance
+- Markdown files and YAML frontmatter are the native runtime
+- `tars-vault` is the write path for managed workspace changes
+- `.base` files are optional Obsidian views over the same workspace
 - transcript archives are first-class retrieval assets
 - tasks and memory go through explicit review before persistence
 - schemas, guardrails, aliasing, and maintenance state live in `_system/`
 
-The result is a framework that is stable for months-long use, especially when the vault accumulates hundreds of journal entries, transcripts, and memory notes.
+The result is a framework that is stable for months-long use, especially when the workspace accumulates hundreds of journal entries, transcripts, and memory notes.
 
 ## Core capabilities
 
@@ -62,7 +62,7 @@ The answer workflow searches memory first, then journal, then transcript archive
 
 ### Strategic and communication workflows
 
-TARS supports structured strategic analysis, stakeholder-aware drafting, initiative planning, and artifact creation while grounding those outputs in what the vault already knows.
+TARS supports structured strategic analysis, stakeholder-aware drafting, initiative planning, and artifact creation while grounding those outputs in what the workspace already knows.
 
 ### Persona-driven cold start (v3.2)
 
@@ -70,11 +70,11 @@ Onboarding is built around seven role personas — Product Leader, Sales / Custo
 
 ### Wikilink discipline (v3.2)
 
-Every wikilink TARS writes is formed via the in-house `format_wikilink` MCP tool, which normalizes smart quotes, sanitizes Obsidian-illegal characters, and resolves canonical names through the alias registry + vault file lookup. Write tools and a pre-write hook reject any `[[…]]` containing forbidden characters. A retroactive `fix-wikilinks --repair-broken` mode classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
+Every wikilink TARS writes is formed via the in-house `format_wikilink` MCP tool, which normalizes smart quotes, sanitizes Obsidian-illegal characters, and resolves canonical names through the alias registry + workspace file lookup. Write tools and a pre-write hook reject any `[[…]]` containing forbidden characters. A retroactive `fix-wikilinks --repair-broken` mode classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
 
 ### Self-improvement loop (v3.2)
 
-A single weekly cron job (`tars-weekly-maintenance`, Sunday evening) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the vault-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
+A single weekly cron job (`tars-weekly-maintenance`, Sunday evening) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the workspace-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
 
 ## Who it is for
 

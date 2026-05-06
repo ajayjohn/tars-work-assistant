@@ -194,10 +194,10 @@ def main() -> int:
     _vault, status = resolve_vault()
     if status.get("mismatch"):
         install = status.get("install") or {}
-        stored = install.get("vault_path") or "(unset)"
+        stored = install.get("workspace_path") or install.get("vault_path") or "(unset)"
         _deny(
-            "Refusing vault write: this folder does not match the vault recorded in "
-            f"_system/install.yaml (vault_path={stored}). Run /welcome --relocate to "
+            "Refusing workspace write: this folder does not match the workspace recorded in "
+            f"_system/install.yaml (workspace_path={stored}). Run /welcome --relocate to "
             "update the install record before writing."
         )
         return 0

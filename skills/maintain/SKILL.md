@@ -34,6 +34,8 @@ help:
 
 Modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
 
+When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
+
 Hygiene — broken wikilinks, orphans, schema violations, staleness banners, contradictions, framework self-state drift — moved to `/lint` in v3.1. Reference-update mode was retired (v2.1 artifact).
 
 ## Relationship to `/lint`

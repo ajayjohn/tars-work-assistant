@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tars-vault"
 version = "3.1.0-dev"
-description = "TARS v3.1 vault MCP server — validated obsidian-cli wrapper, auto-wikilink, FTS+semantic search, integration resolver"
+description = "TARS workspace MCP server: validated Markdown writes, wikilink checks, FTS+semantic search, integration resolver"
 requires-python = ">=3.10"
 license = {text = "PolyForm-Noncommercial-1.0.0"}
 authors = [{name = "Ajay John"}]

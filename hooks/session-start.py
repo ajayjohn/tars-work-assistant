@@ -7,8 +7,8 @@ Banner composition (v3.3):
      passes "${TARS_VAULT_PATH}" as a literal string, writes will land in a
      mis-named directory.  Block and instruct immediately.
   1. Worktree isolation — if CWD is inside a .claude/worktrees/ path, surface
-     a prominent notice so the user knows vault writes go through obsidian-cli
-     (bypassing the worktree boundary) and offer the two operating modes.
+     a prominent notice so the user knows workspace writes go through the MCP
+     server and offer the two operating modes.
   2. install.yaml mismatch warning.
   3. Legacy-vault notice when install.yaml is missing.
   4. tools-registry.yaml stale or missing (TTL = 24h).
@@ -17,6 +17,7 @@ Banner composition (v3.3):
      step 7 (hooks cannot call MCP tools).
 """
 import os
+import re
 import subprocess
 import sys
 import time
@@ -24,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import in_recursion, read_event, resolve_vault, write_output
+from _common import in_recursion, read_event, read_install_config, resolve_vault, write_output
 
 
 _REGISTRY_TTL_SECONDS = 24 * 60 * 60  # 24h per CLAUDE.md startup-checks §6
@@ -39,8 +40,8 @@ def _unexpanded_env_notice(status: dict) -> str:
         "⚠️  TARS CONFIGURATION ERROR: TARS_VAULT_PATH is not resolved.\n"
         f"   The MCP server received the literal string \"{raw}\" instead of an\n"
         "   absolute path. Claude Code does not expand shell variables in .mcp.json\n"
-        "   env blocks — writes will land in a mis-named directory and be invisible\n"
-        "   to Obsidian.\n\n"
+        "   env blocks. Writes will land in a mis-named directory and be invisible\n"
+        "   to TARS.\n\n"
         "   Fix: open your .mcp.json (or the root ~/.claude/.mcp.json) and replace\n"
         f"   \"{raw}\" with the absolute path to your vault, e.g.\n"
         "   \"/Users/you/Notes/TARS-Work\".\n\n"
@@ -100,18 +101,37 @@ def _worktree_notice() -> str:
     except Exception:
         pass
 
+    profile_populated = False
+    try:
+        vault, status = resolve_vault()
+        if vault:
+            cfg = vault / "_system" / "config.md"
+            install = status.get("install") or read_install_config(vault) or {}
+            text = cfg.read_text(encoding="utf-8") if cfg.is_file() else ""
+            profile_populated = bool(install) and bool(
+                re.search(r"^tars-user-name:\s*[\"']?[^\"'\s].*$", text, re.MULTILINE)
+            )
+    except Exception:
+        profile_populated = False
+
+    if not profile_populated:
+        return (
+            "You are running TARS from a git worktree. To try TARS, point it at a "
+            "local Markdown workspace and run `/start` for a 90-second demo or "
+            "`/welcome` for setup.\n\n"
+            "Framework development docs: docs/ARCHITECTURE.md, CONTRIBUTING.md."
+        )
+
     branch_label = f" (`{branch}`)" if branch else ""
     return (
         f"⚠️  TARS WORKTREE SESSION: This session is running in an isolated git "
         f"worktree{branch_label}.\n\n"
-        "   Files created via the git filesystem will NOT appear in your Obsidian\n"
-        "   vault until merged to main. However, TARS vault writes go through\n"
-        "   obsidian-cli, which communicates with the running Obsidian app directly\n"
-        "   and bypasses the worktree boundary — knowledge-work outputs land in\n"
-        "   your live vault immediately.\n\n"
+        "   Files created via the git filesystem will NOT appear in your main\n"
+        "   workspace until merged. TARS workspace writes go through the\n"
+        "   tars-vault MCP server and land in the active workspace immediately.\n\n"
         "   Choose how to proceed:\n"
         "   [1] Knowledge-work mode (default) — /meeting, /learn, /briefing,\n"
-        "       /tasks, /answer: vault writes go to your live Obsidian vault.\n"
+        "       /tasks, /answer: writes go to your active TARS workspace.\n"
         "   [2] Framework/code mode — modifying skills, scripts, templates:\n"
         "       changes stay in this worktree; merge explicitly when done.\n\n"
         "   To list, merge, or prune active worktrees: run /maintain worktrees"
@@ -121,18 +141,18 @@ def _worktree_notice() -> str:
 def _vault_notice(status: dict) -> str:
     if status.get("mismatch"):
         install = status.get("install") or {}
-        stored = install.get("vault_path") or "(unset)"
+        stored = install.get("workspace_path") or install.get("vault_path") or "(unset)"
         return (
-            "TARS install warning: this folder does not match the vault recorded in "
+            "TARS install warning: this folder does not match the workspace recorded in "
             "_system/install.yaml.\n"
-            f"  Recorded vault_path: {stored}\n"
-            "  If you moved or copied the vault, run /welcome --relocate to update "
+            f"  Recorded workspace_path: {stored}\n"
+            "  If you moved or copied the workspace, run /welcome --relocate to update "
             "the install record. Until then, writes are discouraged from this folder."
         )
     if status.get("source") == "cwd-config":
         return (
-            "TARS notice: this vault has no _system/install.yaml. Run /welcome to "
-            "create one — until then, vault-move detection is disabled."
+            "TARS notice: this workspace has no _system/install.yaml. Run /welcome to "
+            "create one. Until then, move detection is disabled."
         )
     return ""
 

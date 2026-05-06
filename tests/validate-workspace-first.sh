@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Fast validation for the workspace-first TARS implementation.
+
+set -u
+
+FAIL=0
+pass() { echo "PASS  $1"; }
+fail() { echo "FAIL  $1"; FAIL=1; }
+
+[ -f commands/start.md ] && pass "/start command exists" || fail "/start command missing"
+[ -f skills/start/SKILL.md ] && pass "/start skill exists" || fail "/start skill missing"
+grep -q "preview-only" skills/start/SKILL.md && pass "/start preview-only stated" || fail "/start preview-only missing"
+grep -qi "Do not write" skills/start/SKILL.md && pass "/start forbids default writes" || fail "/start write guard missing"
+
+[ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
+grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
+grep -q "skills/start/" skills/core/SKILL.md && pass "/start routed" || fail "/start route missing"
+
+for f in examples/pm-customer-call.md examples/eng-design-discussion.md examples/sales-discovery-call.md examples/README.md; do
+  [ -f "$f" ] && pass "example exists: $f" || fail "missing example: $f"
+done
+
+grep -q "workspace_type" templates/install.yaml && pass "install has workspace_type" || fail "install missing workspace_type"
+grep -q "workspace_path" templates/install.yaml && pass "install has workspace_path" || fail "install missing workspace_path"
+grep -q "obsidian_enabled" templates/install.yaml && pass "install has obsidian flag" || fail "install missing obsidian flag"
+grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" || fail "hooks not workspace-aware"
+grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
+[ -f scripts/migrate-workspace-first.py ] && pass "existing-user migration script exists" || fail "migration script missing"
+grep -q "workspace_type" scripts/migrate-workspace-first.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
+grep -q "obsidian_enabled" scripts/migrate-workspace-first.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
+
+grep -q -- "--enable-obsidian" skills/welcome/SKILL.md && pass "enable Obsidian mode documented" || fail "enable Obsidian missing"
+grep -q -- "--disable-obsidian" skills/welcome/SKILL.md && pass "disable Obsidian mode documented" || fail "disable Obsidian missing"
+grep -q -- "--relocate" skills/welcome/SKILL.md && pass "relocate mode documented" || fail "relocate missing"
+grep -q -- "--change-persona" skills/welcome/SKILL.md && pass "change persona mode documented" || fail "change persona missing"
+grep -q "Do not re-scaffold" skills/welcome/SKILL.md && pass "relocate avoids rescaffold" || fail "relocate rescaffold guard missing"
+grep -q "Existing identity, memory, schedule, and integrations were left untouched" skills/welcome/SKILL.md && pass "persona preserves state" || fail "persona preservation missing"
+
+grep -q "coaching:" _system/maturity.yaml && pass "maturity has coaching state" || fail "coaching state missing"
+grep -q "Next useful thing" skills/briefing/SKILL.md && pass "briefing coaching slot" || fail "briefing coaching missing"
+grep -q "Empty-workspace response" skills/answer/SKILL.md && pass "answer empty-workspace coaching" || fail "answer empty-workspace missing"
+grep -q "embedding model" skills/answer/SKILL.md && pass "FastEmbed warning" || fail "FastEmbed warning missing"
+
+grep -q "Degradation messaging convention" skills/core/SKILL.md && pass "degradation convention" || fail "degradation convention missing"
+for s in answer briefing meeting tasks create maintain; do
+  grep -qi "degradation messaging convention" "skills/$s/SKILL.md" \
+    && pass "$s references degradation convention" \
+    || fail "$s missing degradation convention"
+done
+
+grep -q "\"query\"" mcp/tars-vault/src/tars_vault/server.py && pass "search_by_tag schema has query" || fail "search_by_tag query schema missing"
+grep -q "\"frontmatter\"" mcp/tars-vault/src/tars_vault/server.py && pass "search_by_tag schema has frontmatter" || fail "search_by_tag frontmatter schema missing"
+grep -q "\"dry_run\"" mcp/tars-vault/src/tars_vault/server.py && pass "archive_note schema has dry_run" || fail "archive dry_run schema missing"
+grep -q "recent_backlink" mcp/tars-vault/src/tars_vault/tools/archive_note.py && pass "archive backlink guardrail" || fail "archive backlink guardrail missing"
+grep -q "active_task_reference" mcp/tars-vault/src/tars_vault/tools/archive_note.py && pass "archive task guardrail" || fail "archive task guardrail missing"
+
+for f in mcp/tars-vault/src/tars_vault/wikilink_pass.py mcp/tars-vault/src/tars_vault/organize.py; do
+  if [ ! -f "$f" ]; then
+    pass "$f absent until feature recovery"
+  elif grep -qi -E "placeholder|skeleton|unimplemented" "$f"; then
+    fail "$f is still a stub"
+  else
+    pass "$f present and implemented"
+  fi
+done
+[ ! -f mcp/tars-vault/src/tars_vault/obsidian_cli.py ] && pass "unused obsidian_cli removed" || fail "obsidian_cli remains"
+
+remaining=$(grep -rn -i -E "casual.mode|casual/standard|standard.*casual|mode:.casual|engagement.mode" docs README.md skills templates 2>/dev/null | grep -v "removal of the casual/standard" || true)
+[ -z "$remaining" ] && pass "stale casual mode refs purged" || { fail "stale casual refs remain"; echo "$remaining"; }
+
+python3 - <<'PY'
+import os, re, sys
+cmds = {f[:-3] for f in os.listdir("commands") if f.endswith(".md") and f != "README.md"}
+missing = []
+for name in os.listdir("skills"):
+    path = os.path.join("skills", name, "SKILL.md")
+    if not os.path.isfile(path):
+        continue
+    text = open(path, encoding="utf-8").read()
+    if "user-invocable: true" in text and name != "core" and name not in cmds:
+        missing.append(name)
+if missing:
+    print(f"FAIL  user-invocable skills without commands: {missing}")
+    sys.exit(1)
+print("PASS  every user-invocable skill has a command")
+PY
+[ $? -eq 0 ] || FAIL=1
+
+if [ -d mcp/tars-vault/tests ]; then
+  if python3 -c "import pytest" >/dev/null 2>&1; then
+    (cd mcp/tars-vault && python3 -m pytest tests/ -q) \
+      && pass "MCP pytest suite green" \
+      || fail "MCP pytest suite failed"
+  else
+    (cd mcp/tars-vault && python3 tests/test_tools.py && python3 tests/test_search_index.py) \
+      && pass "MCP stdlib tests green" \
+      || fail "MCP stdlib tests failed"
+  fi
+fi
+
+echo ""
+if [ "$FAIL" -eq 0 ]; then
+  echo "ALL CHECKS PASSED"
+  exit 0
+fi
+
+echo "ONE OR MORE CHECKS FAILED"
+exit 1

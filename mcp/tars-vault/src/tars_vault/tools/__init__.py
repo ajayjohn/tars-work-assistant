@@ -1,7 +1,6 @@
 """Tool namespace for tars-vault MCP server.
 
 Each tool module exposes a single callable named identically to the module.
-Phase 1a ships skeletons; later phases fill in the bodies per PRD §3.
 """
 from . import (
     append_note,

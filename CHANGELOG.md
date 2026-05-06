@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.4.0 (2026-05-05)
+
+### Added
+
+- **Workspace-first mode.** `_system/install.yaml` now records `workspace_type`, `workspace_path`, `obsidian_enabled`, and `obsidian_vault_path`, while preserving `vault_path` as a backward-compatible alias.
+- **`/start` and `/help`.** New first-time demo and grouped help commands make TARS useful before integrations or Obsidian setup.
+- **Coaching state.** `_system/maturity.yaml` now tracks restrained coaching, dismissed tips, milestone counters, and Daily Digest "Next useful thing" suggestions.
+- **Example inputs.** Product, Engineering, and Sales paste targets support zero-setup evaluation.
+- **Workspace-first validation.** `tests/validate-workspace-first.sh` provides a fast cross-cutting regression check.
+- **Existing-user backfill script.** `scripts/migrate-workspace-first.py` adds workspace-first install fields to existing Obsidian-first vaults without moving data.
+
+### Changed
+
+- **Progressive `/welcome`.** Setup now starts with folder, identity, persona, and workspace type, then defers integrations, people, initiatives, schedules, and Obsidian helper skills.
+- **Obsidian is optional.** `/welcome --enable-obsidian` and `/welcome --disable-obsidian` switch the view layer without moving or rewriting existing data.
+- **Docs and plugin metadata.** README, Getting Started, Architecture, Catalog, MCP README, and marketplace metadata now describe the Markdown workspace as the primary data model.
+
+### Fixed
+
+- **`search_by_tag` implementation gap.** The MCP tool now supports the `query` and `frontmatter` filters already used by skills.
+- **Archive guardrails.** `archive_note` now checks recent backlinks and active task references, and supports `dry_run`.
+- **Dead MCP modules removed.** Unused skeleton modules were deleted so the source tree no longer advertises incomplete paths.
+- **FastEmbed first-run warning.** `/answer` now warns before the one-time embedding model download.
+
 ## v3.3.0 (2026-05-05)
 
 **Design-efficiency release: doc-code alignment, token trimming, and mode removal.**
