@@ -29,7 +29,7 @@ help:
 
 # Welcome: onboarding wizard
 
-Interactive first-run setup for TARS v3. Creates a local Markdown workspace first, then
+Interactive first-run setup for TARS v3. Creates a local Markdown workspace, then
 adds optional Obsidian views and deeper integrations as the user is ready. This skill
 replaces both `install.sh` and the legacy `/welcome` command.
 

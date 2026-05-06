@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "tars-marketplace",
-  "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications",
+  "description": "Persistent work assistant for Claude with meeting processing, durable memory, task accountability, briefings, strategic analysis, and stakeholder communications",
   "owner": {
     "name": "Ajay John",
     "email": "contact@ajayjohn.com"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "tars",
-      "description": "Workspace-first persistent executive assistant with memory continuity, meeting processing, task accountability, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian .base views, and scheduled maintenance.",
+      "description": "Persistent work assistant for Claude with meeting processing, durable memory, task accountability, briefings, strategic analysis, and stakeholder communications. Uses a local Markdown workspace with schema-validated frontmatter, optional Obsidian views, and scheduled maintenance.",
       "category": "productivity",
       "source": {
         "source": "url",

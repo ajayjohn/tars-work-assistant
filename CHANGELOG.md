@@ -24,12 +24,12 @@
 
 ### Added
 
-- **Workspace-first mode.** `_system/install.yaml` now records `workspace_type`, `workspace_path`, `obsidian_enabled`, and `obsidian_vault_path`, while preserving `vault_path` as a backward-compatible alias.
+- **Local Markdown workspace mode.** `_system/install.yaml` now records `workspace_type`, `workspace_path`, `obsidian_enabled`, and `obsidian_vault_path`, while preserving `vault_path` as a backward-compatible alias.
 - **`/start` and `/help`.** New first-time demo and grouped help commands make TARS useful before integrations or Obsidian setup.
 - **Coaching state.** `_system/maturity.yaml` now tracks restrained coaching, dismissed tips, milestone counters, and Daily Digest "Next useful thing" suggestions.
 - **Example inputs.** Product, Engineering, and Sales paste targets support zero-setup evaluation.
-- **Workspace-first validation.** `tests/validate-workspace-first.sh` provides a fast cross-cutting regression check.
-- **Existing-user backfill script.** `scripts/migrate-workspace-first.py` adds workspace-first install fields to existing Obsidian-first vaults without moving data.
+- **Workspace validation.** `tests/validate-workspace.sh` provides a fast cross-cutting regression check.
+- **Existing-user backfill script.** `scripts/migrate-install-record.py` adds local-workspace install fields to existing Obsidian installs without moving data.
 
 ### Changed
 

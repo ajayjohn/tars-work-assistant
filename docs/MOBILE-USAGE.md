@@ -1,6 +1,6 @@
 # Using TARS from mobile (Claude Remote Control)
 
-TARS is workspace-first and still desktop-run: the Markdown workspace lives on your Mac and the `tars-vault` MCP server runs locally. If Obsidian is enabled, it is a viewer over the same files. To get mobile access, TARS relies on **Claude Remote Control**: claude.ai/code on your phone controls a live Claude Code session running on your Mac. There are zero framework changes for mobile; this doc exists so you know how to set it up and what to expect.
+TARS runs from your desktop: the Markdown workspace lives on your Mac and the `tars-vault` MCP server runs locally. If Obsidian is enabled, it is a viewer over the same files. To get mobile access, TARS relies on **Claude Remote Control**: claude.ai/code on your phone controls a live Claude Code session running on your Mac. There are zero framework changes for mobile; this doc exists so you know how to set it up and what to expect.
 
 ## What Remote Control does
 

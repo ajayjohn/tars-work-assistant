@@ -2,7 +2,7 @@
 
 # Getting Started with TARS
 
-TARS is a workspace-first executive assistant framework. The setup goal is straightforward: point TARS at a local Markdown folder, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately. Obsidian is optional and can be enabled later.
+TARS is a persistent work assistant for Claude. The setup goal is straightforward: point TARS at a local Markdown folder, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately. Obsidian is optional and can be enabled later.
 
 ## Before you install
 
@@ -12,13 +12,13 @@ You need:
 - a local folder dedicated to your TARS workspace, recommended default: `~/Documents/TARS Workspace`
 - optional: Obsidian Desktop if you want live `.base` views and visual note browsing
 
-If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace first and then use this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
+If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace before using this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
 
-Existing Obsidian-first TARS users can backfill the new workspace fields without moving data:
+Existing Obsidian-based TARS users can backfill the new workspace fields without moving data:
 
 ```text
-python3 scripts/migrate-workspace-first.py --vault /path/to/existing/vault
-python3 scripts/migrate-workspace-first.py --vault /path/to/existing/vault --apply
+python3 scripts/migrate-install-record.py --vault /path/to/existing/vault
+python3 scripts/migrate-install-record.py --vault /path/to/existing/vault --apply
 ```
 
 The script defaults legacy installs to `workspace_type: obsidian` so current users keep their existing views. Switch later with `/welcome --disable-obsidian` if you want Claude-first operation.

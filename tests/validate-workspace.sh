@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast validation for the workspace-first TARS implementation.
+# Fast validation for the local Markdown workspace TARS implementation.
 
 set -u
 
@@ -30,9 +30,9 @@ grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" ||
 grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
 grep -q "claude_home" hooks/pre-tool-use.py && pass "pre-tool blocks accidental ~/.claude writes" || fail "pre-tool ~/.claude guard missing"
 grep -q "TARS Workspace" hooks/session-start.py skills/welcome/SKILL.md docs/GETTING-STARTED.md && pass "Documents workspace default documented" || fail "Documents workspace default missing"
-[ -f scripts/migrate-workspace-first.py ] && pass "existing-user migration script exists" || fail "migration script missing"
-grep -q "workspace_type" scripts/migrate-workspace-first.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
-grep -q "obsidian_enabled" scripts/migrate-workspace-first.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
+[ -f scripts/migrate-install-record.py ] && pass "existing-user migration script exists" || fail "migration script missing"
+grep -q "workspace_type" scripts/migrate-install-record.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
+grep -q "obsidian_enabled" scripts/migrate-install-record.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
 [ -f scripts/doctor.py ] && pass "runtime doctor exists" || fail "runtime doctor missing"
 python3 scripts/doctor.py --workspace /tmp/tars-doctor-validation --json >/tmp/tars-doctor-validation.json 2>/tmp/tars-doctor-validation.err || true
 python3 - <<'PY'
