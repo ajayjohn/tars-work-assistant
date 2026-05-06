@@ -251,7 +251,7 @@ Append the lint summary to today's daily note explicitly via `mcp__tars_vault__a
 
 1. Never auto-resolve contradictions — humans decide which version is current.
 2. Never delete files; propose archive via `mcp__tars_vault__archive_note` (which enforces the 90-day backlink + active-task guardrails).
-3. Never bypass `mcp__tars_vault__*` tools for vault writes — the PostToolUse hook emits telemetry on each mutation.
+3. Never bypass `mcp__tars_vault__*` tools for workspace writes — the PostToolUse hook emits telemetry on each mutation.
 4. Never run on stale `housekeeping-state.yaml` without refreshing it afterwards — the nightly cadence depends on that marker.
 5. Auto-fix scope is narrow: wikilink artifacts, missing required schema fields with computable defaults, alias-registry sync, framework self-state drift, unfiled journal entries. Anything touching body content needs explicit review.
 6. Never surface more than 50 findings in a single report — paginate or narrow with `--focus` if over-large.

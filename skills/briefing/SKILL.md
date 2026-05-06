@@ -238,6 +238,12 @@ Three useful next actions:
 
 The `## Next useful thing` section is the only coaching slot in a briefing. Show at most one suggestion, respect `_system/maturity.yaml` coaching settings, and omit it when `coaching.enabled: false` or `frequency: off`.
 
+If `_system/maturity.yaml` has `deferred_setup.completed: false` and `deferred_setup.dismissed: false`, the first eligible coaching suggestion is:
+
+> "Continue setup with `/welcome --continue-setup` or say 'continue TARS setup' to add people, initiatives, integrations, schedules, brand context, maintenance, or optional Obsidian browsing."
+
+Do not show this reminder more than once per day. If another coaching suggestion is more urgent, such as a failed lookup or missing calendar in a schedule-heavy briefing, use only the more urgent suggestion.
+
 ---
 
 ## Step 6.5: Weekly telemetry rollup footer

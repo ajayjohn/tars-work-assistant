@@ -23,12 +23,13 @@ help:
     - "Disable Obsidian dependency: `/welcome --disable-obsidian`"
     - "Relocate a moved workspace: `/welcome --relocate`"
     - "Change persona later: `/welcome --change-persona`"
+    - "Continue deferred setup: `/welcome --continue-setup`"
   scope: setup,bootstrap,onboarding,welcome,initialize
 ---
 
 # Welcome: onboarding wizard
 
-Interactive first-run setup for TARS v3. Creates a local Markdown workspace first, then
+Interactive first-run setup for TARS v3. Creates a local Markdown workspace, then
 adds optional Obsidian views and deeper integrations as the user is ready. This skill
 replaces both `install.sh` and the legacy `/welcome` command.
 
@@ -42,9 +43,14 @@ Fast setup must take about a minute when the user accepts defaults:
 Deferred setup covers key people, initiatives, calendar/tasks, schedules, brand, maintenance,
 and Obsidian helper skills. Do not block first value on these items.
 
+Fast setup must always end with an explicit continuation path:
+
+> "You can continue setup later with `/welcome --continue-setup` or by saying 'continue TARS setup'. I’ll remind you lightly in Daily Digest/help until you finish, dismiss the reminder, or turn coaching off."
+
 ### v3.1 pre-flight additions
 
 - Verify `tars-vault` MCP server is reachable (`mcp__tars_vault__read_note(file="schemas")` should succeed). If not, guide user through `.mcp.json` entry: `{"tars-vault": {"type": "stdio", "command": "python3", "args": ["-m", "tars_vault"]}}`.
+- If the MCP server is not reachable, run or suggest `python3 scripts/doctor.py --workspace <path>` before continuing. Surface missing Python, missing `mcp`, unexpanded `TARS_VAULT_PATH`, non-writable workspace, or install-record mismatch as clear setup issues instead of silently continuing.
 - Confirm plugin hooks (`session-start.py`, `pre-tool-use.py`, `post-tool-use.py`, `pre-compact.py`, `session-end.py`, `instructions-loaded.py`) are registered.
 - Run `scripts/githooks/install-githooks.sh` to enforce authorship rules locally.
 - **Anthropic first-party skills probe (§8.10.1)**: detect which of `pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder` are available in the host Claude Code install. Read the user-invocable skills list surfaced in `<system-reminder>` blocks; do not programmatically load or inspect third-party skill packages. Persist the result in `_system/config.md` frontmatter as `tars-anthropic-skills: [pptx, docx, xlsx, pdf, web-artifacts-builder]` (include only those available). `/create` reads this at session start instead of reprobing.
@@ -60,8 +66,8 @@ and Obsidian helper skills. Do not block first value on these items.
 | 1 | Pre-flight check | Detect existing workspace, offer resume, health check, or fast setup |
 | 1.5 | Pick a persona | Seed role-appropriate defaults for briefings and analysis |
 | 1.6 | Choose workspace type | `headless` by default, or `obsidian` if the user wants Obsidian views now |
-| 1.7 | Mode switching | `--enable-obsidian`, `--disable-obsidian`, `--relocate`, `--change-persona` |
-| 2 | Create workspace structure | Folders, _system files, templates, scripts, and optional _views |
+| 1.7 | Mode switching | `--enable-obsidian`, `--disable-obsidian`, `--relocate`, `--change-persona`, `--continue-setup` |
+| 2 | Create workspace structure | Folders, _system files, workspace index cheat sheet, templates, scripts, and optional _views |
 | 3 | Install Obsidian helper skills | Only in `obsidian` mode |
 | 4 | Configure integrations | Deferred calendar provider and task manager selection |
 | 5 | Initial context gathering | Fast identity first, optional people and initiatives later |
@@ -89,7 +95,22 @@ If `_system/config.md` does not exist or has no user profile, proceed to Step 1.
 
 For first-time setup, keep the first round to the essential questions only:
 
-> "Where should TARS store its local Markdown workspace? [current folder / choose folder]"
+Before asking, determine and show:
+- **Claude-selected folder**: the current working directory exposed to the session.
+- **Active TARS workspace**: the path injected into the `tars-vault` MCP server, or the current folder if no explicit path is available.
+- **Recommended default**: `~/Documents/TARS Workspace`.
+
+Use "workspace" in user-facing copy. If Obsidian is enabled, add one sentence: "In Obsidian mode, this workspace is also your Obsidian vault."
+
+> "Where should TARS store its local Markdown workspace? [active TARS workspace / ~/Documents/TARS Workspace / choose folder]"
+
+If the user chooses a path that differs from the active MCP workspace path, do not scaffold into the wrong folder. Stop and say:
+
+> "The active TARS MCP session is pointed at {active_path}, so I cannot safely create workspace files in {requested_path} from this session. Restart Claude with `TARS_VAULT_PATH` set to {requested_path}, or choose the active workspace for now."
+
+If the active path is under `~/.claude` and there is no existing `_system/install.yaml`, warn and do not scaffold there by default:
+
+> "This resolves under `~/.claude`, which is usually Claude app state, not a transparent TARS workspace. I recommend `~/Documents/TARS Workspace`."
 
 > "What name and role should TARS use for you?"
 
@@ -99,7 +120,7 @@ Everything else is deferred unless the user asks for full setup now.
 
 ## Step 1.5: Pick a persona
 
-Before scaffolding the vault, one short question seeds sensible defaults so day 1 produces a useful briefing instead of an empty one. The answer is recorded in `_system/install.yaml` (written in Step 2b).
+Before scaffolding the workspace, one short question seeds sensible defaults so day 1 produces a useful briefing instead of an empty one. The answer is recorded in `_system/install.yaml` (written in Step 2b).
 
 List the available personas under `templates/personas/` (use `Read` on the directory listing — do not invoke the MCP). Present them as a numbered multiple-choice question:
 
@@ -210,15 +231,52 @@ Use when the user wants a different role default.
 
 Do not touch `tars-user-name`, `tars-user-title`, `tars-user-company`, memory, journal, integrations, or scheduled jobs.
 
+### `/welcome --continue-setup`
+
+Use when the user wants to finish deferred setup after fast setup, or when they say "continue TARS setup", "finish TARS setup", "add integrations", "add people", "add initiatives", or "set up the rest".
+
+1. Read `_system/maturity.yaml`.
+2. Build a checklist from incomplete deferred modules:
+   - Key people (`onboarding.steps.initial_people`)
+   - Active initiatives (`onboarding.steps.initial_initiatives`)
+   - Integrations (`onboarding.steps.integrations_configured`)
+   - Schedule (`onboarding.steps.schedule_configured`)
+   - Cron jobs (`onboarding.steps.cron_registered`)
+   - Brand context (`deferred_setup.modules.brand`)
+   - Maintenance preferences (`deferred_setup.modules.maintenance`)
+   - Obsidian browsing (`deferred_setup.modules.obsidian_browsing`)
+3. Show one compact menu:
+   ```
+   Deferred setup still available:
+     1. Add key people
+     2. Add active initiatives
+     3. Connect calendar/tasks
+     4. Configure briefings and maintenance
+     5. Add brand context
+     6. Enable Obsidian browsing
+     7. Mark setup complete for now
+   ```
+4. Run only the selected modules. Do not rerun fast setup and do not rewrite identity, memory, journal, integrations, or schedules outside the selected module.
+5. After each completed module, update `_system/maturity.yaml`.
+6. If the user chooses "Mark setup complete for now", set `deferred_setup.dismissed: true`, keep `deferred_setup.completed: false`, and stop showing reminders until the user explicitly asks to continue setup again.
+
+When all deferred modules are complete, set:
+```yaml
+deferred_setup:
+  completed: true
+  next_step: null
+```
+and confirm: "Deferred setup is complete. You can still change persona, integrations, schedule, or Obsidian mode later."
+
 ---
 
-## Step 2: Create vault structure
+## Step 2: Create workspace structure
 
 Create the complete workspace directory tree. Use `mcp__tars_vault__create_note` for all note creation. Use filesystem tools only for creating empty directories.
 
 ### 2a: Directories
 
-Create every directory in the vault structure:
+Create every directory in the workspace structure:
 
 ```
 _system/
@@ -313,7 +371,7 @@ Provider-agnostic integration configuration.
 
 **_system/alias-registry.md** -- Empty registry with header and table structure for name-to-canonical mappings.
 
-**_system/taxonomy.md** -- Tag taxonomy and entity type definitions per the tag taxonomy table in the vault structure spec.
+**_system/taxonomy.md** -- Tag taxonomy and entity type definitions per the tag taxonomy table in the workspace structure spec.
 
 **_system/kpis.md** -- Empty KPI template with instructions for adding metrics per team and initiative.
 
@@ -336,6 +394,21 @@ onboarding:
   git_initialized: false
   completed: false
   completed_date: null
+deferred_setup:
+  available: true
+  completed: false
+  dismissed: false
+  next_step: people
+  last_reminded: null
+  modules:
+    people: false
+    initiatives: false
+    integrations: false
+    schedule: false
+    cron_jobs: false
+    brand: false
+    maintenance: false
+    obsidian_browsing: false
 last_updated: null
 coaching:
   enabled: true
@@ -354,6 +427,37 @@ coaching:
     meeting_count: 0
     memory_write_count: 0
     failed_lookup_count: 0
+```
+
+**index.md** -- Workspace cheat sheet created at the workspace root. It must say slash commands are shortcuts, not requirements, and include natural-language examples.
+
+```markdown
+# TARS workspace
+
+This is your TARS workspace. All TARS-managed memory, journal, contexts, inbox, archive, and `_system/` files live here.
+
+Slash commands are optional shortcuts. You can type natural-language requests and TARS will route them.
+
+| What you want | Shortcut | Natural-language example |
+|---|---|---|
+| Try TARS with a paste | `/start` | "Show me what TARS can do with this transcript" |
+| Process raw files | `/maintain inbox` | "Process everything in my inbox" |
+| Process a meeting | `/meeting` | "Process this meeting transcript" |
+| Save durable context | `/learn` | "Remember Sarah owns onboarding" |
+| Look something up | `/answer` | "What do we know about the platform rewrite?" |
+| Get oriented | `/briefing` | "What should I focus on today?" |
+| Extract or manage tasks | `/tasks` | "Extract the action items from this" |
+| Think through a decision | `/think` | "Stress-test this roadmap decision" |
+| Draft communication | `/communicate` | "Draft a follow-up email from this call" |
+| Create an artifact | `/create` | "Turn this into an exec-ready narrative" |
+| Plan or check initiatives | `/initiative` | "Check the health of the onboarding initiative" |
+| Check workspace health | `/lint` | "Check for stale or broken items" |
+| Continue setup | `/welcome --continue-setup` | "Continue TARS setup" |
+| See help | `/help` | "What can TARS do?" |
+
+## Inbox
+
+Drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/`, then say "process inbox". TARS can process the pending folder in bulk and will ask before persisting memory or tasks.
 ```
 
 **_system/housekeeping-state.yaml**
@@ -377,7 +481,7 @@ plugin_version: "3.0.0"
 - `workspace_path`: the absolute path to this workspace (the folder we just scaffolded). Hooks use this on every session start to detect a moved/duplicated workspace and refuse silent writes from a stale folder.
 - `vault_path`: same value as `workspace_path` for backward compatibility.
 - `obsidian_enabled`: true only when Obsidian is enabled.
-- `obsidian_vault_path`: the Obsidian vault path when enabled, otherwise empty.
+- `obsidian_vault_path`: the Obsidian vault path when enabled, otherwise empty. In Obsidian mode, the TARS workspace is also the Obsidian vault.
 - `installation_id`: a UUID generated once per install (use `python3 -c "import uuid; print(uuid.uuid4())"` via Bash, or any equivalent generator). Travels with telemetry events.
 - `persona`: the `tars-persona-key` from Step 1.5, or empty string if the user picked "None of these match".
 - `plugin_version`: read from `.claude-plugin/plugin.json` so /lint can detect stale installs that need migration.
@@ -446,7 +550,7 @@ Create the following Python scripts in `scripts/`:
 | sync.py | Calendar gap detection + task system drift check |
 
 Each script should:
-- Accept the vault path as first argument
+- Accept the workspace path as first argument
 - Output JSON to stdout
 - Exit 0 on success, 1 on error
 - Read configuration from `_system/` files
@@ -642,6 +746,13 @@ After gathering, update `_system/maturity.yaml`:
 ```yaml
 onboarding:
   user_profile: true
+  steps:
+    initial_people: true
+    initial_initiatives: true
+deferred_setup:
+  modules:
+    people: true
+    initiatives: true
 ```
 
 ---
@@ -670,6 +781,11 @@ Update `_system/maturity.yaml`:
 ```yaml
 onboarding:
   schedule: true
+  steps:
+    schedule_configured: true
+deferred_setup:
+  modules:
+    schedule: true
 ```
 
 ---
@@ -821,15 +937,15 @@ python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
 ```
 
 If pending migrations are found:
-1. Surface a notice: "N pending migration(s) need to run to bring your vault up to plugin version X.X.X."
+1. Surface a notice: "N pending migration(s) need to run to bring your workspace up to plugin version X.X.X."
 2. Offer to run them now: "Run migrations now? [Y/n — recommended for fresh onboarding]"
 3. If accepted: run `python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --dry-run`, show the plan, then confirm before `--apply`.
 4. On success, `plugin_version` in housekeeping-state.yaml advances automatically.
 5. If declined: remind user they can run `/maintain migrations` at any time.
 
-For an existing vault being re-onboarded (user ran /welcome --relocate or upgrade):
-- Always run the migration check — the vault may be multiple versions behind.
-- Apply migrations before completing onboarding so the vault is schema-current before first use.
+For an existing workspace being re-onboarded (user ran /welcome --relocate or upgrade):
+- Always run the migration check — the workspace may be multiple versions behind.
+- Apply migrations before completing onboarding so the workspace is schema-current before first use.
 
 Update `_system/maturity.yaml`:
 ```yaml
@@ -876,10 +992,10 @@ Thumbs.db
 ```bash
 git init  # if needed
 git add -A
-git commit -m "Initialize TARS v3 vault structure
+git commit -m "Initialize TARS workspace structure
 
 Created by TARS onboarding wizard.
-Includes: vault structure, templates, _views, scripts, _system config, obsidian-skills."
+Includes: workspace structure, templates, _views, scripts, _system config, obsidian-skills."
 ```
 
 Update `_system/maturity.yaml`:
@@ -895,9 +1011,9 @@ onboarding:
 Display a comprehensive summary of what was configured.
 
 ```markdown
-## TARS v3 setup complete
+## TARS setup complete
 
-### Vault structure
+### Workspace structure
 - _system/: {N} config files created
 - _views/: {N} base queries created
 - templates/: {N} templates created
@@ -907,6 +1023,7 @@ Display a comprehensive summary of what was configured.
 - contexts/: ready (products, artifacts)
 - inbox/: ready (pending, processed)
 - archive/: ready
+- index.md: workspace cheat sheet created
 
 ### Obsidian skills
 - Obsidian helper skills: {installed | verified | skipped in headless mode}
@@ -938,18 +1055,22 @@ Display a comprehensive summary of what was configured.
 - Initial commit: {hash}
 
 ### Next steps
-1. Run "daily briefing" to see your first morning briefing
-2. Drop a meeting transcript into inbox/pending/ and run "process inbox"
-3. Ask "help" to see all available TARS capabilities
-4. Edit _system/kpis.md to define your team metrics
-5. Add more people and context as you use TARS -- it learns as you go
+1. Run "daily briefing" to see your first morning briefing.
+2. Drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/`, then say "process inbox". TARS can process the folder in bulk.
+3. Continue deferred setup with `/welcome --continue-setup` or say "continue TARS setup" when you want to add people, initiatives, integrations, schedule, brand, maintenance, or optional Obsidian browsing.
+4. Ask "help" to see all available TARS capabilities. Slash commands are shortcuts; natural-language requests work too.
+5. Add more people and context as you use TARS. Reviewed self-learning proposals appear through `/learn --review-patterns` and weekly maintenance; nothing is auto-applied.
 ```
 
 Update `_system/maturity.yaml`:
 ```yaml
 onboarding:
-  completed: true
+  completed: true  # fast setup complete
   completed_date: YYYY-MM-DD
+deferred_setup:
+  available: true
+  completed: false  # until /welcome --continue-setup modules are complete
+  next_step: people
 last_updated: YYYY-MM-DD
 ```
 
@@ -964,7 +1085,7 @@ last_updated: YYYY-MM-DD
 | MCP server not responding | Mark integration as "error", continue setup, user can re-run later |
 | CronCreate unavailable | Skip cron registration, rely on session-start fallback |
 | Git init fails | Log error, continue, user can initialize manually |
-| User cancels mid-setup | Save progress to _system/maturity.yaml, user can resume with "setup" |
+| User cancels mid-setup | Save progress to _system/maturity.yaml, user can resume with `/welcome --continue-setup` or "continue TARS setup" |
 
 ### Resume capability
 
@@ -973,6 +1094,8 @@ If the user runs "setup" after a partial completion:
 2. Skip steps marked `true`
 3. Resume from the first `false` step
 4. Report: "Resuming setup from Step {N}: {step_name}"
+
+If the user completed fast setup but deferred modules remain, route "setup", "continue setup", and `/welcome --continue-setup` to Step 1.7 `/welcome --continue-setup`.
 
 ---
 
@@ -986,6 +1109,7 @@ If the user runs "setup" after a partial completion:
 - ALWAYS use `mcp__tars_vault__*` tools for note creation
 - ALWAYS validate integration connectivity before marking as "connected"
 - ALWAYS save progress to maturity.yaml after each step
+- ALWAYS leave an obvious path to continue deferred setup after fast setup
 - ALWAYS use bounded questions (multiple-choice, max 3-4 per round)
 - ALWAYS include a skip/escape option for optional configuration
 

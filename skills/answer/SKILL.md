@@ -304,7 +304,7 @@ Sources:
 
 ## Step 5: Cite sources with wikilinks
 
-Every piece of information in the answer must be traceable to a source. Use `[[wikilinks]]` for vault files and explicit labels for integration sources.
+Every piece of information in the answer must be traceable to a source. Use `[[wikilinks]]` for workspace files and explicit labels for integration sources.
 
 ### Citation format
 
@@ -453,7 +453,7 @@ If any errors occur during lookup:
 - ALWAYS query calendar integration for any question about schedule, agenda, meetings, availability, or "am I free"
 - ALWAYS resolve dates to `YYYY-MM-DD` format before any query
 - ALWAYS use BLUF format — lead with the direct answer
-- ALWAYS cite sources using `[[wikilinks]]` for vault files
+- ALWAYS cite sources using `[[wikilinks]]` for workspace files
 - ALWAYS attempt transcript fallback (Issue 6) before saying "I don't know" for meeting-related questions
 - ALWAYS handle gaps honestly — say what was searched and what was not found
 - ALWAYS use `mcp__tars_vault__search_by_tag` (or `fts_search` / `semantic_search`) rather than folder scanning

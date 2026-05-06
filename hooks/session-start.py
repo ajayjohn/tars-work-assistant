@@ -43,12 +43,12 @@ def _unexpanded_env_notice(status: dict) -> str:
         "   env blocks. Writes will land in a mis-named directory and be invisible\n"
         "   to TARS.\n\n"
         "   Fix: open your .mcp.json (or the root ~/.claude/.mcp.json) and replace\n"
-        f"   \"{raw}\" with the absolute path to your vault, e.g.\n"
-        "   \"/Users/you/Notes/TARS-Work\".\n\n"
+        f"   \"{raw}\" with the absolute path to your workspace, e.g.\n"
+        "   \"~/Documents/TARS Workspace\".\n\n"
         "   To relocate files already written to the wrong directory, run:\n"
-        "     python3 scripts/migrate-stranded-vault-files.py --vault /path/to/vault --dry-run\n"
+        "     python3 scripts/migrate-stranded-vault-files.py --vault /path/to/workspace --dry-run\n"
         "   then re-run with --apply after reviewing the plan.\n\n"
-        "   Vault writes are BLOCKED until TARS_VAULT_PATH is corrected."
+        "   Workspace writes are BLOCKED until TARS_VAULT_PATH is corrected."
     )
 
 
@@ -155,6 +155,26 @@ def _vault_notice(status: dict) -> str:
             "create one. Until then, move detection is disabled."
         )
     return ""
+
+
+def _claude_home_workspace_notice(vault: Path | None) -> str:
+    if vault is None:
+        return ""
+    try:
+        home_claude = (Path.home() / ".claude").resolve()
+        resolved = vault.expanduser().resolve()
+        if not resolved.is_relative_to(home_claude):
+            return ""
+    except Exception:
+        return ""
+    if (vault / "_system" / "install.yaml").is_file():
+        return ""
+    return (
+        "TARS configuration warning: the active workspace resolves under ~/.claude. "
+        "That folder is usually application state, not a transparent TARS workspace. "
+        "Use a folder such as ~/Documents/TARS Workspace and run /welcome again, or "
+        "run `python3 scripts/doctor.py --workspace <path>` to inspect the setup."
+    )
 
 
 def _registry_notice(vault: Path) -> str:
@@ -337,6 +357,9 @@ def _build_context(vault: Path | None, status: dict) -> str:
     vault_note = _vault_notice(status)
     if vault_note:
         parts.append(vault_note)
+    claude_home = _claude_home_workspace_notice(vault)
+    if claude_home:
+        parts.append(claude_home)
     if vault and status.get("source") in ("env", "cwd-install", "cwd-config"):
         reg = _registry_notice(vault)
         if reg:

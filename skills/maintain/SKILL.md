@@ -1,6 +1,6 @@
 ---
 name: maintain
-description: Inbox processing, calendar/task sync, archive sweep, and scheduled housekeeping for the TARS vault
+description: Inbox processing, calendar/task sync, archive sweep, and scheduled housekeeping for the TARS workspace
 user-invocable: true
 triggers:
   - "run maintenance"
@@ -14,8 +14,8 @@ triggers:
   - "list worktrees"
 help:
   purpose: |-
-    Vault maintenance scoped to ingest-adjacent workflows: inbox processing, calendar/task sync,
-    archive sweep, worktree hygiene, and pending vault migrations. Hygiene checks (broken links,
+    Workspace maintenance scoped to ingest-adjacent workflows: inbox processing, calendar/task sync,
+    archive sweep, worktree hygiene, and pending workspace migrations. Hygiene checks (broken links,
     orphans, schema violations, staleness, contradictions, framework state drift) moved to
     `/lint` in v3.1.
   use_cases:
@@ -32,7 +32,7 @@ help:
 
 # Maintain skill: inbox, sync, and archive
 
-Modes: **inbox** (classify and route pending items), **sync** (drift detection between vault and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
+Modes: **inbox** (classify and route pending items), **sync** (drift detection between workspace and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
 
 When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
 
@@ -41,7 +41,7 @@ Hygiene — broken wikilinks, orphans, schema violations, staleness banners, con
 ## Relationship to `/lint`
 
 - **/maintain**: Workflow/ingest scope. Focuses on external boundary sync (inbox routing, calendar drift, task gap checks, git worktree hygiene).
-- **/lint**: Structural/hygiene scope. Focuses on intra-vault integrity (broken wikilinks, orphans, schema violations, staleness warnings).
+- **/lint**: Structural/hygiene scope. Focuses on workspace integrity (broken wikilinks, orphans, schema violations, staleness warnings).
 
 ## Invocation contexts
 
@@ -49,7 +49,7 @@ Hygiene — broken wikilinks, orphans, schema violations, staleness banners, con
 - **Background (cron)**: `tars-weekly-maintenance` invokes `/maintain --weekly` silently. Nothing auto-applies; everything flows into a review queue note for the next session.
 - **Session startup**: The SessionStart hook may prompt the user to run maintenance if the `last_run` timestamp indicates it is due.
 
-All vault writes go through `mcp__tars_vault__*` tools. External integrations resolve via `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code provider names.
+All workspace writes go through `mcp__tars_vault__*` tools. External integrations resolve via `mcp__tars_vault__resolve_capability(capability=…)` — never hard-code provider names.
 
 | Mode | Trigger | Purpose |
 |------|---------|---------|
@@ -69,7 +69,7 @@ All vault writes go through `mcp__tars_vault__*` tools. External integrations re
 
 Triggered by: "process inbox", "check inbox".
 
-Classify and process all pending inbox items. Supports text, transcripts, images, PDFs, and mixed content.
+Classify and process all pending inbox items. Supports text, transcripts, images, PDFs, decks, documents, spreadsheets, screenshots, exported notes, and mixed content when the active Claude environment can read them. If a binary file cannot be read directly, create a companion note and ask the user for extracted text or a converted copy rather than marking it processed.
 
 ### Step 1: Scan inbox
 
@@ -88,7 +88,7 @@ For each file, read the first 50 lines (or full content for images) to determine
 | Transcript/meeting notes | Speaker labels, timestamp patterns, "Meeting:", Otter/Fireflies/Teams/Zoom format | `/meeting` pipeline |
 | Screenshot/image | .png, .jpg, .jpeg, .gif, .webp | Multimodal analysis + context inference |
 | Article/link | URL, "http", article structure, byline | `/learn` wisdom mode |
-| PDF/document | .pdf, .docx, .xlsx | Companion file + text extraction |
+| Document/deck/report | .pdf, .docx, .pptx, .xlsx, exported report files | Companion file + text extraction when readable; otherwise companion note + request extracted text |
 | Task-like items | Checkbox patterns, "TODO", "Action item" | `/tasks` extract mode |
 | Facts/memory items | Declarative statements, "Remember:", "Note:" | `/learn` memory mode |
 | Claude-session capture | `tars-source-type: claude-session` frontmatter (dropped by PreCompact / SessionEnd hooks) | Review + route to `/meeting`, `/learn`, or `/tasks` |
@@ -116,7 +116,7 @@ Route each selected item to the appropriate skill. Between items, report progres
 - **Transcript** → invoke `/meeting` pipeline with the file content (steps 2–14).
 - **Image** → multimodal read, calendar correlation for timestamp, companion note via `mcp__tars_vault__create_note(template="companion", path="contexts/YYYY-MM/…")` with the §26.13 frontmatter contract, extracted tasks/facts routed through `/tasks` / `/learn`.
 - **Article/link** → `WebFetch` extraction, then `/learn` wisdom mode.
-- **PDF** → text extraction, companion note, filed in `contexts/YYYY-MM/`.
+- **Document/deck/report** → text extraction when available, companion note, filed in `contexts/YYYY-MM/`; if extraction is unavailable, keep the source in inbox and ask for a converted/exported text copy.
 - **Tasks-only** → `/tasks` extract mode (accountability test + numbered review).
 - **Facts-only** → `/learn` memory mode (durability test + numbered review).
 - **Claude-session** → surface decisions/commitments/questions to user, then route to appropriate skill(s). Never silently persist.
@@ -163,8 +163,8 @@ vault_tasks    = mcp__tars_vault__search_by_tag(tag="tars/task", frontmatter={"t
 ```
 
 Compare and surface:
-- **Vault-only**: tasks in vault not in external system.
-- **External-only**: tasks in external system not in vault.
+- **Workspace-only**: tasks in workspace not in external system.
+- **External-only**: tasks in external system not in workspace.
 - **Status mismatch**: completed in one, open in the other.
 - **Date mismatch**: different due dates.
 
@@ -240,14 +240,14 @@ Parse the output into a list of `{path, branch, HEAD}` records. Skip the main wo
 
 - Compute `commits_ahead` vs `main`: `git rev-list --count main..<branch>`
 - Check last-commit date: `git log -1 --format="%ci" <branch>`
-- Check if any TARS vault files were written in this worktree (look for new/modified `.md` files relative to `main`)
+- Check if any TARS workspace files were written in this worktree (look for new/modified `.md` files relative to `main`)
 
 ### Step 2: Present inventory
 
 ```
 Active worktrees (excluding main):
   1. claude/feature-xyz  (3 commits ahead, last activity: 2026-04-28)
-     — 2 vault files modified (may need merge review)
+     — 2 workspace files modified (may need merge review)
   2. claude/old-task     (0 commits ahead, last activity: 2026-03-10)
      — nothing ahead of main; safe to prune
 
@@ -279,7 +279,7 @@ Report counts: merged, pruned, skipped. Log to `_system/changelog/YYYY-MM-DD.md`
 
 Triggered by: "run migrations", "run pending migrations", or as part of `/maintain --realign` (Phase 5).
 
-Applies pending schema and vault-structure migrations that ship with each plugin version. Migrations are idempotent Python scripts in `scripts/migrations/`.
+Applies pending schema and workspace-structure migrations that ship with each plugin version. Migrations are idempotent Python scripts in `scripts/migrations/`.
 
 ### Step 1: Check pending migrations
 
@@ -292,7 +292,7 @@ This compares `_system/housekeeping-state.yaml.plugin_version` against the avail
 ### Step 2: Present the list
 
 ```
-Pending migrations (vault is at v3.1.x; plugin is v3.3.0):
+Pending migrations (workspace is at v3.1.x; plugin is v3.3.0):
   1. v3.2.0-add-tars-category       — backfill tars-category on 228 task notes
   2. v3.3.0-backfill-journal-aliases — add aliases to 13+ journal files with slug mismatch
 
@@ -510,5 +510,5 @@ Triggered by: "run maintenance", "housekeeping", or cron.
 
 ### Universal
 - ALWAYS emit telemetry for every mode run (`inbox_processed`, `sync_completed`, `archive_swept`, `maintenance_run`).
-- ALWAYS use `mcp__tars_vault__*` tools for vault writes. Append daily-note and changelog entries explicitly.
-- NEVER use direct file I/O for vault content.
+- ALWAYS use `mcp__tars_vault__*` tools for workspace writes. Append daily-note and changelog entries explicitly.
+- NEVER use direct file I/O for workspace content.

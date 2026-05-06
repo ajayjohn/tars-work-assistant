@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast validation for the workspace-first TARS implementation.
+# Fast validation for the local Markdown workspace TARS implementation.
 
 set -u
 
@@ -15,6 +15,9 @@ grep -qi "Do not write" skills/start/SKILL.md && pass "/start forbids default wr
 [ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
 grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
 grep -q "skills/start/" skills/core/SKILL.md && pass "/start routed" || fail "/start route missing"
+grep -q -- "--continue-setup" skills/welcome/SKILL.md && pass "welcome continue setup documented" || fail "welcome continue setup missing"
+grep -q "Natural-language example" skills/welcome/SKILL.md && pass "generated index natural-language examples" || fail "index natural-language examples missing"
+grep -qi "process everything in my inbox" skills/welcome/SKILL.md commands/README.md && pass "inbox natural-language example" || fail "inbox natural-language example missing"
 
 for f in examples/pm-customer-call.md examples/eng-design-discussion.md examples/sales-discovery-call.md examples/README.md; do
   [ -f "$f" ] && pass "example exists: $f" || fail "missing example: $f"
@@ -25,9 +28,21 @@ grep -q "workspace_path" templates/install.yaml && pass "install has workspace_p
 grep -q "obsidian_enabled" templates/install.yaml && pass "install has obsidian flag" || fail "install missing obsidian flag"
 grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" || fail "hooks not workspace-aware"
 grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
-[ -f scripts/migrate-workspace-first.py ] && pass "existing-user migration script exists" || fail "migration script missing"
-grep -q "workspace_type" scripts/migrate-workspace-first.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
-grep -q "obsidian_enabled" scripts/migrate-workspace-first.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
+grep -q "claude_home" hooks/pre-tool-use.py && pass "pre-tool blocks accidental ~/.claude writes" || fail "pre-tool ~/.claude guard missing"
+grep -q "TARS Workspace" hooks/session-start.py skills/welcome/SKILL.md docs/GETTING-STARTED.md && pass "Documents workspace default documented" || fail "Documents workspace default missing"
+[ -f scripts/migrate-install-record.py ] && pass "existing-user migration script exists" || fail "migration script missing"
+grep -q "workspace_type" scripts/migrate-install-record.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
+grep -q "obsidian_enabled" scripts/migrate-install-record.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
+[ -f scripts/doctor.py ] && pass "runtime doctor exists" || fail "runtime doctor missing"
+python3 scripts/doctor.py --workspace /tmp/tars-doctor-validation --json >/tmp/tars-doctor-validation.json 2>/tmp/tars-doctor-validation.err || true
+python3 - <<'PY'
+import json
+data = json.load(open('/tmp/tars-doctor-validation.json'))
+checks = {c.get('check') for c in data.get('checks', [])}
+assert 'python' in checks and 'workspace_path' in checks and 'import:mcp' in checks
+print('PASS  runtime doctor emits deterministic checks')
+PY
+[ $? -eq 0 ] || fail "runtime doctor output invalid"
 
 grep -q -- "--enable-obsidian" skills/welcome/SKILL.md && pass "enable Obsidian mode documented" || fail "enable Obsidian missing"
 grep -q -- "--disable-obsidian" skills/welcome/SKILL.md && pass "disable Obsidian mode documented" || fail "disable Obsidian missing"
@@ -37,7 +52,9 @@ grep -q "Do not re-scaffold" skills/welcome/SKILL.md && pass "relocate avoids re
 grep -q "Existing identity, memory, schedule, and integrations were left untouched" skills/welcome/SKILL.md && pass "persona preserves state" || fail "persona preservation missing"
 
 grep -q "coaching:" _system/maturity.yaml && pass "maturity has coaching state" || fail "coaching state missing"
+grep -q "deferred_setup:" _system/maturity.yaml && pass "maturity has deferred setup state" || fail "deferred setup state missing"
 grep -q "Next useful thing" skills/briefing/SKILL.md && pass "briefing coaching slot" || fail "briefing coaching missing"
+grep -q -- "--continue-setup" skills/briefing/SKILL.md && pass "briefing deferred setup reminder" || fail "briefing deferred setup reminder missing"
 grep -q "Empty-workspace response" skills/answer/SKILL.md && pass "answer empty-workspace coaching" || fail "answer empty-workspace missing"
 grep -q "embedding model" skills/answer/SKILL.md && pass "FastEmbed warning" || fail "FastEmbed warning missing"
 
@@ -67,6 +84,9 @@ done
 
 remaining=$(grep -rn -i -E "casual.mode|casual/standard|standard.*casual|mode:.casual|engagement.mode" docs README.md skills templates 2>/dev/null | grep -v "removal of the casual/standard" || true)
 [ -z "$remaining" ] && pass "stale casual mode refs purged" || { fail "stale casual refs remain"; echo "$remaining"; }
+
+stale_indexes=$(grep -rn "_index.md" skills docs README.md commands 2>/dev/null | grep -v "No \`_index.md\` files" | grep -v "replaced \`_index.md\`" | grep -v "replace \`_index.md\`" || true)
+[ -z "$stale_indexes" ] && pass "stale _index.md guidance purged" || { fail "stale _index.md guidance remains"; echo "$stale_indexes"; }
 
 python3 - <<'PY'
 import os, re, sys

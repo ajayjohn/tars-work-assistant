@@ -272,12 +272,12 @@ initiatives: [Initiative names]
 **Planning mode:**
 - Memory: Read initiative file + up to 3 related files
 - Project tracker: Up to 3 queries
-- Journal: Current month `_index.md` + up to 2 relevant entries
+- Journal: Search current month + up to 2 relevant entries
 
 **Status mode:**
 - Memory: Read initiative file + up to 3 related files
 - Project tracker: Up to 3 queries
-- Journal: Current month `_index.md` + up to 2 relevant entries
+- Journal: Search current month + up to 2 relevant entries
 
 **Performance mode:**
 - Reference: `reference/kpis.md` (mandatory)

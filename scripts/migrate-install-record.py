@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Backfill workspace-first install fields for existing TARS workspaces.
+"""Backfill install-record fields for existing TARS workspaces.
 
 This is intentionally standalone rather than version-gated by
 scripts/run-migrations.py. Existing users may already be on the same plugin
-version that introduced workspace-first language, so the migration must be safe
+version that introduced local Markdown workspace fields, so the migration must be safe
 to run explicitly at any time.
 
 Behavior:
@@ -183,7 +183,7 @@ def migrate(vault: Path, apply: bool) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Backfill workspace-first fields in _system/install.yaml.")
+    parser = argparse.ArgumentParser(description="Backfill local workspace fields in _system/install.yaml.")
     parser.add_argument("--vault", required=True, help="Path to the existing TARS workspace or vault.")
     parser.add_argument("--apply", action="store_true", help="Write changes. Default is dry run.")
     parser.add_argument("--json", action="store_true", dest="json_output", help="Print JSON output.")
@@ -194,7 +194,7 @@ def main() -> int:
         print(json.dumps(result, indent=2))
     else:
         mode = "apply" if args.apply else "dry run"
-        print(f"Workspace-first migration ({mode})")
+        print(f"Install-record migration ({mode})")
         print(f"Status: {result['status']}")
         print(f"Workspace: {result.get('workspace_path', '')}")
         print(f"Mode: {result.get('workspace_type', '')}")

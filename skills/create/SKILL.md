@@ -92,7 +92,7 @@ See `templates/brand-guidelines.md` for the content shape that a brand file shou
 
 ## Step 3: Context gathering
 
-Load relevant context via vault MCP tools. `.base` views replace `_index.md` files in v3.
+Load relevant context via workspace MCP tools. `.base` views replace `_index.md` files in Obsidian mode.
 
 - Initiatives: `mcp__tars_vault__search_by_tag(tag="tars/initiative", limit=20)` + targeted `read_note` for those referenced.
 - Products:   `mcp__tars_vault__search_by_tag(tag="tars/product", limit=20)` + targeted `read_note`.
