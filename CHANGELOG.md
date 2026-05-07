@@ -14,7 +14,7 @@
 - **Obsidian mode scaffolds views without changing the data model.** Headless setup creates the canonical portable workspace only; Obsidian setup creates the same workspace plus `_views/*.base`.
 - **Release validation now tests the artifact users install.** New artifact validation extracts the built zip, verifies required packaged files, starts the packaged local helper over stdio, fails unless required tools are visible, runs scaffold from the extracted helper, rejects generic `knowledge/`, `projects/`, or `research/` setup folders, and checks the generated `index.md` for natural-language and inbox guidance.
 - **Helper/tool contract gaps are closed.** `resolve_alias` and `runtime_info` are now real helper tools, semantic search accepts `limit` as well as `top_k`, and single-property `update_frontmatter` examples are supported.
-- **Semantic-search dependencies are optional.** `requirements.txt` now contains only the required `mcp` dependency; `fastembed` and `sqlite-vec` moved to `requirements-search.txt` and degrade to FTS-only when absent.
+- **Semantic-search dependencies are optional.** `requirements.txt` has no third-party requirement for first setup; `fastembed` and `sqlite-vec` live in `requirements-search.txt` and degrade to FTS-only when absent.
 
 ## v3.4.2 (2026-05-06)
 
