@@ -2,7 +2,7 @@
 
 # Getting Started with TARS
 
-TARS is a persistent work assistant for Claude. The setup goal is straightforward: point TARS at a local Markdown folder, install the `tars-vault` MCP server, and let `/welcome` scaffold the runtime so daily work can begin immediately. Obsidian is optional and can be enabled later.
+TARS is a persistent work assistant for Claude. The setup goal is straightforward: point TARS at a local Markdown folder and let `/welcome` create the workspace so daily work can begin immediately. TARS includes one required local helper, `tars-vault`, that runs locally and keeps workspace writes safe. Obsidian is optional and can be enabled later.
 
 ## Before you install
 
@@ -11,6 +11,9 @@ You need:
 - Claude Code or Claude Cowork with the TARS framework installed
 - a local folder dedicated to your TARS workspace, recommended default: `~/Documents/TARS Workspace`
 - optional: Obsidian Desktop if you want live `.base` views and visual note browsing
+
+Markdown files are plain text files you can open in any text editor. If you do
+not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
 If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace before using this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
 
@@ -34,15 +37,23 @@ Install from your preferred path:
    - clone the repository
    - install the plugin from the local checkout
 
-After installing the plugin, install the Python runtime dependencies for the `tars-vault` MCP server from the repo root:
+After installing the plugin from a local checkout, install the required local-helper dependency from the repo root:
 
 ```text
 pip install -r requirements.txt
 ```
 
-The pinned deps are minimal: `mcp`, `fastembed`, `sqlite-vec`. Nothing else. In particular TARS does NOT bundle any office-rendering libraries — office output in `/create` delegates to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills.
+The required dependency is minimal: `mcp`. Semantic search enhancements are optional:
 
-The repository root ships an `.mcp.json` declaring the `tars-vault` server. Set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the MCP server knows where to operate.
+```text
+pip install -r requirements-search.txt
+```
+
+If you skip the optional search packages, setup, workspace writes, inbox processing, keyword search, and daily use still work. Semantic search falls back to FTS-only retrieval and surfaces that gap in the answer.
+
+TARS does NOT bundle any office-rendering libraries. Office output in `/create` delegates to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills.
+
+The plugin ships the local TARS helper configuration. In code checkout flows, set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the helper knows where to operate.
 
 The repository contains the framework source. The folder you point TARS at is the live runtime workspace.
 
@@ -52,7 +63,7 @@ If setup behaves strangely, run the lightweight doctor from the framework checko
 python3 scripts/doctor.py --workspace ~/Documents/TARS\ Workspace
 ```
 
-It checks Python, MCP importability, the resolved workspace path, write permissions, and install-record consistency. If Python itself is missing, install Python 3.10+ first, then rerun the check.
+It checks Python, local-helper dependency importability, the resolved workspace path, write permissions, and install-record consistency. If Python itself is missing, install Python 3.10+ first, then rerun the check.
 
 ## First-run setup
 
@@ -60,14 +71,12 @@ Run `/start` first if you want a no-setup demo with pasted content. Run `/welcom
 
 The welcome flow:
 - shows the Claude-selected folder and active TARS workspace so files are not silently created somewhere else
-- asks for a workspace folder, your name/role, persona, and workspace type
+- asks for a workspace folder, your name, role/title, company/team, persona, and workspace type
 - asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
 - creates the TARS workspace structure
-- writes `_system/` files (including the new `install.yaml` install record), templates, and live views
-- installs or verifies Obsidian helper skills only when Obsidian mode is enabled
-- configures integration metadata
-- captures your initial profile and operating context
-- registers briefing and maintenance schedules when supported
+- writes `_system/` files (including `install.yaml`), templates, scripts, `index.md`, and optional Obsidian views only when Obsidian mode is enabled
+- captures your initial profile
+- asks you to paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes so TARS can preview extraction into memory candidates, journal notes, and tasks
 
 Fast setup intentionally stops there. Continue deeper setup later with:
 
@@ -81,7 +90,6 @@ After setup, the workspace should contain:
 
 ```text
 _system/
-_views/
 memory/
 journal/
 contexts/
@@ -90,7 +98,10 @@ inbox/processed/
 archive/transcripts/
 templates/
 scripts/
+index.md
 ```
+
+Obsidian mode adds `_views/` in the same workspace folder.
 
 ## Workspace modes
 

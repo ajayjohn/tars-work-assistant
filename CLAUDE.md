@@ -41,13 +41,16 @@ mode must use the same workspace folder and must not move or duplicate data.
 
 ## Write Interface
 
-All workspace mutations go through `mcp__tars_vault__*` tools. Use
+All workspace mutations go through the local TARS helper, exposed internally as
+`mcp__tars_vault__*` tools. Use
 `mcp__tars_vault__scaffold_workspace` for first-run setup. Use
 `mcp__tars_vault__read_note` to verify key files before telling the user setup
 is complete.
 
 Never use direct filesystem writes for user workspace content from a skill.
-Never hard-code external integration MCP names. Resolve integrations through
+Never show raw helper tool names to nontechnical users when setup fails. Say
+"local TARS helper" first, with technical details only after recovery steps.
+Never hard-code external integration server names. Resolve integrations through
 `mcp__tars_vault__resolve_capability`.
 
 ## Setup Completion Contract
@@ -81,6 +84,7 @@ universal constraints.
 | `core` | identity, routing, constraints, help |
 | `welcome` | first-run setup and mode switching |
 | `start` | zero-setup preview with pasted content |
+| `doctor` | local helper and workspace health check |
 | `meeting` | transcript processing |
 | `maintain` | inbox processing, sync, archive sweep |
 | `learn` | durable memory and learning capture |

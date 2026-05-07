@@ -19,7 +19,7 @@ For Obsidian users, the same workspace can be opened as a vault. The product ter
 
 TARS is intentionally opinionated about how a long-lived assistant should work:
 - Markdown files and YAML frontmatter are the native runtime
-- `tars-vault` is the write path for managed workspace changes
+- the local TARS helper (`tars-vault`) is the write path for managed workspace changes
 - `.base` files are optional Obsidian views over the same workspace
 - transcript archives are first-class retrieval assets
 - `inbox/pending/` is the bulk intake surface for transcripts, PDFs, decks, docs, screenshots, exports, and rough notes
@@ -79,7 +79,7 @@ Fast setup captures only the essentials. Deferred setup can be resumed with `/we
 
 ### Wikilink discipline (v3.2)
 
-Every wikilink TARS writes is formed via the in-house `format_wikilink` MCP tool, which normalizes smart quotes, sanitizes Obsidian-illegal characters, and resolves canonical names through the alias registry + workspace file lookup. Write tools and a pre-write hook reject any `[[…]]` containing forbidden characters. A retroactive `fix-wikilinks --repair-broken` mode classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
+Every wikilink TARS writes is formed via the local helper’s `format_wikilink` tool, which normalizes smart quotes, sanitizes Obsidian-illegal characters, and resolves canonical names through the alias registry + workspace file lookup. Write tools and a pre-write hook reject any `[[…]]` containing forbidden characters. A retroactive `fix-wikilinks --repair-broken` mode classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
 
 ### Self-improvement loop (v3.2)
 

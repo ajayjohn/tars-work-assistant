@@ -21,6 +21,7 @@ at the skill's `SKILL.md`; all pipeline logic lives in the skill.
 | `/briefing` | [skills/briefing/](../skills/briefing/SKILL.md) | Daily / weekly briefing | "What should I focus on today?" |
 | `/communicate` | [skills/communicate/](../skills/communicate/SKILL.md) | Stakeholder drafting with RASCI | "Draft a follow-up to Sam from this call" |
 | `/create` | [skills/create/](../skills/create/SKILL.md) | Office output via Anthropic rendering skills | "Turn this into an exec-ready narrative" |
+| `/doctor` | [skills/doctor/](../skills/doctor/SKILL.md) | Install and workspace health check | "Check my TARS install" |
 | `/initiative` | [skills/initiative/](../skills/initiative/SKILL.md) | Initiative plan / status / performance | "Check the health of the onboarding initiative" |
 | `/learn` | [skills/learn/](../skills/learn/SKILL.md) | Memory save or wisdom extraction | "Remember Sarah owns onboarding" |
 | `/lint` | [skills/lint/](../skills/lint/SKILL.md) | Workspace lint — deterministic + LLM checks | "Check the workspace for stale or broken items" |

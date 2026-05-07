@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import select
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -15,9 +20,38 @@ REQUIRED_FILES = {
     ".claude-plugin/mcp-servers.json",
     "commands/welcome.md",
     "commands/start.md",
+    "commands/doctor.md",
     "skills/welcome/SKILL.md",
+    "skills/doctor/SKILL.md",
     "CLAUDE.md",
     "mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py",
+    "mcp/tars-vault/src/tars_vault/tools/runtime_info.py",
+    "mcp/tars-vault/src/tars_vault/tools/resolve_alias.py",
+    "requirements.txt",
+    "requirements-search.txt",
+}
+
+REQUIRED_TOOLS = {
+    "append_note",
+    "archive_note",
+    "classify_file",
+    "create_note",
+    "detect_near_duplicates",
+    "format_wikilink",
+    "fts_search",
+    "move_note",
+    "read_note",
+    "refresh_integrations",
+    "rerank",
+    "resolve_alias",
+    "resolve_capability",
+    "runtime_info",
+    "scan_secrets",
+    "scaffold_workspace",
+    "search_by_tag",
+    "semantic_search",
+    "update_frontmatter",
+    "write_note_from_content",
 }
 
 FORBIDDEN_ROOT_PATHS = {
@@ -68,7 +102,7 @@ def validate_zip_members(zip_path: Path) -> None:
     missing = sorted(REQUIRED_FILES - names)
     if missing:
         fail(f"artifact missing required files: {missing}")
-    pass_("artifact includes commands, welcome skill, CLAUDE.md, MCP metadata, and scaffold tool")
+    pass_("artifact includes commands, welcome skill, doctor skill, CLAUDE.md, helper metadata, and required helper tools")
 
     forbidden = sorted(path for path in FORBIDDEN_ROOT_PATHS if path in names)
     if forbidden:
@@ -90,6 +124,118 @@ def validate_text_surface(root: Path) -> None:
         if hits:
             fail(f"{path.relative_to(root)} contains stale install language: {hits}")
     pass_("packaged user surface avoids stale Obsidian-required and /tars:* language")
+
+
+def validate_tool_registry_from_artifact(root: Path) -> None:
+    sys.path.insert(0, str(root / "mcp" / "tars-vault" / "src"))
+    try:
+        from tars_vault import server
+    finally:
+        try:
+            sys.path.remove(str(root / "mcp" / "tars-vault" / "src"))
+        except ValueError:
+            pass
+
+    schema_tools = set(server.TOOL_SCHEMAS)
+    registry_tools = set(server.TOOL_REGISTRY)
+    missing = sorted(REQUIRED_TOOLS - schema_tools)
+    if missing:
+        fail(f"server schema missing required tools: {missing}")
+    missing_registry = sorted(REQUIRED_TOOLS - registry_tools)
+    if missing_registry:
+        fail(f"server registry missing required tools: {missing_registry}")
+    pass_("artifact server registry exposes required TARS helper tools")
+
+
+def _read_json_response(proc: subprocess.Popen[str], expected_id: int, timeout: float) -> dict:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            stderr = proc.stderr.read() if proc.stderr else ""
+            fail(f"helper exited before response id {expected_id}: {stderr.strip()}")
+        ready, _, _ = select.select([proc.stdout], [], [], max(0.0, deadline - time.time()))
+        if not ready:
+            continue
+        line = proc.stdout.readline()
+        if not line:
+            continue
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if payload.get("id") == expected_id:
+            if "error" in payload:
+                fail(f"helper response id {expected_id} returned error: {payload['error']}")
+            return payload
+    stderr = proc.stderr.read() if proc.stderr else ""
+    fail(f"timed out waiting for helper response id {expected_id}: {stderr.strip()}")
+    return {}
+
+
+def validate_runtime_list_tools(root: Path) -> None:
+    config_path = root / ".claude-plugin" / "mcp-servers.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    spec = config["mcpServers"]["tars-vault"]
+    args = [sys.executable if spec["command"] == "python3" else spec["command"], *spec["args"]]
+    workspace = Path(tempfile.mkdtemp(prefix="tars-runtime-workspace-"))
+    env = os.environ.copy()
+    env["CLAUDE_PLUGIN_ROOT"] = str(root)
+    env["TARS_VAULT_PATH"] = str(workspace)
+    for key, value in spec.get("env", {}).items():
+        env[key] = (
+            value.replace("${CLAUDE_PLUGIN_ROOT}", str(root))
+            .replace("${TARS_VAULT_PATH}", str(workspace))
+        )
+
+    proc = subprocess.Popen(
+        args,
+        cwd=str(root),
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert proc.stdin is not None
+        init = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "tars-artifact-validator", "version": "0"},
+            },
+        }
+        proc.stdin.write(json.dumps(init) + "\n")
+        proc.stdin.flush()
+        _read_json_response(proc, 1, timeout=10)
+
+        proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        proc.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}) + "\n")
+        proc.stdin.flush()
+        response = _read_json_response(proc, 2, timeout=10)
+        tools = {
+            tool["name"]
+            for tool in response.get("result", {}).get("tools", [])
+            if isinstance(tool, dict) and "name" in tool
+        }
+        missing = sorted(REQUIRED_TOOLS - tools)
+        if missing:
+            fail(f"runtime list_tools missing required tools: {missing}")
+        pass_("packaged local TARS helper starts over stdio and lists required tools")
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        shutil.rmtree(workspace, ignore_errors=True)
 
 
 def run_scaffold_from_artifact(root: Path, workspace_type: str) -> Path:
@@ -134,8 +280,9 @@ def validate_workspace(workspace: Path, *, obsidian: bool) -> None:
         "Slash commands are optional",
         "Process everything in my inbox",
         "inbox/pending/",
-        "Paste a transcript",
+        "Paste a meeting transcript",
         "not a single `INBOX.md` note",
+        "Check my TARS install",
     ):
         if needle not in text:
             fail(f"index.md missing first-user guidance: {needle}")
@@ -165,6 +312,8 @@ def main() -> int:
             zf.extractall(extract_root)
 
         validate_text_surface(extract_root)
+        validate_tool_registry_from_artifact(extract_root)
+        validate_runtime_list_tools(extract_root)
 
         headless = run_scaffold_from_artifact(extract_root, "headless")
         workspaces.append(headless.parent)

@@ -95,12 +95,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         checks.append(_record("error", "python", "Python 3.10+ is required", found=sys.version.split()[0]))
 
     sys.path.insert(0, str(MCP_SRC))
-    for module in ("tars_vault.server", "mcp", "fastembed", "sqlite_vec"):
+    for module in ("tars_vault.server", "mcp.server", "mcp.server.stdio", "fastembed", "sqlite_vec"):
         try:
             importlib.import_module(module)
             checks.append(_record("ok", f"import:{module}", "Import succeeded"))
         except Exception as exc:
-            severity = "error" if module in ("tars_vault.server", "mcp") else "warning"
+            severity = "error" if module in ("tars_vault.server", "mcp.server", "mcp.server.stdio") else "warning"
             checks.append(_record(severity, f"import:{module}", f"Import failed: {exc}"))
 
     workspace, path_checks = _workspace_from_args(args)
@@ -174,9 +174,9 @@ def main() -> int:
             label = check["status"].upper()
             print(f"{label:7} {check['check']}: {check['message']}")
         if result["status"] == "ok":
-            print("\nTARS runtime preflight passed.")
+            print("\nTARS runtime preflight passed. The local TARS helper can be used.")
         else:
-            print("\nTARS runtime preflight found blocking issues.")
+            print("\nTARS runtime preflight found blocking issues with the local TARS helper.")
     return 1 if result["status"] == "error" else 0
 
 

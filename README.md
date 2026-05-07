@@ -6,7 +6,7 @@ TARS turns a local Markdown workspace into a persistent Claude assistant for mee
 
 TARS is built around a few core ideas:
 - The local Markdown workspace is the data model. Obsidian is optional and can be enabled later as a visual browser.
-- A `tars-vault` MCP server is the write interface; skills call `mcp__tars_vault__*` tools and hooks enforce write discipline.
+- The local TARS helper (`tars-vault`) is the required guardrail layer for workspace writes. It ships with the plugin and runs locally.
 - TARS-managed notes use schema-validated `tars-` frontmatter properties.
 - Live Obsidian Bases are available in Obsidian mode; headless users can query the same files through Claude.
 - Retrieval combines SQLite FTS5 over structured memory with a local FastEmbed + sqlite-vec semantic layer over prose (journal, transcripts, contexts).
@@ -21,7 +21,7 @@ TARS is built around a few core ideas:
 
 ## Try it in 90 seconds
 
-After installing the plugin, run `/start` and paste your own content. No setup, integrations, or Obsidian required.
+After installing the plugin, run `/start` and paste your own content. It works without setup, integrations, or Obsidian.
 
 ```text
 /start
@@ -44,7 +44,7 @@ No transcript handy? Try one of `examples/`.
 
 ## What ships in the framework
 
-The framework ships with 14 skills, 15 commands, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
+The framework ships with 15 skills, 16 commands, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
 
 Core user-facing capabilities:
 - Daily and weekly briefings with calendar, task, people, and initiative context (plus a Monday telemetry footer)
@@ -63,10 +63,10 @@ Core user-facing capabilities:
 The framework uses this high-level structure:
 
 ```text
-skills/           Behavioral and workflow protocols (14 skills)
+skills/           Behavioral and workflow protocols (15 skills)
 commands/         Thin slash-command wrappers into the skills
 hooks/            SessionStart / PreToolUse / PostToolUse / PreCompact / SessionEnd
-mcp/tars-vault/   Write-interface MCP server + retrieval + organization tools
+mcp/tars-vault/   Local TARS helper + retrieval + organization tools
 _system/          Source defaults for scaffolded runtime config and schemas
 _views/           Source templates for optional Obsidian `.base` views
 templates/        Canonical TARS note templates (+ office content outlines)

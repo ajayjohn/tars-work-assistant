@@ -1,0 +1,5 @@
+# Optional TARS semantic-search enhancements.
+# Setup, workspace writes, keyword search, and onboarding work without these.
+
+fastembed>=0.4,<1.0
+sqlite-vec>=0.1.6,<0.2

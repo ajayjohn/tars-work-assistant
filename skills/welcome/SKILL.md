@@ -13,8 +13,8 @@ triggers:
 help:
   purpose: |-
     Create or update the user's portable TARS workspace. The first-run path
-    asks only essential questions, calls the deterministic scaffold tool, and
-    verifies the canonical workspace before saying setup is complete.
+    asks only essential questions, uses the local TARS helper to create the
+    workspace, and verifies the canonical workspace before saying setup is complete.
   use_cases:
     - "Set up TARS"
     - "Bootstrap my workspace"
@@ -67,12 +67,13 @@ subfolders, not in root files like `MEMORY.md`, `PEOPLE.md`, or
 
 Use this path when `_system/config.md` or `_system/install.yaml` is missing.
 
-### 1. Show Workspace Choices
+### 1. Show workspace choices
 
 Tell the user:
 
-> "TARS stores everything in one local Markdown workspace folder. You can zip
-> that folder later to back up your setup and data."
+> "TARS stores everything in one local workspace folder. Markdown files are
+> plain text files you can open in any text editor. You can zip the workspace
+> later to back up your setup and data."
 
 Show:
 
@@ -85,26 +86,25 @@ Ask:
 > "Where should TARS create the workspace? Choose the active folder, the
 > Documents default, or provide another folder."
 
-If the requested folder differs from the active MCP workspace and the MCP cannot
-write there, stop. Do not scaffold into the wrong folder.
+If the requested folder differs from the active workspace path available to the
+local TARS helper and the helper cannot write there, stop. Do not create the
+workspace in the wrong folder.
 
 If the active path resolves under `~/.claude` and no existing install record is
 present, warn and recommend `~/Documents/TARS Workspace`.
 
-### 2. Ask Essential Personalization Questions
+### 2. Ask essential personalization questions
 
 Ask this compact prompt:
 
 > "What should TARS know to personalize setup?
 > - Your name:
 > - Role/title:
-> - Company or team:
-> - First thing you want TARS to help with: meetings, inbox/documents, tasks,
->   briefings, strategic thinking, stakeholder communication, or something else"
+> - Company or team:"
 
 Do not skip this prompt during first-run setup.
 
-### 3. Pick Persona
+### 3. Pick persona
 
 Ask:
 
@@ -130,19 +130,22 @@ support-ops-lead
 engineering-manager
 ```
 
-### 4. Pick Workspace Mode
+### 4. Pick workspace mode
 
 Ask:
 
 > "How do you want to use this workspace now?
 > 1. Claude-first Markdown workspace (recommended)
-> 2. Obsidian browsing over the same workspace"
+> 2. Obsidian browsing over the same workspace
+>
+> If you don't know what Obsidian is, leave it disabled. You can turn it on
+> later. In Obsidian mode, this same TARS workspace is also an Obsidian vault."
 
 Use `headless` for option 1 and `obsidian` for option 2.
 
-### 5. Scaffold Deterministically
+### 5. Create workspace deterministically
 
-Call the MCP tool exactly once:
+Use the local TARS helper exactly once:
 
 ```text
 mcp__tars_vault__scaffold_workspace(
@@ -155,11 +158,23 @@ mcp__tars_vault__scaffold_workspace(
 )
 ```
 
-If the tool returns an error, show the reason and stop.
+If the helper is unavailable, stop. Use this user-facing recovery text:
 
-### 6. Verify Before Completing
+```markdown
+I can't safely finish TARS setup because the local TARS helper is not connected.
 
-Read and verify:
+This helper creates and checks the workspace in the background. This is not an
+Obsidian, calendar, task, email, or Slack issue. Those integrations are optional.
+
+Please make sure the TARS plugin is enabled, restart Claude, and run `/doctor`
+or ask "check my TARS install." Then run `/welcome` again.
+```
+
+If the helper returns an error, show the reason in plain language and stop.
+
+### 6. Verify before completing
+
+Use the local TARS helper to read and verify:
 
 ```text
 mcp__tars_vault__read_note(file="index.md")
@@ -177,7 +192,7 @@ index_path: "index.md"
 
 If any verification fails, say setup is incomplete and explain what failed.
 
-### 7. Final Response
+### 7. Final response
 
 Keep the final response short. Use this structure:
 
@@ -195,12 +210,15 @@ Slash commands are optional. You can ask in natural language.
 ### Try this now
 
 Paste a meeting transcript, PDF/report excerpt, email thread, or rough notes.
-I will preview what TARS can extract before saving anything.
+I will preview what TARS can extract into memory candidates, journal notes, and
+tasks before saving anything.
 
 Or drop files into `inbox/pending/` and say: "process inbox".
 
 You can continue setup later with `/welcome --continue-setup` or by saying
 "continue TARS setup".
+
+TARS is ready whenever you want to process something.
 ```
 
 Do not include a long directory listing. Do not recommend namespaced command

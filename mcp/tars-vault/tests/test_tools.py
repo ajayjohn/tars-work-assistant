@@ -26,7 +26,9 @@ from tars_vault.tools.create_note import create_note
 from tars_vault.tools.detect_near_duplicates import detect_near_duplicates
 from tars_vault.tools.move_note import move_note
 from tars_vault.tools.read_note import read_note
+from tars_vault.tools.resolve_alias import resolve_alias
 from tars_vault.tools.resolve_capability import resolve_capability
+from tars_vault.tools.runtime_info import runtime_info
 from tars_vault.tools.scan_secrets import scan_secrets
 from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.search_by_tag import search_by_tag
@@ -162,6 +164,14 @@ class ToolTests(unittest.TestCase):
         self.assertIn("tars-created", r["updated"])
         r2 = read_note(vault=str(self.vault), file="memory/people/dan.md")
         self.assertEqual(r2["frontmatter"]["tars-role"], "Director")
+        r = update_frontmatter(
+            vault=str(self.vault),
+            file="memory/people/dan.md",
+            property="tars-title",
+            value="Staff Engineer",
+        )
+        self.assertEqual(r["status"], "ok")
+        self.assertIn("tars-title", r["updated"])
         # Now remove
         r = update_frontmatter(
             vault=str(self.vault),
@@ -170,6 +180,35 @@ class ToolTests(unittest.TestCase):
         )
         self.assertEqual(r["status"], "ok")
         self.assertIn("tars-created", r["removed"])
+
+    def test_resolve_alias_default_and_context_override(self) -> None:
+        (self.vault / "_system" / "alias-registry.md").write_text(
+            "## Ambiguous Names\n"
+            "| Short Name | Default Resolution | Context Override |\n"
+            "|---|---|---|\n"
+            "| Sam | [[Sam Product]] | security -> [[Sam Security]] |\n"
+            "\n"
+            "## Product Abbreviations\n"
+            "| Abbreviation | Canonical |\n"
+            "|---|---|\n"
+            "| DP | [[Data Platform]] |\n"
+        )
+        r = resolve_alias(vault=str(self.vault), name="Sam")
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["resolution_status"], "resolved")
+        self.assertEqual(r["canonical"], "Sam Product")
+        r = resolve_alias(vault=str(self.vault), name="Sam", context="security launch")
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["canonical"], "Sam Security")
+        r = resolve_alias(vault=str(self.vault), name="DP", kind="product")
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["canonical"], "Data Platform")
+
+    def test_runtime_info_reports_helper_state_without_mutation(self) -> None:
+        r = runtime_info(vault=str(self.vault))
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["helper"], "connected")
+        self.assertIn("checks", r)
 
     # --- search / classify / dedupe ---
 

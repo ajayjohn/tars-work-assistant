@@ -3,8 +3,10 @@
 Arguments:
   vault:       required.
   file:        required. Vault-relative path.
-  updates:     required. Mapping of key → value. Existing keys replaced,
+  updates:     preferred. Mapping of key → value. Existing keys replaced,
                missing keys added. Set value to null to DELETE a key.
+  property:    compatibility alias for one-key updates.
+  value:       compatibility value for property.
   allow_user_properties: optional bool (default false). Unless true, only
                          `tars-` keys or {tags, aliases} may be modified.
 
@@ -25,6 +27,8 @@ def update_frontmatter(**kwargs: Any) -> dict:
     vault = kwargs.get("vault")
     file_ = kwargs.get("file")
     updates = kwargs.get("updates")
+    if updates is None and kwargs.get("property"):
+        updates = {kwargs.get("property"): kwargs.get("value")}
     allow_user = bool(kwargs.get("allow_user_properties", False))
     if not vault:
         return _common.error("missing 'vault'")
