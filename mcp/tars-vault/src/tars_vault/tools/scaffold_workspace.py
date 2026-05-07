@@ -106,7 +106,7 @@ Slash commands are optional shortcuts. You can type natural-language requests an
 | Process a meeting | `/meeting` | "Process this meeting transcript" |
 | Save durable context | `/learn` | "Remember Sarah owns onboarding" |
 | Look something up | `/answer` | "What do we know about the platform rewrite?" |
-| Get oriented | `/briefing` | "What should I focus on today?" |
+| Get oriented after adding context | `/briefing` | "What should I focus on today?" |
 | Extract or manage tasks | `/tasks` | "Extract the action items from this" |
 | Think through a decision | `/think` | "Stress-test this roadmap decision" |
 | Draft communication | `/communicate` | "Draft a follow-up email from this call" |
@@ -167,7 +167,7 @@ obsidian_enabled: {"true" if obsidian_enabled else "false"}
 obsidian_vault_path: "{workspace if obsidian_enabled else ""}"
 installation_id: "{uuid.uuid4()}"
 persona: "{persona}"
-plugin_version: "3.4.3"
+plugin_version: "3.4.4"
 created: "{now}"
 last_session_at: "{now}"
 """
@@ -278,7 +278,7 @@ def scaffold_workspace(**kwargs: Any) -> dict:
         "_system/kpis.md": "# KPIs\n\nAdd team, product, and initiative metrics here when useful.\n",
         "_system/schedule.md": "# Schedule\n\nRecurring and one-time TARS schedules.\n",
         "_system/guardrails.yaml": "blocked_patterns:\n  - ssn\n  - credit_card\n  - api_key\nwarn_patterns:\n  - salary\n  - compensation\n  - performance_rating\n",
-        "_system/housekeeping-state.yaml": "last_run: null\nlast_success: null\nrun_count: 0\npending_inbox_count: 0\ncron_jobs:\n  daily_briefing: null\n  weekly_briefing: null\n  maintenance: null\nplugin_version: \"3.4.3\"\n",
+        "_system/housekeeping-state.yaml": "last_run: null\nlast_success: null\nrun_count: 0\npending_inbox_count: 0\ncron_jobs:\n  daily_briefing: null\n  weekly_briefing: null\n  maintenance: null\nplugin_version: \"3.4.4\"\n",
         "index.md": _index_md(),
     }
 

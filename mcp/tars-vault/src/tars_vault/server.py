@@ -1,4 +1,4 @@
-"""Local helper bootstrap for tars-vault (v3.4.3).
+"""Local helper bootstrap for tars-vault (v3.4.4).
 
 Wires list_tools + call_tool handlers against the tool modules under `tools/`.
 Each handler is a synchronous `(**kwargs) -> dict` function; this module
@@ -448,7 +448,7 @@ def _run_minimal_stdio(vault_path: str) -> int:
                         "result": {
                             "protocolVersion": protocol,
                             "capabilities": {"tools": {}},
-                            "serverInfo": {"name": "tars-vault", "version": "3.4.3"},
+                            "serverInfo": {"name": "tars-vault", "version": "3.4.4"},
                         },
                     }
                 )
@@ -533,7 +533,7 @@ def run_stdio(vault_path: str) -> int:
                 write_stream,
                 InitializationOptions(
                     server_name="tars-vault",
-                    server_version="3.4.3",
+                    server_version="3.4.4",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},

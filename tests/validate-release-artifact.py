@@ -135,6 +135,7 @@ def validate_text_surface(root: Path) -> None:
     checked = [
         root / "CLAUDE.md",
         root / "README.md",
+        root / "commands" / "welcome.md",
         root / "skills" / "welcome" / "SKILL.md",
         root / ".claude-plugin" / "plugin.json",
         root / ".claude-plugin" / "mcp-servers.json",
@@ -145,6 +146,15 @@ def validate_text_surface(root: Path) -> None:
         hits = [needle for needle in STALE_TEXT if needle in text]
         if hits:
             fail(f"{path.relative_to(root)} contains stale install language: {hits}")
+    welcome_command = (root / "commands" / "welcome.md").read_text(encoding="utf-8")
+    for needle in (
+        "from the user's workspace",
+        "Natural-language example",
+        "Paste or upload a meeting transcript",
+        "Do not recommend `/briefing` as a starter action",
+    ):
+        if needle not in welcome_command:
+            fail(f"commands/welcome.md missing fallback guard: {needle}")
     pass_("packaged user surface avoids stale Obsidian-required and /tars:* language")
 
 

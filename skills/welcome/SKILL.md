@@ -205,11 +205,19 @@ TARS is set up in `{workspace_path}`.
 - `memory/`: durable context folders ready
 - `inbox/pending/`: drop-zone ready for transcripts, PDFs, reports, email threads, decks, screenshots, exports, and rough notes
 
-Slash commands are optional. You can ask in natural language.
+Slash commands are optional. You do not need to remember them; natural language works just as well.
+
+| Shortcut | Natural-language example |
+|---|---|
+| `/start` | "Show me what TARS can do with this transcript" |
+| `/maintain inbox` | "Process everything in my inbox" |
+| `/meeting` | "Process this meeting transcript" |
+| `/learn` | "Remember that Sarah owns onboarding" |
+| `/help` | "What can TARS do?" |
 
 ### Try this now
 
-Paste a meeting transcript, PDF/report excerpt, email thread, or rough notes.
+Paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes.
 I will preview what TARS can extract into memory candidates, journal notes, and
 tasks before saving anything.
 
@@ -223,6 +231,10 @@ TARS is ready whenever you want to process something.
 
 Do not include a long directory listing. Do not recommend namespaced command
 syntax; use plain TARS slash commands or natural language.
+Do not recommend `/briefing` as a starter action in a brand-new workspace;
+briefings become useful after the workspace has memory, meetings, tasks, or
+connected calendar/task integrations. Do not end with an open-ended "what's on
+your mind?" question; guide the user into the first demo.
 
 ## Existing Workspace
 

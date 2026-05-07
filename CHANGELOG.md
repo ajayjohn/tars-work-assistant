@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.4.4 (2026-05-07)
+
+### Fixed
+
+- **Installed `/welcome` no longer exposes missing skill-file lookups.** The command wrapper now tells Claude not to read packaged skill files from the user's workspace, so a fresh workspace does not show `note not found: skills/welcome/SKILL.md`.
+- **Fresh setup closeout now gives a concrete first demo.** The welcome fallback and full skill both ask the user to paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes so TARS can preview memory, journal, and task extraction before saving anything.
+- **Slash commands are explained as optional shortcuts.** The welcome closeout now includes natural-language examples next to the most useful starter commands instead of leaving users to memorize command names.
+- **Empty workspaces no longer get briefing as a starter suggestion.** Welcome now avoids recommending `/briefing` until the workspace has useful context, tasks, meetings, or integrations.
+
 ## v3.4.3 (2026-05-06)
 
 ### Fixed

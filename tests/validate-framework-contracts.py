@@ -138,7 +138,7 @@ def validate_welcome_contract() -> None:
         "If you don't know what Obsidian is, leave it disabled",
         "local TARS helper is not connected",
         "not an\nObsidian, calendar, task, email, or Slack issue",
-        "Paste a meeting transcript, PDF/report excerpt, email thread, or rough notes",
+        "Paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes",
         "memory candidates, journal notes, and\ntasks",
     ):
         if needle not in welcome:

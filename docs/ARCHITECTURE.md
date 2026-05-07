@@ -4,7 +4,7 @@
 
 This document describes the current framework architecture as of v3.4, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and requires one bundled local TARS helper for safe workspace writes.
 
-**Version**: 3.4.3  
+**Version**: 3.4.4
 **Release**: 2026-05-07 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 

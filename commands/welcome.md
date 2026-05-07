@@ -7,10 +7,16 @@ argument-hint: "[--continue-setup | --enable-obsidian | --disable-obsidian | --r
 
 ## Protocol
 
-Read and follow `skills/welcome/SKILL.md`.
+Use the packaged `skills/welcome/SKILL.md` instructions only if they are
+already visible in the plugin context. Do not call any tool just to load them.
 
-If the skill file is not available, do **not** improvise a generic workspace.
-Follow this fallback contract instead:
+Do **not** try to read `skills/welcome/SKILL.md` from the user's workspace with
+the TARS helper. The workspace will not contain plugin source files during
+fresh setup, and a missing workspace note is not a setup problem.
+
+If the packaged skill file is not available, do **not** mention the missing
+skill file to the user and do **not** improvise a generic workspace. Follow this
+self-contained fallback contract instead:
 
 1. Explain that TARS stores all state in one portable Markdown workspace.
 2. Ask for:
@@ -46,3 +52,40 @@ Hard rules:
   `projects/`, `research/`, or `knowledge/`.
 - Do not recommend namespaced command syntax. Slash commands are optional;
   natural language works.
+- Do not recommend `/briefing` as a starter action in a brand-new workspace.
+  Briefings become useful after the workspace has memory, meetings, tasks, or
+  connected calendar/task integrations.
+- Do not end by asking an open-ended "what's on your mind?" question. End by
+  guiding the user into the first demo.
+
+When setup succeeds, use this final response shape exactly. Keep it concise:
+
+```markdown
+## Workspace Ready
+
+TARS is set up in `{workspace_path}`.
+
+- `index.md`: cheat sheet created
+- `memory/`: durable context folders ready
+- `inbox/pending/`: drop-zone ready for transcripts, PDFs, reports, email threads, decks, screenshots, exports, and rough notes
+
+Slash commands are optional. You do not need to remember them; natural language works just as well.
+
+| Shortcut | Natural-language example |
+|---|---|
+| `/start` | "Show me what TARS can do with this transcript" |
+| `/maintain inbox` | "Process everything in my inbox" |
+| `/meeting` | "Process this meeting transcript" |
+| `/learn` | "Remember that Sarah owns onboarding" |
+| `/help` | "What can TARS do?" |
+
+### Try this now
+
+Paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes. I will preview what TARS can extract into memory candidates, journal notes, and tasks before saving anything.
+
+Or drop files into `inbox/pending/` and say: "process inbox".
+
+You can continue setup later with `/welcome --continue-setup` or by saying "continue TARS setup".
+
+TARS is ready whenever you want to process something.
+```
