@@ -6,9 +6,13 @@
 
 - **Installed plugin now includes command wrappers and MCP metadata.** The release package now ships `commands/` and `.claude-plugin/mcp-servers.json` so `/welcome`, `/start`, and the rest of the command surface route into TARS reliably after marketplace-style install.
 - **Fresh setup is deterministic for Sonnet or stronger models.** `/welcome` is now a short setup contract that asks essential personalization questions, calls the deterministic scaffold tool, verifies `index.md`, `_system/install.yaml`, `_system/config.md`, `memory/`, and `inbox/pending/`, then offers an immediate demo with a transcript, report, email thread, or notes.
+- **Setup failures now explain the local TARS helper, not raw tool plumbing.** `/welcome` and `/doctor` describe `tars-vault` as the one required local helper, keep Obsidian/calendar/tasks/email/Slack clearly optional, and give nontechnical recovery steps before technical details.
+- **The first-run closeout now prescribes a concrete demo.** After setup, TARS asks the user to paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes so it can preview memory candidates, journal notes, and tasks.
 - **The installed runtime contract no longer carries stale Obsidian assumptions.** Shipped `CLAUDE.md` now states that the Markdown workspace is authoritative, Obsidian is optional, writes go through `tars-vault`, and uninitialized workspaces must route to `/welcome`.
 - **Obsidian mode scaffolds views without changing the data model.** Headless setup creates the canonical portable workspace only; Obsidian setup creates the same workspace plus `_views/*.base`.
-- **Release validation now tests the artifact users install.** New artifact validation extracts the built zip, verifies required packaged files, runs scaffold from the extracted MCP server, rejects generic `knowledge/`, `projects/`, or `research/` setup folders, and checks the generated `index.md` for natural-language and inbox guidance.
+- **Release validation now tests the artifact users install.** New artifact validation extracts the built zip, verifies required packaged files, starts the packaged local helper over stdio, fails unless required tools are visible, runs scaffold from the extracted helper, rejects generic `knowledge/`, `projects/`, or `research/` setup folders, and checks the generated `index.md` for natural-language and inbox guidance.
+- **Helper/tool contract gaps are closed.** `resolve_alias` and `runtime_info` are now real helper tools, semantic search accepts `limit` as well as `top_k`, and single-property `update_frontmatter` examples are supported.
+- **Semantic-search dependencies are optional.** `requirements.txt` now contains only the required `mcp` dependency; `fastembed` and `sqlite-vec` moved to `requirements-search.txt` and degrade to FTS-only when absent.
 
 ## v3.4.2 (2026-05-06)
 

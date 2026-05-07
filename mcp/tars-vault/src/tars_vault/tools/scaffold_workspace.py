@@ -95,6 +95,8 @@ def _index_md() -> str:
 
 This is your TARS workspace. All TARS-managed memory, journal, contexts, inbox, archive, and `_system/` files live here.
 
+Markdown files are plain text files. You can open them in any text editor. If you enable Obsidian later, this same workspace also becomes your Obsidian vault.
+
 Slash commands are optional shortcuts. You can type natural-language requests and TARS will route them.
 
 | What you want | Shortcut | Natural-language example |
@@ -111,6 +113,7 @@ Slash commands are optional shortcuts. You can type natural-language requests an
 | Create an artifact | `/create` | "Turn this into an exec-ready narrative" |
 | Plan or check initiatives | `/initiative` | "Check the health of the onboarding initiative" |
 | Check workspace health | `/lint` | "Check for stale or broken items" |
+| Check TARS install | `/doctor` | "Check my TARS install" |
 | Continue setup | `/welcome --continue-setup` | "Continue TARS setup" |
 | See help | `/help` | "What can TARS do?" |
 
@@ -120,7 +123,7 @@ The inbox is a folder workflow, not a single `INBOX.md` note. Drop transcripts, 
 
 ## First demo
 
-Paste a transcript, report, email thread, or rough notes and say "show me what TARS can do with this." TARS will preview the structure first and ask before saving durable memory or tasks.
+Paste a meeting transcript, PDF/report excerpt, email thread, or rough notes and say "show me what TARS can do with this." TARS will preview memory candidates, journal notes, and tasks first, then ask before saving anything durable.
 """
 
 

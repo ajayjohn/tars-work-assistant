@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.3 Architecture
+# TARS 3.4 Architecture
 
-This document describes the current framework architecture as of v3.3, which builds on v3.2 ("persistence, cold-start, wikilink hygiene, and self-improvement plumbing") with documentation-code alignment fixes, token-efficiency consolidation, and removal of the casual/standard engagement modes.
+This document describes the current framework architecture as of v3.4, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and requires one bundled local TARS helper for safe workspace writes.
 
-**Version**: 3.3.0  
-**Release**: 2026-05-05 — see `CHANGELOG.md`  
+**Version**: 3.4.3  
+**Release**: 2026-05-07 — see `CHANGELOG.md`  
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
 ## Three operations (Karpathy framing)
@@ -23,12 +23,12 @@ TARS operates directly on a local Markdown workspace and treats that workspace a
 At a high level:
 - the repository is the framework source, packaging logic, and documentation
 - the workspace is the live operating environment where memory, journal entries, transcripts, and context live
-- the `tars-vault` MCP server is the canonical write interface for workspace mutations; skills call `mcp__tars_vault__*` tools and never raw file writes
+- the local TARS helper (`tars-vault`) is the canonical write interface for workspace mutations; skills call its internal `mcp__tars_vault__*` tools and never raw file writes
 - TARS-managed notes use schema-validated `tars-` properties and `tars/` tags
 - Obsidian Bases provide optional live query surfaces instead of hand-maintained index notes
 - Hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`) enforce write discipline, capture telemetry, and route Claude Code session transcripts into `inbox/pending/` for later `/meeting`-style review
 
-Only skill metadata loads eagerly at session start. With 14 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
+Only skill metadata loads eagerly at session start. With 15 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
 
 ## Repository layout
 
@@ -39,9 +39,9 @@ tars/
 ├── .claude-plugin/           Manifest and marketplace metadata
 ├── .claude/skills/           Obsidian helper skills used by the agent
 ├── .mcp.json                 Project defaults for MCP servers (incl. tars-vault)
-├── mcp/tars-vault/           Write-interface MCP server (Python)
+├── mcp/tars-vault/           Local TARS helper (Python)
 ├── hooks/                    SessionStart / *ToolUse / PreCompact / SessionEnd scripts
-├── skills/                   TARS protocol skills (14)
+├── skills/                   TARS protocol skills (15)
 ├── commands/                 Slash-command wrappers + README mapping
 ├── _system/                  Canonical v3.1 system files and defaults
 ├── _views/                   Obsidian `.base` query definitions
@@ -52,14 +52,15 @@ tars/
 ├── archive/historical/       Retired legacy rebuild docs (pre-v3.0)
 ├── docs/                     User and developer guides (architecture, build, migration, mobile)
 ├── build-plugin.sh           Supported packaging entrypoint
-├── requirements.txt          Pinned runtime deps: mcp, fastembed, sqlite-vec
+├── requirements.txt          Required local-helper dependency: mcp
+├── requirements-search.txt   Optional semantic-search deps: fastembed, sqlite-vec
 ├── CLAUDE.md                 Live agent operating rules
 ├── README.md
 ├── CHANGELOG.md
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 14 skills, 14 commands, and deterministic scripts.
+The framework currently ships 15 skills, 16 commands, and deterministic scripts.
 
 Some older directories remain in the repository for compatibility, migration context, or packaging history. They should not be treated as the active TARS 3.0 runtime architecture unless a specific document says otherwise.
 
@@ -145,7 +146,7 @@ The framework uses one core skill and twelve user-invocable skills (the `/lint` 
 
 ### Write interface layer
 
-The `mcp/tars-vault/` Python MCP server sits between every skill and the workspace. It exposes `mcp__tars_vault__*` tools that:
+The `mcp/tars-vault/` Python local helper sits between every skill and the workspace. It exposes internal `mcp__tars_vault__*` tools that:
 - enforce the `tars-` frontmatter prefix and `_system/schemas.yaml` validation on every write
 - chunk appends at 40KB so large transcripts land cleanly
 - maintain an in-process alias-registry cache with mtime invalidation
@@ -160,7 +161,7 @@ The `mcp/tars-vault/` Python MCP server sits between every skill and the workspa
 
 Hooks under `hooks/` are stdlib-only Python scripts wired via `hooks/hooks.json` and `.claude/settings.json`:
 - `SessionStart` — load housekeeping state, refresh `_system/tools-registry.yaml`, inject workspace-state summary into the session
-- `PreToolUse` — observability for MCP writes (frontmatter prefix enforcement is owned by the MCP server; this hook captures shape)
+- `PreToolUse` — observability for helper writes (frontmatter prefix enforcement is owned by the local helper; this hook captures shape)
 - `PostToolUse` — emit workspace-write telemetry events
 - `PreCompact` + `SessionEnd` — drop the Claude Code session transcript into `inbox/pending/` so `/meeting` can ingest it later
 - `InstructionsLoaded` — telemetry on skill load
@@ -267,7 +268,7 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 ## What was new in v3.1
 
 - **Hook-based enforcement** replaces duplicated prompt-level reminders. SessionStart, PreCompact, SessionEnd, PreToolUse, PostToolUse all go through stdlib-only Python scripts under `hooks/`.
-- **`tars-vault` MCP server** centralizes filesystem writes, validation, chunking, alias resolution, and secret scanning. Skills call `mcp__tars_vault__*` tools.
+- **Local TARS helper (`tars-vault`)** centralizes filesystem writes, validation, chunking, alias resolution, and secret scanning. Skills call internal `mcp__tars_vault__*` tools.
 - **Integration Registry 2.0** — capability-preference map (`_system/integrations.md` v2) plus auto-discovered `_system/tools-registry.yaml` with a 24h TTL. Skills resolve via `resolve_capability` and work interchangeably across Apple, Microsoft 365, Minutes.app, Figma, Snowflake, Pendo, etc.
 - **Hybrid retrieval** — FTS5 for structured memory + FastEmbed + sqlite-vec semantic search for prose. Directly fixes the retrieval-nuance pain point from v3.0 feedback.
 - **Meeting nuance pass** — a Haiku sub-step after summarization preserves contrarian views, notable phrases, specific quotes, unusual terms, missed numbers and dates. Lands in the journal as `## Notable phrases & perspectives`.

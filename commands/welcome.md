@@ -18,14 +18,22 @@ Follow this fallback contract instead:
    - name
    - role/title
    - company/team
-   - first use case
    - persona
    - Claude-first vs Obsidian browsing mode
-3. Call `mcp__tars_vault__scaffold_workspace` exactly once.
+3. Use the bundled local TARS helper to create the workspace. Internally this
+   means `mcp__tars_vault__scaffold_workspace` exactly once.
 4. Verify `index.md`, `_system/install.yaml`, `_system/config.md`, `memory/`,
    and `inbox/pending/` before saying setup is complete.
-5. If the scaffold tool is unavailable or verification fails, stop and show the
-   reason. Do not create files or folders manually.
+5. If the local helper is unavailable or verification fails, stop. Do not create
+   files or folders manually. Use this user-facing recovery text:
+
+   > I can't safely finish TARS setup because the local TARS helper is not connected.
+   >
+   > This helper creates and checks the workspace in the background. This is not
+   > an Obsidian, calendar, task, email, or Slack issue. Those integrations are optional.
+   >
+   > Please make sure the TARS plugin is enabled, restart Claude, and run `/doctor`
+   > or ask "check my TARS install." Then run `/welcome` again.
 
 Hard rules:
 

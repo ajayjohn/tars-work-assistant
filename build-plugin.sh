@@ -20,7 +20,7 @@ cp -r templates/* tars-cowork-plugin/templates/
 mkdir -p tars-cowork-plugin/templates/views
 cp -r _views/* tars-cowork-plugin/templates/views/
 cp -r .claude/skills/* tars-cowork-plugin/.claude/skills/
-cp LICENSE CLAUDE.md requirements.txt tars-cowork-plugin/
+cp LICENSE CLAUDE.md requirements.txt requirements-search.txt tars-cowork-plugin/
 cp .claude-plugin/mcp-servers.json tars-cowork-plugin/.claude-plugin/
 
 # Copy the tars-vault MCP server (required for TARS workspace writes).
@@ -54,6 +54,7 @@ minimal = {
 # Write minimal version for distribution
 with open('tars-cowork-plugin/.claude-plugin/plugin.json', 'w') as f:
     json.dump(minimal, f, indent=2)
+    f.write('\n')
 
 # Sync version to marketplace.json (always in .claude-plugin/)
 marketplace_path = '.claude-plugin/marketplace.json'
@@ -70,6 +71,7 @@ if os.path.exists(marketplace_path):
 
     with open(marketplace_path, 'w') as f:
         json.dump(marketplace, f, indent=2)
+        f.write('\n')
 
     print(f"✓ Created minimal plugin.json (v{minimal['version']})")
     print(f"✓ Synced .claude-plugin/marketplace.json version to v{source['version']}")

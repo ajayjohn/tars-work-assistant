@@ -1,6 +1,6 @@
 # Using TARS from mobile (Claude Remote Control)
 
-TARS runs from your desktop: the Markdown workspace lives on your Mac and the `tars-vault` MCP server runs locally. If Obsidian is enabled, it is a viewer over the same files. To get mobile access, TARS relies on **Claude Remote Control**: claude.ai/code on your phone controls a live Claude Code session running on your Mac. There are zero framework changes for mobile; this doc exists so you know how to set it up and what to expect.
+TARS runs from your desktop: the Markdown workspace lives on your Mac and the local TARS helper runs there too. If Obsidian is enabled, it is a viewer over the same files. To get mobile access, TARS relies on **Claude Remote Control**: claude.ai/code on your phone controls a live Claude Code session running on your Mac. There are zero framework changes for mobile; this doc exists so you know how to set it up and what to expect.
 
 ## What Remote Control does
 
@@ -11,7 +11,7 @@ claude.ai/code on mobile controls a live Claude Code session running on your Mac
 - Anthropic Pro or Max plan (required for Remote Control).
 - Claude Code v2.1.51 or newer on the Mac.
 - Your Mac is powered on, awake, and online.
-- TARS plugin installed on the Mac; `tars-vault` MCP server reachable; workspace available locally. If Obsidian is enabled, the workspace can also be open as an Obsidian vault.
+- TARS plugin installed on the Mac; local TARS helper connected; workspace available locally. If Obsidian is enabled, the workspace can also be open as an Obsidian vault.
 - An iOS or Android device signed into the same Anthropic account.
 
 ## One-time desktop setup
@@ -30,7 +30,7 @@ claude.ai/code on mobile controls a live Claude Code session running on your Mac
    ```
 
    Expect a non-zero PID and exit status 0.
-4. Start a Claude Code session, run `/welcome` or `/briefing` to confirm `tars-vault` MCP is reachable, then leave the session idle — Remote Control picks up from there.
+4. Start a Claude Code session, run `/doctor`, `/welcome`, or `/briefing` to confirm the local TARS helper is reachable, then leave the session idle — Remote Control picks up from there.
 
 ## One-time mobile setup
 
@@ -56,12 +56,12 @@ Voice input works well for meetings: hit the mic, describe what happened, and ha
 - **Claude Code crashed.** The launchd keepalive restarts it automatically. If it doesn't, reload: `launchctl unload ~/Library/LaunchAgents/com.tars.keepalive.plist && launchctl load -w ~/Library/LaunchAgents/com.tars.keepalive.plist`.
 - **Latency spikes.** Check your Mac's network and Anthropic's status page (`status.anthropic.com`). Remote Control tunnels through Anthropic's infrastructure.
 - **Workspace looks stale in Obsidian.** Obsidian sometimes caches. On the Mac, Cmd+R the Obsidian vault, or run `/lint` to force a re-scan.
-- **`tars-vault` MCP not reachable from mobile session.** The MCP server runs on the Mac — confirm `python3 -m tars_vault` starts cleanly with `TARS_VAULT_PATH` set. Mobile doesn't execute the MCP server itself.
+- **Local TARS helper not reachable from mobile session.** The helper runs on the Mac. Run `/doctor` from the Mac session, or confirm `python3 -m tars_vault` starts cleanly with `TARS_VAULT_PATH` set. Mobile doesn't execute the helper itself.
 
 ## Security considerations
 
 - Remote Control traffic goes through Anthropic's infrastructure. Don't paste secrets (API keys, passwords, personal identifiers) into the mobile chat — session content is logged to your Anthropic account like any other.
-- `tars-vault`'s `scan_secrets` pre-write hook still runs on every workspace mutation, so accidental paste of a secret into a journal would still be blocked before landing on disk. This is belt-and-braces, not license to get careless.
+- The local helper's `scan_secrets` pre-write check still runs on every workspace mutation, so accidental paste of a secret into a journal would still be blocked before landing on disk. This is belt-and-braces, not license to get careless.
 - The Mac's TARS workspace is the authoritative store. If Obsidian is enabled, that same folder is the Obsidian vault. Remote Control does not create a separate copy on the phone.
 
 ## What doesn't work on mobile

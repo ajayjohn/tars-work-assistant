@@ -13,8 +13,11 @@ grep -q "preview-only" skills/start/SKILL.md && pass "/start preview-only stated
 grep -qi "Do not write" skills/start/SKILL.md && pass "/start forbids default writes" || fail "/start write guard missing"
 
 [ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
+[ -f commands/doctor.md ] && pass "/doctor command exists" || fail "/doctor command missing"
+[ -f skills/doctor/SKILL.md ] && pass "/doctor skill exists" || fail "/doctor skill missing"
 grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
 grep -q "skills/start/" skills/core/SKILL.md && pass "/start routed" || fail "/start route missing"
+grep -q "skills/doctor/" skills/core/SKILL.md && pass "/doctor routed" || fail "/doctor route missing"
 grep -q -- "--continue-setup" skills/welcome/SKILL.md && pass "welcome continue setup documented" || fail "welcome continue setup missing"
 grep -q "Natural-language example" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && pass "generated index natural-language examples" || fail "index natural-language examples missing"
 grep -qi "process everything in my inbox" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py commands/README.md && pass "inbox natural-language example" || fail "inbox natural-language example missing"
@@ -30,8 +33,12 @@ grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" ||
 grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
 grep -q "scaffold_workspace" mcp/tars-vault/src/tars_vault/server.py && pass "server exposes scaffold_workspace" || fail "scaffold_workspace schema missing"
 grep -q "mcp__tars_vault__scaffold_workspace" skills/welcome/SKILL.md && pass "welcome uses deterministic scaffold" || fail "welcome does not use scaffold tool"
-grep -q "What should TARS know to personalize" skills/welcome/SKILL.md && pass "welcome asks identity and use case" || fail "welcome identity/use-case prompt missing"
+grep -q "What should TARS know to personalize" skills/welcome/SKILL.md && pass "welcome asks identity essentials" || fail "welcome identity prompt missing"
+! grep -q "First thing you want TARS to help with" skills/welcome/SKILL.md && pass "welcome does not ask open-ended first use case" || fail "welcome still asks open-ended first use case"
 grep -q "Try this now" skills/welcome/SKILL.md && pass "welcome offers guided first demo" || fail "welcome guided demo missing"
+grep -q "local TARS helper is not connected" skills/welcome/SKILL.md commands/welcome.md && pass "welcome has nontechnical local-helper recovery" || fail "welcome helper recovery missing"
+grep -q "Markdown files are" skills/welcome/SKILL.md && pass "welcome explains Markdown plainly" || fail "welcome Markdown explanation missing"
+grep -q "If you don't know what Obsidian is" skills/welcome/SKILL.md && pass "welcome explains Obsidian plainly" || fail "welcome Obsidian explanation missing"
 grep -q "Never create generic product-management folders" skills/welcome/SKILL.md && pass "welcome forbids generic workspace folders" || fail "welcome generic-folder guard missing"
 grep -q "Sonnet or a stronger model" CLAUDE.md && pass "runtime contract sets Sonnet-or-stronger setup expectation" || fail "Sonnet setup expectation missing"
 ! grep -qi "Haiku" CLAUDE.md skills/welcome/SKILL.md && pass "welcome setup no longer promises Haiku support" || fail "Haiku setup wording remains"
@@ -49,10 +56,12 @@ python3 - <<'PY'
 import json
 data = json.load(open('/tmp/tars-doctor-validation.json'))
 checks = {c.get('check') for c in data.get('checks', [])}
-assert 'python' in checks and 'workspace_path' in checks and 'import:mcp' in checks
+assert 'python' in checks and 'workspace_path' in checks and 'import:mcp.server' in checks
 print('PASS  runtime doctor emits deterministic checks')
 PY
 [ $? -eq 0 ] || fail "runtime doctor output invalid"
+grep -q "fastembed" requirements-search.txt && pass "optional search requirements separated" || fail "requirements-search missing fastembed"
+! grep -q "fastembed" requirements.txt && pass "required requirements exclude optional FastEmbed" || fail "requirements.txt still requires FastEmbed"
 
 grep -q -- "--enable-obsidian" skills/welcome/SKILL.md && pass "enable Obsidian mode documented" || fail "enable Obsidian missing"
 grep -q -- "--disable-obsidian" skills/welcome/SKILL.md && pass "disable Obsidian mode documented" || fail "disable Obsidian missing"
@@ -115,6 +124,10 @@ if missing:
 print("PASS  every user-invocable skill has a command")
 PY
 [ $? -eq 0 ] || FAIL=1
+
+python3 tests/validate-framework-contracts.py \
+  && pass "framework contract checks green" \
+  || fail "framework contract checks failed"
 
 if [ -d mcp/tars-vault/tests ]; then
   if python3 -c "import pytest" >/dev/null 2>&1; then

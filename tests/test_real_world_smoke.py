@@ -25,6 +25,8 @@ from tars_vault.tools.detect_near_duplicates import detect_near_duplicates
 from tars_vault.tools.fts_search import fts_search
 from tars_vault.tools.move_note import move_note
 from tars_vault.tools.read_note import read_note
+from tars_vault.tools.resolve_alias import resolve_alias
+from tars_vault.tools.runtime_info import runtime_info
 from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.scan_secrets import scan_secrets
 from tars_vault.tools.search_by_tag import search_by_tag
@@ -64,6 +66,8 @@ class FreshInstallSmokeTests(unittest.TestCase):
             "journal",
             "contexts/artifacts",
             "archive/transcripts",
+            "templates",
+            "scripts",
         ]
         for rel in expected_dirs:
             self.assertTrue((self.workspace / rel).is_dir(), rel)
@@ -79,6 +83,7 @@ class FreshInstallSmokeTests(unittest.TestCase):
         self.assertIn("Slash commands are optional shortcuts", index_text)
         self.assertIn("Process everything in my inbox", index_text)
         self.assertIn("inbox/pending/", index_text)
+        self.assertIn("Check my TARS install", index_text)
 
         install = read_note(vault=str(self.workspace), file="_system/install.yaml")
         self.assertEqual(install["status"], "ok")
@@ -101,6 +106,9 @@ class FreshInstallSmokeTests(unittest.TestCase):
         self.assertEqual(found["status"], "ok")
         self.assertEqual(found["count"], 1)
         self.assertEqual(found["results"][0]["path"], "memory/people/sarah.md")
+        health = runtime_info(vault=str(self.workspace))
+        self.assertEqual(health["status"], "ok")
+        self.assertEqual(health["helper"], "connected")
 
     def test_obsidian_mode_uses_same_workspace_with_views(self) -> None:
         result = scaffold_workspace(
@@ -196,6 +204,17 @@ class FreshInstallSmokeTests(unittest.TestCase):
         task_text = (self.workspace / "tasks" / "2026-05-06-follow-up.md").read_text()
         self.assertIn("[[memory/people/alex-renewal]]", task_text)
 
+        (self.workspace / "_system" / "alias-registry.md").write_text(
+            "## Ambiguous Names\n"
+            "| Short Name | Default Resolution | Context Override |\n"
+            "|---|---|---|\n"
+            "| Alex | [[memory/people/alex-renewal]] | renewal -> [[memory/people/alex-renewal]] |\n",
+            encoding="utf-8",
+        )
+        alias = resolve_alias(vault=str(self.workspace), name="Alex", context="renewal")
+        self.assertEqual(alias["status"], "ok")
+        self.assertEqual(alias["resolution_status"], "resolved")
+
         report = create_note(
             vault=str(self.workspace),
             path="inbox/pending/northwind-renewal-report.md",
@@ -249,7 +268,7 @@ class FreshInstallSmokeTests(unittest.TestCase):
         self.assertEqual(fts["status"], "ok", fts)
         self.assertGreaterEqual(fts["count"], 1)
 
-        semantic = semantic_search(vault=str(self.workspace), query="budget timeline", scope="all")
+        semantic = semantic_search(vault=str(self.workspace), query="budget timeline", scope="all", limit=5)
         self.assertIn(semantic["status"], {"ok", "fts_only", "no_index"}, semantic)
         if semantic["status"] != "no_index":
             self.assertIn("results", semantic)

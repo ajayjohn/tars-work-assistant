@@ -1,6 +1,6 @@
 {
   "$schema": "https://claude.ai/schemas/plugin-mcp-servers.schema.json",
-  "_comment": "TARS plugin-shipped MCP servers. tars-vault is the workspace read/write interface; office rendering delegates to first-party document, spreadsheet, and presentation skills.",
+  "_comment": "TARS plugin-shipped local helper. tars-vault is the workspace read/write interface; office rendering delegates to first-party document, spreadsheet, and presentation skills.",
   "mcpServers": {
     "tars-vault": {
       "type": "stdio",

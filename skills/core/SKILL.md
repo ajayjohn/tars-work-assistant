@@ -28,7 +28,7 @@ The user is a senior executive. Every interaction must respect their time, prese
 
 TARS uses a local Markdown workspace as the durable operating surface. All persistent state lives in that workspace as Markdown files with typed frontmatter properties. Obsidian is an optional enhanced viewer over the same files, not a separate data model.
 
-**The `tars-vault` MCP server is the write interface for ALL workspace mutations.** Skills call `mcp__tars_vault__*` tools; the server writes Markdown files directly, enforces the `tars-` prefix, validates against `_system/schemas.yaml`, auto-chunks large content (>40KB), runs wikilink validation, and logs every mutation. Never use direct file I/O from skills.
+**The local TARS helper (`tars-vault`) is the write interface for ALL workspace mutations.** Skills call its internal `mcp__tars_vault__*` tools; the helper writes Markdown files directly, enforces the `tars-` prefix, validates against `_system/schemas.yaml`, auto-chunks large content (>40KB), runs wikilink validation, and logs every mutation. Never use direct file I/O from skills.
 
 Storage/view adapter:
 
@@ -48,7 +48,7 @@ TARS operates on three verbs:
 - **query**: `/answer`, `/briefing`, `/think` — synthesize answers from workspace context with citations.
 - **lint**: `/lint`, `/maintain` — maintain consistency, hygiene, and health.
 
-### Write interface — `tars-vault` MCP tools
+### Write interface — local TARS helper tools
 
 | Tool | Purpose | Replaces |
 |------|---------|----------|
@@ -67,8 +67,9 @@ TARS operates on three verbs:
 | `mcp__tars_vault__classify_file` | Organization Engine classifier | — |
 | `mcp__tars_vault__resolve_capability` | Provider-agnostic integration resolver | hardcoded MCP server names |
 | `mcp__tars_vault__refresh_integrations` | Force re-discovery of MCP tools | — |
+| `mcp__tars_vault__runtime_info` | Local helper health check | ad hoc setup debugging |
 
-**Hooks now enforce** tars-prefix checks, large-content rejection, alias-registry loading, install-record mismatch warnings, and telemetry emission. Skill prompts do not re-assert these guarantees. The MCP server and `PreToolUse`/`PostToolUse`/`SessionStart` hooks handle them. Skills write daily-note summaries and changelog entries explicitly via `mcp__tars_vault__append_note`.
+**Hooks now enforce** tars-prefix checks, large-content rejection, alias-registry loading, install-record mismatch warnings, and telemetry emission. Skill prompts do not re-assert these guarantees. The local helper and `PreToolUse`/`PostToolUse`/`SessionStart` hooks handle them. Skills write daily-note summaries and changelog entries explicitly via `mcp__tars_vault__append_note`.
 
 ### User profile
 
@@ -202,6 +203,7 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 | "Lint workspace", "check hygiene", broken links, orphans, schema drift | `skills/lint/` | `/lint` |
 | "Health check", "run maintenance" | `skills/maintain/` | `/maintain` |
 | "Process inbox", "check inbox" | `skills/maintain/` (inbox) | `/maintain inbox` |
+| "Check TARS install", "diagnose TARS", "local TARS helper not connected" | `skills/doctor/` | `/doctor` |
 | `/start`, "try TARS", "quick demo", first session with no `_system/config.md` | `skills/start/` | `/start` |
 | "Setup", "get started", "configure TARS", "onboard" | `skills/welcome/` | `/welcome` |
 | "Continue TARS setup", "finish setup", `/welcome --continue-setup` | `skills/welcome/` (continue setup) | `/welcome --continue-setup` |
@@ -667,7 +669,7 @@ When users ask "what can you do?", "help", "show me commands", or similar:
 | Synthesize | `/answer`, `/briefing`, `/think` |
 | Produce | `/communicate`, `/create`, `/initiative` |
 | Maintain | `/lint`, `/maintain` |
-| Set up | `/start`, `/welcome` |
+| Set up | `/start`, `/doctor`, `/welcome` |
 
 If `_system/maturity.yaml` shows deferred setup incomplete, the recommended next workflow is:
 
@@ -678,6 +680,7 @@ If `_system/maturity.yaml` shows deferred setup incomplete, the recommended next
 | Skill | Purpose |
 |-------|---------|
 | `/start` | Zero-setup preview using pasted content, with optional persistence after setup |
+| `/doctor` | Install and workspace health check for the local TARS helper |
 | `/meeting` | Process meeting transcripts into journal, tasks, memory |
 | `/briefing` | Daily and weekly briefings with schedule, tasks, context, and restrained coaching |
 | `/tasks` | Extract and manage tasks with accountability testing |

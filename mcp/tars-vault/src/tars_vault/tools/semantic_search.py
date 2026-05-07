@@ -60,13 +60,15 @@ def semantic_search(**kwargs: Any) -> dict:
         }
     source_types = SCOPE_TO_SOURCE_TYPES[scope]
 
-    top_k = kwargs.get("top_k", 10)
+    top_k = kwargs.get("top_k", kwargs.get("limit", 10))
     try:
         top_k = max(1, min(int(top_k), MAX_K))
     except (TypeError, ValueError):
         top_k = 10
 
     date_range = kwargs.get("date_range")
+    if date_range is None and (kwargs.get("since") or kwargs.get("until")):
+        date_range = {"start": kwargs.get("since"), "end": kwargs.get("until")}
 
     vault_path = Path(vault).expanduser()
     db_path = si.index_path(vault_path)

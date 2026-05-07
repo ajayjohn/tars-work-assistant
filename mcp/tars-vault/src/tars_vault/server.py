@@ -1,4 +1,4 @@
-"""MCP server bootstrap for tars-vault (v3.1.1).
+"""Local helper bootstrap for tars-vault (v3.4.3).
 
 Wires list_tools + call_tool handlers against the tool modules under `tools/`.
 Each handler is a synchronous `(**kwargs) -> dict` function; this module
@@ -55,7 +55,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 **_COMMON_VAULT,
+                "name": {"type": "string"},
                 "path": {"type": "string"},
+                "template": {"type": "string"},
                 "frontmatter": {"type": "object"},
                 "body": {"type": "string"},
                 "overwrite": {"type": "boolean"},
@@ -99,9 +101,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 **_COMMON_VAULT,
                 "file": {"type": "string"},
                 "updates": {"type": "object"},
+                "property": {"type": "string"},
+                "value": {},
                 "allow_user_properties": {"type": "boolean"},
             },
-            "required": ["file", "updates"],
+            "required": ["file"],
         },
     },
     "search_by_tag": {
@@ -179,6 +183,29 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["capability"],
         },
     },
+    "resolve_alias": {
+        "description": "Resolve an alias, abbreviation, or short name to a canonical TARS record.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "name": {"type": "string"},
+                "alias": {"type": "string"},
+                "kind": {"type": "string"},
+                "kind_hint": {"type": "string"},
+                "context": {"type": "string"},
+            },
+        },
+    },
+    "runtime_info": {
+        "description": "Check whether the local TARS helper is connected and report required/optional runtime health.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+            },
+        },
+    },
     "refresh_integrations": {
         "description": "Rebuild _system/tools-registry.yaml from .mcp.json.",
         "inputSchema": {
@@ -240,8 +267,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "query": {"type": "string"},
                 "scope": {"type": "string"},
                 "limit": {"type": "integer"},
+                "top_k": {"type": "integer"},
                 "since": {"type": "string"},
                 "until": {"type": "string"},
+                "date_range": {"type": "object"},
                 "semantic_weight": {"type": "number"},
             },
             "required": ["query"],
@@ -405,7 +434,7 @@ def run_stdio(vault_path: str) -> int:
                 write_stream,
                 InitializationOptions(
                     server_name="tars-vault",
-                    server_version="3.1.1",
+                    server_version="3.4.3",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},
