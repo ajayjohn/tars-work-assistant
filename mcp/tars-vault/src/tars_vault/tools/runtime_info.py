@@ -6,25 +6,12 @@ without mutating the workspace.
 """
 from __future__ import annotations
 
-import importlib
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
 from .. import _common
-
-
-def _check_import(module: str, *, required: bool) -> dict[str, Any]:
-    try:
-        importlib.import_module(module)
-        return {"check": f"import:{module}", "status": "ok", "message": "Import succeeded"}
-    except Exception as exc:
-        return {
-            "check": f"import:{module}",
-            "status": "error" if required else "warning",
-            "message": f"Import failed: {exc}",
-        }
 
 
 def runtime_info(**kwargs: Any) -> dict:
@@ -40,9 +27,11 @@ def runtime_info(**kwargs: Any) -> dict:
             "message": f"Python 3.10+ required; found {sys.version.split()[0]}",
         })
 
-    checks.append(_check_import("mcp.server", required=True))
-    checks.append(_check_import("fastembed", required=False))
-    checks.append(_check_import("sqlite_vec", required=False))
+    checks.append({
+        "check": "local_helper_transport",
+        "status": "ok",
+        "message": "Bundled stdlib MCP transport available",
+    })
 
     if vault:
         workspace = _common.resolve_vault_path(vault)
@@ -65,7 +54,7 @@ def runtime_info(**kwargs: Any) -> dict:
     return _common.ok(
         helper="connected",
         required_runtime="ok" if not errors else "error",
-        optional_search="available" if not any(c["check"] in {"import:fastembed", "import:sqlite_vec"} and c["status"] != "ok" for c in checks) else "degraded",
+        optional_search="checked_by_search_tool",
         errors=len(errors),
         warnings=len(warnings),
         checks=checks,

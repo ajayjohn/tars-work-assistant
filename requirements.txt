@@ -1,4 +1,3 @@
-# TARS required local-helper dependency.
+# TARS has no required third-party Python packages for first setup.
+# The local TARS helper speaks MCP using a bundled stdlib transport.
 # Optional semantic-search packages live in requirements-search.txt.
-
-mcp>=1.0,<2.0

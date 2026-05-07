@@ -18,6 +18,7 @@ from pathlib import Path
 REQUIRED_FILES = {
     ".claude-plugin/plugin.json",
     ".claude-plugin/mcp-servers.json",
+    ".mcp.json",
     "commands/welcome.md",
     "commands/start.md",
     "commands/doctor.md",
@@ -110,6 +111,26 @@ def validate_zip_members(zip_path: Path) -> None:
     pass_("artifact does not ship a fake runtime workspace")
 
 
+def _server_spec_from_manifest(root: Path) -> dict:
+    plugin = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    inline = plugin.get("mcpServers", {})
+    if "tars-vault" not in inline:
+        fail("packaged plugin.json missing inline mcpServers.tars-vault")
+    root_mcp = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
+    if "mcpServers" not in root_mcp:
+        fail("packaged root .mcp.json must use standard mcpServers shape")
+    if "tars-vault" not in root_mcp["mcpServers"]:
+        fail("packaged root .mcp.json missing tars-vault")
+    root_servers = root_mcp["mcpServers"]
+    for label, spec in (("plugin.json", inline["tars-vault"]), (".mcp.json", root_servers["tars-vault"])):
+        env = spec.get("env", {})
+        py_path = env.get("PYTHONPATH", "")
+        if "${CLAUDE_PLUGIN_ROOT}" not in py_path:
+            fail(f"{label} tars-vault PYTHONPATH must use CLAUDE_PLUGIN_ROOT")
+    pass_("packaged manifests declare tars-vault in plugin.json and root .mcp.json")
+    return inline["tars-vault"]
+
+
 def validate_text_surface(root: Path) -> None:
     checked = [
         root / "CLAUDE.md",
@@ -117,6 +138,7 @@ def validate_text_surface(root: Path) -> None:
         root / "skills" / "welcome" / "SKILL.md",
         root / ".claude-plugin" / "plugin.json",
         root / ".claude-plugin" / "mcp-servers.json",
+        root / ".mcp.json",
     ]
     for path in checked:
         text = path.read_text(encoding="utf-8")
@@ -176,9 +198,7 @@ def _read_json_response(proc: subprocess.Popen[str], expected_id: int, timeout: 
 
 
 def validate_runtime_list_tools(root: Path) -> None:
-    config_path = root / ".claude-plugin" / "mcp-servers.json"
-    config = json.loads(config_path.read_text(encoding="utf-8"))
-    spec = config["mcpServers"]["tars-vault"]
+    spec = _server_spec_from_manifest(root)
     args = [sys.executable if spec["command"] == "python3" else spec["command"], *spec["args"]]
     workspace = Path(tempfile.mkdtemp(prefix="tars-runtime-workspace-"))
     env = os.environ.copy()

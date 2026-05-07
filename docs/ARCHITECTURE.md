@@ -52,7 +52,7 @@ tars/
 ├── archive/historical/       Retired legacy rebuild docs (pre-v3.0)
 ├── docs/                     User and developer guides (architecture, build, migration, mobile)
 ├── build-plugin.sh           Supported packaging entrypoint
-├── requirements.txt          Required local-helper dependency: mcp
+├── requirements.txt          No required third-party deps for first setup
 ├── requirements-search.txt   Optional semantic-search deps: fastembed, sqlite-vec
 ├── CLAUDE.md                 Live agent operating rules
 ├── README.md
@@ -269,6 +269,7 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 
 - **Hook-based enforcement** replaces duplicated prompt-level reminders. SessionStart, PreCompact, SessionEnd, PreToolUse, PostToolUse all go through stdlib-only Python scripts under `hooks/`.
 - **Local TARS helper (`tars-vault`)** centralizes filesystem writes, validation, chunking, alias resolution, and secret scanning. Skills call internal `mcp__tars_vault__*` tools.
+- **Bundled stdlib MCP transport** lets marketplace installs expose `tars-vault` tools without requiring users to install the Python `mcp` package first. The official SDK remains an optional transport when available.
 - **Integration Registry 2.0** — capability-preference map (`_system/integrations.md` v2) plus auto-discovered `_system/tools-registry.yaml` with a 24h TTL. Skills resolve via `resolve_capability` and work interchangeably across Apple, Microsoft 365, Minutes.app, Figma, Snowflake, Pendo, etc.
 - **Hybrid retrieval** — FTS5 for structured memory + FastEmbed + sqlite-vec semantic search for prose. Directly fixes the retrieval-nuance pain point from v3.0 feedback.
 - **Meeting nuance pass** — a Haiku sub-step after summarization preserves contrarian views, notable phrases, specific quotes, unusual terms, missed numbers and dates. Lands in the journal as `## Notable phrases & perspectives`.

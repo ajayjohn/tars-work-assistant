@@ -320,7 +320,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 
 
 # ---------------------------------------------------------------------------
-# MCP server — wired against the mcp SDK
+# MCP server transport
 # ---------------------------------------------------------------------------
 
 
@@ -368,10 +368,130 @@ def _check_install_record(vault_path: str) -> None:
         return
 
 
+def _tool_specs() -> list[dict[str, Any]]:
+    out = []
+    for name, spec in TOOL_SCHEMAS.items():
+        if name not in TOOL_REGISTRY:
+            continue
+        out.append(
+            {
+                "name": name,
+                "description": spec["description"],
+                "inputSchema": spec["inputSchema"],
+            }
+        )
+    return out
+
+
+def _call_handler_sync(name: str, arguments: dict | None, default_vault: str) -> dict:
+    handler = TOOL_REGISTRY.get(name)
+    if handler is None:
+        return {"status": "error", "reason": f"unknown tool: {name}"}
+    args = dict(arguments or {})
+    if "vault" not in args and default_vault:
+        args["vault"] = default_vault
+    try:
+        result = handler(**args)
+    except TypeError as exc:
+        result = {"status": "error", "reason": f"bad arguments: {exc}"}
+    except NotImplementedError as exc:
+        result = {"status": "error", "reason": f"tool not yet implemented: {exc}"}
+    except Exception as exc:
+        result = {"status": "error", "reason": f"tool raised: {exc}"}
+    if not isinstance(result, dict):
+        result = {"status": "error", "reason": f"tool returned non-dict: {type(result).__name__}"}
+    return result
+
+
+def _write_json(payload: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(payload, default=str) + "\n")
+    sys.stdout.flush()
+
+
+def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
+
+
+def _run_minimal_stdio(vault_path: str) -> int:
+    """Run a small stdlib MCP stdio transport.
+
+    The official `mcp` Python SDK is preferred when installed, but marketplace
+    users should not need to run `pip install` before first setup. This fallback
+    implements the JSON-RPC methods TARS needs: initialize, tools/list, and
+    tools/call.
+    """
+    default_vault = _resolve_default_vault(vault_path)
+    _check_install_record(default_vault)
+    try:
+        for raw in sys.stdin:
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                request = json.loads(line)
+            except json.JSONDecodeError:
+                _write_json(_jsonrpc_error(None, -32700, "Parse error"))
+                continue
+
+            method = request.get("method")
+            request_id = request.get("id")
+            params = request.get("params") or {}
+
+            if method == "notifications/initialized":
+                continue
+            if method == "initialize":
+                protocol = params.get("protocolVersion") or "2024-11-05"
+                _write_json(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {
+                            "protocolVersion": protocol,
+                            "capabilities": {"tools": {}},
+                            "serverInfo": {"name": "tars-vault", "version": "3.4.3"},
+                        },
+                    }
+                )
+                continue
+            if method == "ping":
+                _write_json({"jsonrpc": "2.0", "id": request_id, "result": {}})
+                continue
+            if method == "tools/list":
+                _write_json({"jsonrpc": "2.0", "id": request_id, "result": {"tools": _tool_specs()}})
+                continue
+            if method == "tools/call":
+                name = params.get("name")
+                arguments = params.get("arguments") or {}
+                result = _call_handler_sync(str(name or ""), arguments, default_vault)
+                _write_json(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": {
+                            "content": [
+                                {"type": "text", "text": json.dumps(result, indent=2, default=str)}
+                            ],
+                            "isError": result.get("status") == "error",
+                        },
+                    }
+                )
+                continue
+
+            if request_id is not None:
+                _write_json(_jsonrpc_error(request_id, -32601, f"Method not found: {method}"))
+    except KeyboardInterrupt:
+        return 0
+    except Exception as exc:
+        print(f"tars-vault: fallback server exited with error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def run_stdio(vault_path: str) -> int:
     """Run the MCP server on stdio. Blocks until the transport closes.
 
-    Returns 0 on clean shutdown, 3 if the `mcp` SDK is unavailable.
+    Uses the official `mcp` SDK when available, otherwise falls back to the
+    bundled stdlib transport so marketplace installs work without pip setup.
     """
     try:
         from mcp.server import NotificationOptions, Server
@@ -381,10 +501,10 @@ def run_stdio(vault_path: str) -> int:
     except Exception as exc:
         print(
             f"tars-vault: mcp SDK not available ({exc}). "
-            "Install with: pip install 'mcp>=1.0,<2.0'",
+            "Using bundled stdlib transport.",
             file=sys.stderr,
         )
-        return 3
+        return _run_minimal_stdio(vault_path)
 
     default_vault = _resolve_default_vault(vault_path)
     _check_install_record(default_vault)
@@ -392,39 +512,18 @@ def run_stdio(vault_path: str) -> int:
 
     @server.list_tools()
     async def _list_tools() -> list[Tool]:
-        out = []
-        for name, spec in TOOL_SCHEMAS.items():
-            if name not in TOOL_REGISTRY:
-                continue
-            out.append(
-                Tool(
-                    name=name,
-                    description=spec["description"],
-                    inputSchema=spec["inputSchema"],
-                )
+        return [
+            Tool(
+                name=spec["name"],
+                description=spec["description"],
+                inputSchema=spec["inputSchema"],
             )
-        return out
+            for spec in _tool_specs()
+        ]
 
     @server.call_tool()
     async def _call_tool(name: str, arguments: dict | None) -> list[TextContent]:
-        handler = TOOL_REGISTRY.get(name)
-        if handler is None:
-            payload = {"status": "error", "reason": f"unknown tool: {name}"}
-            return [TextContent(type="text", text=json.dumps(payload, indent=2))]
-        args = dict(arguments or {})
-        if "vault" not in args and default_vault:
-            args["vault"] = default_vault
-        # Run the synchronous handler off the event loop.
-        try:
-            result = await asyncio.to_thread(handler, **args)
-        except TypeError as exc:
-            result = {"status": "error", "reason": f"bad arguments: {exc}"}
-        except NotImplementedError as exc:
-            result = {"status": "error", "reason": f"tool not yet implemented: {exc}"}
-        except Exception as exc:  # defensive: never kill the server
-            result = {"status": "error", "reason": f"tool raised: {exc}"}
-        if not isinstance(result, dict):
-            result = {"status": "error", "reason": f"tool returned non-dict: {type(result).__name__}"}
+        result = await asyncio.to_thread(_call_handler_sync, name, arguments, default_vault)
         return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
 
     async def _main() -> None:

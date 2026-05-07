@@ -60,7 +60,7 @@ Try this:
 3. Run `/doctor` again, or ask "check my TARS install."
 4. When the check passes, run `/welcome`.
 
-Details: TARS needs the bundled `tars-vault` helper with Python 3.10+ and the `mcp` package. Semantic search packages are optional and can be added later.
+Details: TARS needs Python 3.10+ and the bundled `tars-vault` helper. It does not require the Python `mcp` package for first setup. Semantic search packages are optional and can be added later.
 ```
 
 If the user is in a code checkout and asks for technical help, suggest:

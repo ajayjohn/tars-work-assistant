@@ -9,7 +9,7 @@ The migration is additive. Existing notes, frontmatter, and views keep working. 
 ## Prerequisites
 
 - Framework upgraded to `v3.1.0` (plugin installed / checkout at the `v3.1.0` tag).
-- `python3 -m pip install -r requirements.txt` inside the framework repo (installs the pinned `mcp`, `fastembed`, `sqlite-vec` deps — nothing else).
+- Current TARS releases require no third-party Python package for first setup. Optional semantic search dependencies live in `requirements-search.txt`.
 - `TARS_VAULT_PATH` environment variable points at the vault.
 - Vault is a git working tree with a clean status (`git -C "$TARS_VAULT_PATH" status --porcelain` returns empty).
 - Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills available in your Claude Code install (auto-bundled on most installs; `/welcome` will probe and record the result).

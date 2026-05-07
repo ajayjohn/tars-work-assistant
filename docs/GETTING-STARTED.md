@@ -37,13 +37,9 @@ Install from your preferred path:
    - clone the repository
    - install the plugin from the local checkout
 
-After installing the plugin from a local checkout, install the required local-helper dependency from the repo root:
+After installing the plugin from a local checkout, no third-party Python package is required for first setup. `requirements.txt` is intentionally empty of runtime pins.
 
-```text
-pip install -r requirements.txt
-```
-
-The required dependency is minimal: `mcp`. Semantic search enhancements are optional:
+Semantic search enhancements are optional:
 
 ```text
 pip install -r requirements-search.txt
@@ -63,7 +59,7 @@ If setup behaves strangely, run the lightweight doctor from the framework checko
 python3 scripts/doctor.py --workspace ~/Documents/TARS\ Workspace
 ```
 
-It checks Python, local-helper dependency importability, the resolved workspace path, write permissions, and install-record consistency. If Python itself is missing, install Python 3.10+ first, then rerun the check.
+It checks Python, the bundled local helper, the resolved workspace path, write permissions, and install-record consistency. If Python itself is missing, install Python 3.10+ first, then rerun the check.
 
 ## First-run setup
 

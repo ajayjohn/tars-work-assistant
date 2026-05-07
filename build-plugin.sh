@@ -30,8 +30,9 @@ rsync -a --exclude '__pycache__' --exclude 'tests' mcp/tars-vault/ tars-cowork-p
 # Copy hooks (plugin auto-registers them via hooks/hooks.json).
 rsync -a --exclude '__pycache__' hooks/ tars-cowork-plugin/hooks/
 
-# .mcp.json is dev-only (tars repo working context); fresh installs use
-# .claude-plugin/mcp-servers.json which resolves ${CLAUDE_PLUGIN_ROOT} correctly.
+# The packaged plugin ships MCP metadata in two documented places:
+# - .claude-plugin/plugin.json inline `mcpServers`.
+# - plugin-root .mcp.json using the standard `{"mcpServers": ...}` shape.
 
 # Create minimal plugin.json and sync marketplace.json using Python
 python3 << 'PYTHON_SCRIPT'
@@ -48,12 +49,18 @@ minimal = {
     "version": source["version"],
     "description": source["description"],
     "author": source["author"],
-    "license": source["license"]
+    "license": source["license"],
+    "mcpServers": source["mcpServers"]
 }
 
 # Write minimal version for distribution
 with open('tars-cowork-plugin/.claude-plugin/plugin.json', 'w') as f:
     json.dump(minimal, f, indent=2)
+    f.write('\n')
+
+# Plugin-root .mcp.json uses the standard MCP server configuration shape.
+with open('tars-cowork-plugin/.mcp.json', 'w') as f:
+    json.dump({"mcpServers": source["mcpServers"]}, f, indent=2)
     f.write('\n')
 
 # Sync version to marketplace.json (always in .claude-plugin/)

@@ -10,10 +10,12 @@ requires-python = ">=3.10"
 license = {text = "PolyForm-Noncommercial-1.0.0"}
 authors = [{name = "Ajay John"}]
 dependencies = [
-  "mcp>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
+mcp-sdk = [
+  "mcp>=1.0,<2.0",
+]
 search = [
   "fastembed>=0.4,<1.0",
   "sqlite-vec>=0.1.6,<0.2",

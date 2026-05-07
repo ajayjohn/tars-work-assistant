@@ -56,12 +56,13 @@ python3 - <<'PY'
 import json
 data = json.load(open('/tmp/tars-doctor-validation.json'))
 checks = {c.get('check') for c in data.get('checks', [])}
-assert 'python' in checks and 'workspace_path' in checks and 'import:mcp.server' in checks
+assert 'python' in checks and 'workspace_path' in checks and 'local_helper_transport' in checks
 print('PASS  runtime doctor emits deterministic checks')
 PY
 [ $? -eq 0 ] || fail "runtime doctor output invalid"
 grep -q "fastembed" requirements-search.txt && pass "optional search requirements separated" || fail "requirements-search missing fastembed"
 ! grep -q "fastembed" requirements.txt && pass "required requirements exclude optional FastEmbed" || fail "requirements.txt still requires FastEmbed"
+! grep -q "mcp>=" requirements.txt && pass "first setup has no required mcp pip dependency" || fail "requirements.txt still requires mcp"
 
 grep -q -- "--enable-obsidian" skills/welcome/SKILL.md && pass "enable Obsidian mode documented" || fail "enable Obsidian missing"
 grep -q -- "--disable-obsidian" skills/welcome/SKILL.md && pass "disable Obsidian mode documented" || fail "disable Obsidian missing"

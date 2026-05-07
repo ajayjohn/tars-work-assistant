@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Packaged helper registration now uses Claude's plugin manifest path.** The install artifact declares `tars-vault` directly in packaged `plugin.json` and ships a plugin-root `.mcp.json`, so Claude can register `mcp__tars_vault__runtime_info`, `mcp__tars_vault__scaffold_workspace`, and the rest of the local helper tools after marketplace install.
+- **The local helper no longer requires a pip-installed MCP SDK.** `tars-vault` now falls back to a bundled stdlib MCP transport when the Python `mcp` package is unavailable, so marketplace users only need Python for first setup.
 - **Installed plugin now includes command wrappers and MCP metadata.** The release package now ships `commands/` and `.claude-plugin/mcp-servers.json` so `/welcome`, `/start`, and the rest of the command surface route into TARS reliably after marketplace-style install.
 - **Fresh setup is deterministic for Sonnet or stronger models.** `/welcome` is now a short setup contract that asks essential personalization questions, calls the deterministic scaffold tool, verifies `index.md`, `_system/install.yaml`, `_system/config.md`, `memory/`, and `inbox/pending/`, then offers an immediate demo with a transcript, report, email thread, or notes.
 - **Setup failures now explain the local TARS helper, not raw tool plumbing.** `/welcome` and `/doctor` describe `tars-vault` as the one required local helper, keep Obsidian/calendar/tasks/email/Slack clearly optional, and give nontechnical recovery steps before technical details.

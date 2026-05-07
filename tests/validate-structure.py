@@ -138,6 +138,8 @@ def main():
     shipped_mcp_json = os.path.join(PLUGIN_ROOT, ".claude-plugin", "mcp-servers.json")
     if not os.path.isfile(shipped_mcp_json):
         errors.append("MISSING: .claude-plugin/mcp-servers.json (plugin-shipped MCP configuration)")
+    if "mcpServers" not in manifest or "tars-vault" not in manifest.get("mcpServers", {}):
+        errors.append("MISSING: plugin.json mcpServers.tars-vault (required for plugin helper registration)")
 
     print_results(errors, warnings)
     return 1 if errors else 0
