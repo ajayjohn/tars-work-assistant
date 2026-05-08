@@ -1,11 +1,12 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.4 Architecture
+# TARS 3.5 Architecture
 
-This document describes the current framework architecture as of v3.4, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and requires one bundled local TARS helper for safe workspace writes.
+This document describes the current framework architecture as of v3.5, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and requires one bundled local TARS helper for safe workspace writes.
 
-**Version**: 3.4.4
-**Release**: 2026-05-07 — see `CHANGELOG.md`  
+**Version**: 3.5.0
+**Release**: 2026-05-08 — see `CHANGELOG.md`
+
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
 ## Three operations (Karpathy framing)
@@ -148,11 +149,15 @@ The framework uses one core skill and twelve user-invocable skills (the `/lint` 
 
 The `mcp/tars-vault/` Python local helper sits between every skill and the workspace. It exposes internal `mcp__tars_vault__*` tools that:
 - enforce the `tars-` frontmatter prefix and `_system/schemas.yaml` validation on every write
+- reject unknown tool arguments before dispatch, so misshaped calls fail visibly instead of silently dropping data
+- fail closed when no real workspace can be resolved, and block writes when `_system/install.yaml` records a different workspace path
+- protect managed system paths (`_system/`, `_views/`, `archive/`, root `index.md`) from direct create/update/move/archive calls outside internal maintenance flows
 - chunk appends at 40KB so large transcripts land cleanly
 - maintain an in-process alias-registry cache with mtime invalidation
 - validate wikilinks before writes
 - move notes while preserving wikilinks (Organization Engine primitive)
 - wrap `scripts/scan-secrets.py` for pre-write secret classification
+- read system files through `read_system_file`, with YAML parsed into structured data and traversal blocked
 - classify files and detect near-duplicates for the Organization Engine
 - resolve capabilities against `_system/tools-registry.yaml` (populated by `SessionStart`)
 - expose FTS5 + semantic retrieval + deterministic rerank
@@ -160,7 +165,7 @@ The `mcp/tars-vault/` Python local helper sits between every skill and the works
 ### Hooks layer
 
 Hooks under `hooks/` are stdlib-only Python scripts wired via `hooks/hooks.json` and `.claude/settings.json`:
-- `SessionStart` — load housekeeping state, refresh `_system/tools-registry.yaml`, inject workspace-state summary into the session
+- `SessionStart` — refresh the integrations index, inject concise workspace-state guidance, and suppress repeated housekeeping notices through `_system/install.yaml.acknowledged_notices`
 - `PreToolUse` — observability for helper writes (frontmatter prefix enforcement is owned by the local helper; this hook captures shape)
 - `PostToolUse` — emit workspace-write telemetry events
 - `PreCompact` + `SessionEnd` — drop the Claude Code session transcript into `inbox/pending/` so `/meeting` can ingest it later
@@ -178,7 +183,7 @@ Hybrid retrieval, built by `scripts/build-search-index.py` and served from `mcp/
 
 ### Integration layer (provider-agnostic)
 
-`_system/integrations.md` is a capability-preference map (calendar / tasks / email / meeting-recording / office-docs / file-storage / design / data-warehouse / analytics / project-tracker / documentation / monitoring / communication). `_system/tools-registry.yaml` is auto-discovered state with a 24-hour TTL, written by the SessionStart hook via `scripts/discover-mcp-tools.py` + `scripts/capability-classifier.py`.
+`_system/integrations.md` is a capability-preference map (calendar / tasks / email / meeting-recording / office-docs / file-storage / design / data-warehouse / analytics / project-tracker / documentation / monitoring / communication). `_system/tools-registry.yaml` is auto-discovered state with a 24-hour TTL, refreshed silently by the SessionStart hook via `scripts/discover-mcp-tools.py` + `scripts/capability-classifier.py`. Users only see a plain `/doctor` hint if that refresh fails.
 
 Every skill resolves integrations through `mcp__tars_vault__resolve_capability(capability=…)` and uses whatever MCP tool the registry returns. No hardcoded server names anywhere.
 
@@ -201,8 +206,9 @@ TARS ships zero office-rendering Python libraries. The `templates/office/` folde
 - `alias-registry.md` resolves names and alternate forms
 - `integrations.md` records capability preferences (v3.1 format, `tars-config-version: "2.0"`)
 - `tools-registry.yaml` is the auto-discovered live tool roster (24h TTL)
-- `guardrails.yaml` drives secret and negative-sentiment scans
+- `guardrails.yaml` drives secret and negative-sentiment scans, including common Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic token patterns
 - `housekeeping-state.yaml` + `maturity.yaml` track maintenance cadence and live hydration counts
+- `install.yaml` stores workspace identity, plugin version, scheduler preference, and notice acknowledgments
 - `telemetry/YYYY-MM-DD.jsonl` captures skill invocations, workspace writes, retrieval hits, durability / accountability signals
 - `backlog/` stores framework issues and user improvement ideas
 - `search-index-state.json` + `search.db` hold the hybrid retrieval state
@@ -249,16 +255,27 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace, not a copied `reference/` bundle
 
-## What's new in v3.2
+## What's new in v3.5
 
-- **Persistent install record (`_system/install.yaml`)** — workspace-specific record carrying `workspace_type`, `workspace_path`, backward-compatible `vault_path`, `obsidian_enabled`, `obsidian_vault_path`, `installation_id`, `persona`, `plugin_version`, and timestamps. Hooks consult it on every session start; install/CWD mismatch refuses silent writes via the pre-tool-use hook.
+- **MCP helper safety moved into the server.** Unknown tool arguments are rejected, write tools fail when the install record points at another workspace, and auto-resolution no longer treats the current directory as a vault unless it is actually a TARS workspace.
+- **Runtime schema validation.** `create_note` and `write_note_from_content` validate managed notes against `_system/schemas.yaml` before writing. Intentional partial stubs must opt out with `validate=false`.
+- **Plain SessionStart notices.** SessionStart silently refreshes integration metadata, deduplicates housekeeping notices through `acknowledged_notices`, and surfaces empty-workspace, welcome-back, version-drift, inbox, overdue-task, stale-initiative, and frontmatter-pollution guidance as short action-oriented lines.
+- **Freeform note writes are safe.** `write_note_from_content` accepts either split `frontmatter` + `body` or a single full-Markdown `content` blob, and never reports success for unknown arguments or empty accidental writes.
+- **Managed paths are protected.** Direct writes to system files, generated views, archive destinations, and the root cheat sheet are blocked unless an internal maintenance flow opts in.
+- **System-file reads are explicit.** `read_system_file` reads `_system/*.yaml|*.yml|*.md`, parses YAML into structured data, and rejects traversal.
+- **Expanded secret scanning.** Guardrails now block common provider tokens including Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic.
+- **Version-stamped generated views.** Obsidian `.base` views scaffold with a generated-by TARS version marker so stale generated views can be detected.
+
+## What was new in v3.2
+
+- **Persistent install record (`_system/install.yaml`)** — workspace-specific record carrying `workspace_type`, `workspace_path`, backward-compatible `vault_path`, `obsidian_enabled`, `obsidian_vault_path`, `installation_id`, `persona`, `plugin_version`, and timestamps. Hooks consult it on every session start; the local helper enforces install/workspace alignment for writes.
 - **Persona-driven cold start** — seven onboarding personas (`templates/personas/`) seed `_system/config.md` defaults, `_system/taxonomy.md` starter tags, and `_system/briefing-sections` so day-1 briefings are role-aware.
 - **Workspace modes (`headless` | `obsidian`)** — headless mode uses the Markdown workspace through Claude. Obsidian mode uses the same files plus `.base` views and helper skills. This is a view/storage adapter, not a separate data model.
 - **Wikilink discipline (forward + retroactive)** — new `mcp__tars_vault__format_wikilink(text, kind)` tool resolves raw text to an Obsidian-safe link via the alias registry + workspace file lookup. Write tools and the pre-tool-use hook reject content with smart quotes or Obsidian-illegal characters. `scripts/fix-wikilinks.py --repair-broken` classifies broken legacy links into `auto_safe` / `needs_review` / `unresolvable`, with apply-only-on-safe semantics.
 - **40 KB body cap + `tars-` prefix enforcement** at the hook layer for non-chunking write tools.
-- **SessionStart banner** — composes install-mismatch, legacy-workspace, stale `tools-registry.yaml`, and unregistered-cron notices.
-- **Active `/lint --actions`** — materializes fixable findings as a numbered review queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for cron-fired callers. Subsets: `wikilinks`, `patterns`, `curator`.
-- **Weekly maintenance job (`/maintain --weekly`)** — cron-fired Sunday 18:00 (registered by `/welcome` Step 7). Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
+- **SessionStart banner** — now a concise, state-aware context summary rather than a persistent wall of internal notices.
+- **Active `/lint --actions`** — materializes fixable findings as a numbered review queue. Two surfaces: inline for interactive users, `inbox/pending/weekly-review-YYYY-MM-DD.md` for scheduled maintenance callers. Subsets: `wikilinks`, `patterns`, `curator`.
+- **Weekly maintenance job (`/maintain --weekly`)** — scheduled Sunday 18:00 when the user enables schedules through `/welcome --setup-schedules`, or run manually. Pipeline: telemetry rollup → `_system/changelog/`, backlog grouping, `/lint --actions`, `/learn --review-patterns` proposals, curator + persona-drift proposals, materialize the weekly review file, update housekeeping cooling-off timestamps. Single trigger that backstops every staleness/drift/rollup feature; Claude does not run in the background.
 - **Telemetry rollup script (`scripts/telemetry-rollup.py`)** — stdlib aggregator over `_system/telemetry/*.jsonl`. Same source feeds `/briefing` weekly footer (Mondays) and `/maintain --weekly`.
 - **Observed-preference user model (`_system/user-model.md`)** — single living note (~5 KB cap) capturing BLUF tolerance, decision speed, default skill, meeting cadence, recurring concerns, vendor sentiment, observed skill mix. Updated passively by `/learn` Mode C when patterns repeat ≥3× in 14 days.
 - **Workflows registry (`_system/workflows.yaml`)** — workspace-owned saved multi-step routing aliases. Created only on user approval. `core` consults the registry before default routing.

@@ -15,7 +15,7 @@ You need:
 Markdown files are plain text files you can open in any text editor. If you do
 not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
-If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace before using this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). v3.1 -> v3.3 migrations are handled automatically; reopen the workspace and `/welcome` or `/maintain migrations` will surface any pending changes.
+If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace before using this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). Later workspace migrations are handled through `/maintain migrations`; SessionStart only shows a short update line when work is actually pending.
 
 Existing Obsidian-based TARS users can backfill the new workspace fields without moving data:
 
@@ -49,7 +49,7 @@ If you skip the optional search packages, setup, workspace writes, inbox process
 
 TARS does NOT bundle any office-rendering libraries. Office output in `/create` delegates to Anthropic's first-party `pptx` / `docx` / `xlsx` / `pdf` skills.
 
-The plugin ships the local TARS helper configuration. In code checkout flows, set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the helper knows where to operate.
+The plugin ships the local TARS helper configuration. In code checkout flows, set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the helper knows where to operate. The helper fails closed when it cannot resolve a real TARS workspace; it will not silently use a random current directory.
 
 The repository contains the framework source. The folder you point TARS at is the live runtime workspace.
 
@@ -71,6 +71,7 @@ The welcome flow:
 - asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
 - creates the TARS workspace structure
 - writes `_system/` files (including `install.yaml`), templates, scripts, `index.md`, and optional Obsidian views only when Obsidian mode is enabled
+- records the live plugin version in install and housekeeping state so fresh workspaces do not see false migration prompts
 - captures your initial profile
 - asks you to paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes so TARS can preview extraction into memory candidates, journal notes, and tasks
 
@@ -110,7 +111,7 @@ Switch later with `/welcome --enable-obsidian` or `/welcome --disable-obsidian`.
 
 ## Integrations
 
-TARS is strongest when it has calendar and task access, but the framework treats integrations generically. Skills look for configured providers through `_system/integrations.md` (capability-preference map, v3.1 format) and `_system/tools-registry.yaml` (auto-discovered by the SessionStart hook, 24-hour TTL). All skill calls resolve via `mcp__tars_vault__resolve_capability(capability=…)` — no hardcoded server names.
+TARS is strongest when it has calendar and task access, but the framework treats integrations generically. Skills look for configured providers through `_system/integrations.md` (capability-preference map, v3.1 format) and `_system/tools-registry.yaml` (auto-discovered by the SessionStart hook, 24-hour TTL). SessionStart refreshes that registry silently and only asks you to run `/doctor` if refresh fails. All skill calls resolve via `mcp__tars_vault__resolve_capability(capability=…)` — no hardcoded server names.
 
 Capabilities TARS understands out of the box: `calendar`, `tasks`, `email`, `meeting-recording`, `office-docs`, `file-storage`, `design`, `data-warehouse`, `analytics`, `project-tracker`, `documentation`, `monitoring`, `communication`.
 
@@ -175,7 +176,7 @@ TARS answers from memory first (FTS5 over `memory/**`), then tasks, then journal
 /lint
 ```
 
-Runs deterministic checks (schema, broken links, stale memory, task escalation, telemetry signals) and surfaces proposed fixes for review. Runs nightly as a scheduled cron job once `/maintain register-crons` has been executed.
+Runs deterministic checks (schema, broken links, stale memory, task escalation, telemetry signals) and surfaces proposed fixes for review. It can run manually, or on a schedule after `/welcome --setup-schedules` succeeds in an environment with a scheduler.
 
 ### Strategic work
 
@@ -194,6 +195,8 @@ Before it writes:
 - it resolves names through aliases and search
 - it asks when confidence is low
 - it routes content into the proper TARS schema and folder
+- the local helper rejects unknown tool arguments, protects managed system paths, and blocks writes if the install record points at a different workspace
+- create-time note writes validate required TARS frontmatter fields and enum values against `_system/schemas.yaml`
 
 Before it persists tasks or memory:
 - tasks must pass the accountability test

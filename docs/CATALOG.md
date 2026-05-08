@@ -83,7 +83,7 @@ Every wikilink TARS writes is formed via the local helper’s `format_wikilink` 
 
 ### Self-improvement loop (v3.2)
 
-A single weekly cron job (`tars-weekly-maintenance`, Sunday evening) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the workspace-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
+A single weekly scheduled job (`tars-weekly-maintenance`, Sunday evening, enabled through `/welcome --setup-schedules` when a scheduler is available) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the workspace-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
 
 ## Who it is for
 

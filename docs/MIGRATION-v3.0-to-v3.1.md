@@ -95,20 +95,22 @@ In Claude Code, inside the vault, run `/welcome`. This:
 
 Review each finding; apply via the numbered selection syntax.
 
-### 8. Register nightly cron jobs
+### 8. Enable scheduled jobs
 
 In Claude Code, run:
 
 ```text
-/maintain register-crons
+/welcome --setup-schedules
 ```
 
-Registers `CronCreate` entries (in Claude Code) for:
+When a supported scheduler is available, this registers scheduled jobs for:
 
 - daily briefing — `30 7 * * *`
 - weekly briefing — `0 8 * * 1`
 - maintenance — `0 17 * * 5`
 - lint — `0 2 * * *`
+
+If no scheduler is available in the current runtime, you can still run `/briefing`, `/maintain --weekly`, and `/lint` manually. Do not edit scheduler IDs directly in housekeeping state.
 
 Adjust times in `_system/config.md` before running if the defaults do not match your schedule.
 
