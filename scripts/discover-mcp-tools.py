@@ -61,7 +61,6 @@ SHORTNAME_HINTS: dict[str, list[str]] = {
     "slack": ["communication"],
     "filesystem": ["file-storage"],
     "tars-vault": ["search"],
-    "data-portal-audience": ["analytics"],
     "tana-local": ["documentation"],
 }
 
