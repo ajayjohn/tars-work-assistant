@@ -26,6 +26,7 @@ When a `resolve_capability` call returns `status: "unavailable"`, follow the deg
 |--------|------|
 | "daily briefing", "what's my day look like?", "morning briefing" | Daily |
 | "weekly briefing", "plan my week", "weekly planning", "what's my week" | Weekly |
+| `--catchup` flag, "what did I miss", "catch me up", returning after >14 days | Catch-up |
 | Ambiguous | Default to daily unless the user mentions "week" |
 
 **Parallelization**: Data gathering (calendar, tasks, memory) runs as **three parallel sub-agents** using the Task tool. This reduces wall-clock time since calendar queries, task queries, and memory lookups are independent operations. Launch all three in a single message.
@@ -600,6 +601,67 @@ Use the `TodoWrite` tool to give the user real-time visibility into briefing gen
 ```
 
 **Parallelization note**: Steps 2, 3, and 4 run concurrently as sub-agents. Mark ALL THREE as `in_progress` when spawning them. Mark each `completed` as its sub-agent returns. Do not wait for all three before updating individual statuses.
+
+---
+
+# Catch-up Briefing (`--catchup`)
+
+Triggered by `/briefing --catchup`, "what did I miss", "catch me up", or after the SessionStart welcome-back notice fires (when `last_session_at` is more than 14 days in the past).
+
+The output is intended to fit on one screen and reorient the user without rebuilding their entire mental model. **Do not save** — this is read-once orientation, not a durable artifact.
+
+## Step 1: Detect the gap
+
+```
+last = read_system_file(file="_system/install.yaml").parsed.last_session_at
+gap_days = days_between(last, today)
+```
+
+If `gap_days < 14`, decline catch-up mode and offer the standard daily briefing instead: *"It's only been N days. Want me to run a regular daily briefing?"*
+
+## Step 2: Gather (parallel — Task tool)
+
+Launch three sub-agents in a single message; each must return inside 15 seconds:
+
+1. **Overdue tasks**: `mcp__tars_vault__search_by_tag(tag="tars/task", frontmatter={"tars-status":"open"})` → filter `tars-due < today`. Group by `tars-owner`.
+2. **Stale active initiatives**: `search_by_tag(tag="tars/initiative", frontmatter={"tars-status":"active"})` → filter `tars-modified < today - 30d`.
+3. **Recent journal entries**: list `journal/YYYY-MM/*.md` for the last 30 days from today, take the most recent 5 by `tars-created`.
+
+## Step 3: Render — strict one-screen budget
+
+```
+# Catch-up — N days away
+
+You haven't used TARS since YYYY-MM-DD.
+
+## Overdue (M)
+- [[Owner A]] — Task title (due YYYY-MM-DD)
+- [[Owner B]] — Task title (due YYYY-MM-DD)
+…
+
+## Stale active initiatives (K)
+- [[Initiative X]] — last touched YYYY-MM-DD
+…
+
+## Recent activity
+- YYYY-MM-DD — one-line journal headline (link to entry)
+…
+
+## Suggested next action
+<one sentence; pick the highest-leverage item from the lists above>
+```
+
+Hard limits: at most 5 overdue tasks, 5 stale initiatives, 5 journal headlines. If a section is empty, write `_(none)_` rather than omitting the heading. Total output ≤ 25 lines.
+
+## Step 4: Don't save
+
+Catch-up is read-once. **Do not** write a journal entry or briefing file for this mode. The user wants orientation, not another document to manage.
+
+## Edge cases
+
+- Empty workspace (no tasks, no initiatives, no journal): say *"Your workspace is still light — no overdue items or stale initiatives. Try `/start` for a 90-second demo, `/welcome --setup-schedules` to wire up scheduled briefings, or `/meeting` to process a transcript."*
+- `last_session_at` missing or unparseable: skip Step 1's gate; default to running Step 2 anyway.
+- All sub-agents return empty: same fallback as the empty-workspace path.
 
 ---
 

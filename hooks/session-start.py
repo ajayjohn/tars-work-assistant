@@ -21,7 +21,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -495,22 +495,39 @@ def _parse_frontmatter_only(text: str) -> dict[str, str]:
 
 
 def _state_aware_lines(vault: Path) -> list[str]:
+    """Power-user state insights (PRD-11). Each insight: at most one line.
+
+    Staleness is judged by `tars-modified` in frontmatter (the workspace's
+    truth) rather than filesystem mtime, which gets reset by backups, copies,
+    or git checkouts.
+    """
     lines: list[str] = []
+    today = date.today()
+    cutoff = today - timedelta(days=30)
+
     stale = 0
-    cutoff = time.time() - (30 * 24 * 60 * 60)
     for md in (vault / "memory" / "initiatives").rglob("*.md"):
         try:
-            text = md.read_text(encoding="utf-8")
-            fm = _parse_frontmatter_only(text)
-            if "tars/initiative" in fm.get("tags", "") and "active" in fm.get("tars-status", "") and md.stat().st_mtime < cutoff:
-                stale += 1
+            fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
+            continue
+        if "tars/initiative" not in fm.get("tags", ""):
+            continue
+        if "active" not in fm.get("tars-status", ""):
+            continue
+        modified = fm.get("tars-modified", "").strip('"').strip("'")
+        if not modified:
+            continue
+        try:
+            if date.fromisoformat(modified[:10]) < cutoff:
+                stale += 1
+        except ValueError:
             continue
     if stale:
         lines.append(f"{stale} active initiative(s) haven't been touched in 30+ days. Run `/lint --stale`.")
 
     overdue = 0
-    today = date.today().isoformat()
+    today_iso = today.isoformat()
     for md in (vault / "memory" / "tasks").rglob("*.md"):
         try:
             fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
@@ -518,13 +535,15 @@ def _state_aware_lines(vault: Path) -> list[str]:
             continue
         if "tars/task" in fm.get("tags", "") and fm.get("tars-status", "open") in ("open", "in-progress"):
             due = fm.get("tars-due", "").strip('"').strip("'")
-            if due and due < today:
+            if due and due < today_iso:
                 overdue += 1
     if overdue:
         lines.append(f"{overdue} task(s) are overdue. Run `/tasks` to triage them.")
 
     inbox_dir = vault / "inbox" / "pending"
-    pending = sum(1 for p in inbox_dir.glob("*.md")) if inbox_dir.is_dir() else 0
+    pending = 0
+    if inbox_dir.is_dir():
+        pending = sum(1 for p in inbox_dir.iterdir() if p.is_file())
     if pending:
         lines.append(f"{pending} item(s) waiting in your inbox. Say \"process inbox\" to work through them.")
     return lines
@@ -549,7 +568,37 @@ def _build_context(vault: Path | None, status: dict) -> str:
         parts.append(unexpanded)
         return "\n\n".join(parts)
 
-    if vault is None and status.get("source") == "none":
+    # Empty-folder hint (PRD-10): fires when no TARS workspace is reachable.
+    # That includes (a) resolver returned nothing, or (b) resolver returned an
+    # env- or CWD-rooted path that has no _system/ directory yet. Suppressed
+    # inside the plugin's own checkout so framework devs aren't pestered.
+    def _looks_like_workspace(p: Path | None) -> bool:
+        if p is None:
+            return False
+        sys_dir = p / "_system"
+        if not sys_dir.is_dir():
+            return False
+        return any(
+            (sys_dir / name).is_file()
+            for name in ("install.yaml", "config.md", "schemas.yaml")
+        )
+
+    def _is_plugin_checkout(p: Path | None) -> bool:
+        if p is None:
+            return False
+        try:
+            real = p.resolve()
+        except (OSError, RuntimeError):
+            return False
+        if (real / ".claude-plugin" / "plugin.json").is_file():
+            return True
+        parts = real.parts
+        return any(
+            seg in parts
+            for seg in (".claude/plugins/cache", ".claude/plugins/marketplaces")
+        )
+
+    if not _looks_like_workspace(vault) and not _is_plugin_checkout(vault):
         return "This folder isn't a TARS workspace yet. Try `/start` for a 90-second demo, or `/welcome` to set one up."
 
     # Worktree isolation notice (informational, non-blocking).

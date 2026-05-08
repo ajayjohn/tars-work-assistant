@@ -6,6 +6,12 @@
 
 - **Session start now uses plain, state-aware guidance.** TARS avoids the old wall of setup jargon, suppresses repeated schedule and integration notices, shows empty-folder and welcome-back hints, and surfaces stale initiatives, overdue tasks, inbox items, version drift, and non-TARS frontmatter in user-facing language.
 - **The local helper can read managed system files.** `read_system_file` returns parsed YAML for system settings while keeping traversal and unsupported file types blocked.
+- **`/briefing --catchup` for sparse returners.** A new briefing mode produces a one-screen catch-up summary (gap days, overdue tasks, stale initiatives, recent journal entries) for users returning after a long absence. Triggered by the SessionStart welcome-back notice or invoked directly.
+- **Frontmatter pollution is now detectable and fixable.** `scripts/lint-frontmatter-pollution.py` finds notes with bare `pm:`/`status:`/`title:` style keys imported from outside TARS; `scripts/migrate-frontmatter-pollution.py` renames them to canonical `tars-*` equivalents (with originals preserved as `<name>.md.pre-migration`). Wired into `/lint --fix-prefixes` and surfaced via SessionStart.
+- **Obsidian views can be refreshed when stale.** `scripts/refresh-obsidian-views.py` detects views whose `# generated-by` stamp doesn't match the current plugin, backs them up to `_views/.attic/<timestamp>/`, and regenerates from current templates. `--keep-views` skips regeneration with a warning. Wired into `/welcome --enable-obsidian`.
+- **Concrete `/welcome --setup-schedules` procedure.** The welcome skill now documents step-by-step scheduler detection (Cowork preferred, Claude Code fallback), idempotent registration of the four standard jobs, mutual-exclusion enforcement, and the housekeeping/install record updates. `--skip-schedules` permanently dismisses the SessionStart notice.
+- **Exhaustive regression suite.** `scripts/regression-suite.sh` runs 7 layers — structural validators, MCP pytest, 9-scenario SessionStart matrix, 19 adversarial probes, perf gate (<300ms median), notice-string lint, and a 12-check QA-finding re-verifier — and writes a machine-readable report to `tests/regression/last-run.json`. Wired into CI on every PR.
+- **`tests/test_notice_strings.py` string-lint.** Catches PRs that re-introduce raw shell commands, MCP tool names, internal yaml filenames, "cron" jargon, or phantom "step N" references in user-visible SessionStart notices.
 
 ### Fixed
 
@@ -14,9 +20,13 @@
 - **Workspace writes now fail closed.** MCP writes are blocked when the install record points at another workspace, unknown tool arguments are rejected, and automatic vault resolution no longer falls back to an arbitrary current directory.
 - **Freeform note writes no longer create empty files.** `write_note_from_content` accepts full Markdown content or split frontmatter/body, rejects mixed shapes, and shares create-time schema validation.
 - **Created notes are validated against workspace schemas.** Managed notes with missing required fields or invalid enum values now fail before anything is written, with `validate=false` available for intentional partial stubs.
-- **Managed paths are protected.** Direct writes, moves, archives, and frontmatter updates are blocked for TARS system areas and generated views unless an internal maintenance flow opts in.
+- **Schema validation is no longer over-strict on freeform notes.** Notes without a `tars/<type>` tag pass through validation untouched (matching `write_note_from_content`'s "no template available" contract); only notes with an inferable entity type are checked against the schema.
+- **Managed paths are protected.** Direct writes, moves, archives, and frontmatter updates are blocked for TARS system areas and generated views unless an internal maintenance flow opts in via the now-public `allow_protected_paths` argument.
 - **Secret scanning catches more common tokens.** Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic key patterns are now blocked.
 - **Obsidian views carry a generated-by version stamp.** Newly scaffolded views include the plugin version so stale generated views can be detected later.
+- **Empty-folder hint surfaces from any non-vault directory.** SessionStart now prompts `/start` or `/welcome` whenever the resolved path lacks `_system/` — including when `TARS_VAULT_PATH` points at a folder with no workspace yet.
+- **Stale-initiative detection uses `tars-modified` instead of filesystem mtime.** Backups, copies, and git checkouts no longer reset the staleness clock on real workspace data.
+- **Plugin-self-checkout no longer pesters framework developers.** SessionStart silently skips the empty-folder hint when run from inside a `~/.claude/plugins/cache/...`, `~/.claude/plugins/marketplaces/...`, or repo with `.claude-plugin/plugin.json`.
 
 ## v3.4.4 (2026-05-07)
 

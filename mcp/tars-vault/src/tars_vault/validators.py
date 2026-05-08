@@ -189,12 +189,18 @@ def _infer_schema(tags: list[str], schemas: dict[str, Any]) -> tuple[str | None,
 
 
 def validate_against_schema(frontmatter: dict[str, Any], schemas: dict[str, Any]) -> list[str]:
-    """Validate create-time frontmatter against the inferred TARS schema."""
+    """Validate create-time frontmatter against the inferred TARS schema.
+
+    Per PRD-07: when no `tars/<type>` tag is present, validation is best-effort
+    and returns no errors — freeform notes (used by `write_note_from_content`
+    for genuinely templateless content) are intentionally schema-agnostic.
+    Once an entity type is inferable, all schema rules apply.
+    """
     if not isinstance(frontmatter, dict):
         return ["frontmatter must be a mapping"]
     tags = _tags_from_frontmatter(frontmatter)
     if not tags:
-        return ["frontmatter must include tags with a tars/<type> marker"]
+        return []
     _name, schema = _infer_schema(tags, schemas)
     if not schema:
         return []
