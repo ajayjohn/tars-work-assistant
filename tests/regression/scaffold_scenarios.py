@@ -3,6 +3,15 @@
 Each scenario simulates a distinct user state. Used by the regression suite
 and also runnable standalone for manual probing.
 
+All fixture dates are computed relative to "today" so the suite is
+deterministic regardless of when CI runs:
+
+  * `last_session_at` — for fresh / current scenarios, "today at 10:00 UTC";
+    for the sparse scenario, "today minus 60 days".
+  * `tars-created` / `tars-modified` — recent scenarios use yesterday;
+    "stale" fixtures use today minus 60 days so the >30-day staleness check
+    fires.
+
 Usage:
     python3 -m tests.regression.scaffold_scenarios --base /tmp/tars-qa
 """
@@ -10,8 +19,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -88,6 +99,15 @@ def _stamp_housekeeping_version(vault: Path, version: str) -> None:
     p.write_text("\n".join(new) + "\n", encoding="utf-8")
 
 
+def _iso(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+
+def _set_mtime(path: Path, dt: datetime) -> None:
+    ts = dt.timestamp()
+    os.utime(path, (ts, ts))
+
+
 def scaffold(base: Path) -> dict:
     base.mkdir(parents=True, exist_ok=True)
     if base.exists():
@@ -95,6 +115,21 @@ def scaffold(base: Path) -> dict:
     base.mkdir(parents=True)
     live = _live_plugin_version()
     paths: dict[str, Path] = {}
+
+    # Compute every fixture date relative to "today" so the suite is
+    # deterministic regardless of when CI runs.
+    today_dt = datetime.now(timezone.utc).replace(hour=10, minute=0, second=0, microsecond=0)
+    today = today_dt.date()
+    today_iso = _iso(today_dt)
+    yesterday = today - timedelta(days=1)
+    sixty_days_ago_dt = today_dt - timedelta(days=60)
+    sixty_days_ago_iso = _iso(sixty_days_ago_dt)
+    sixty_days_ago_d = (today - timedelta(days=60)).isoformat()
+    fortnight_ago_iso = _iso(today_dt - timedelta(days=23))
+    forty_days_ago_iso = _iso(today_dt - timedelta(days=40))
+    forty_days_ago_d = (today - timedelta(days=40)).isoformat()
+    next_month = (today + timedelta(days=30)).strftime("%Y-%m")
+    following_month = (today + timedelta(days=60)).strftime("%Y-%m")
 
     # s1-empty: just an empty directory
     p = base / "s1-empty"
@@ -111,8 +146,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s2",
         plugin_version=live,
-        created="2026-05-08T10:00:00+00:00",
-        last_session_at="2026-05-08T10:00:00+00:00",
+        created=today_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     paths["s2-fresh-headless"] = p
@@ -128,8 +163,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path=p,
         slug="s3",
         plugin_version=live,
-        created="2026-05-08T10:00:00+00:00",
-        last_session_at="2026-05-08T10:00:00+00:00",
+        created=today_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     paths["s3-fresh-obsidian"] = p
@@ -144,8 +179,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s4",
         plugin_version="3.2.0",
-        created="2026-04-01T00:00:00+00:00",
-        last_session_at="2026-04-15T00:00:00+00:00",
+        created=forty_days_ago_iso,
+        last_session_at=fortnight_ago_iso,
     ))
     _stamp_housekeeping_version(p, "3.2.0")
     paths["s4-stale-version"] = p
@@ -160,8 +195,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s5",
         plugin_version=live,
-        created="2026-05-08T10:00:00+00:00",
-        last_session_at="2026-05-08T10:00:00+00:00",
+        created=today_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     paths["s5-path-mismatch"] = p
@@ -176,8 +211,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s6",
         plugin_version=live,
-        created="2026-05-08T10:00:00+00:00",
-        last_session_at="2026-05-08T10:00:00+00:00",
+        created=today_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     (p / "memory" / "initiatives").mkdir(parents=True)
@@ -186,8 +221,8 @@ def scaffold(base: Path) -> dict:
         'tars-summary: A canonical initiative\n'
         'tars-status: active\n'
         'tars-owner: "[[Alison Slowes]]"\n'
-        'tars-created: "2026-05-08"\n'
-        'tars-modified: "2026-05-08"\n'
+        f'tars-created: "{yesterday.isoformat()}"\n'
+        f'tars-modified: "{yesterday.isoformat()}"\n'
         'tags: [tars/initiative]\n'
         'aliases: []\n'
         '---\n# Canonical Initiative\n', encoding="utf-8")
@@ -196,8 +231,8 @@ def scaffold(base: Path) -> dict:
         'title: Polluted Initiative\n'
         'pm: Alison Slowes\n'
         'status: active\n'
-        'start: 2026-08\n'
-        'end: 2026-09\n'
+        f'start: {next_month}\n'
+        f'end: {following_month}\n'
         'tags: [initiative, ai]\n'
         '---\n# Polluted Initiative\n', encoding="utf-8")
     paths["s6-polluted-frontmatter"] = p
@@ -217,8 +252,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s7",
         plugin_version=live,
-        created="2026-05-08T10:00:00+00:00",
-        last_session_at="2026-05-08T10:00:00+00:00",
+        created=today_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     paths["s7-mid-mode-switch"] = p
@@ -233,8 +268,8 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path="",
         slug="s8",
         plugin_version=live,
-        created="2026-03-01T00:00:00+00:00",
-        last_session_at="2026-03-08T00:00:00+00:00",
+        created=sixty_days_ago_iso,
+        last_session_at=sixty_days_ago_iso,
     ))
     _stamp_housekeeping_version(p, live)
     paths["s8-sparse-returning"] = p
@@ -254,23 +289,25 @@ def scaffold(base: Path) -> dict:
         obsidian_vault_path=p,
         slug="s9",
         plugin_version=live,
-        created="2026-04-01T00:00:00+00:00",
-        last_session_at="2026-05-07T00:00:00+00:00",
+        created=forty_days_ago_iso,
+        last_session_at=today_iso,
     ))
     _stamp_housekeeping_version(p, live)
     for i in range(1, 51):
         st = "completed" if i % 7 == 0 else "active"
-        modified = "2026-03-01" if i % 10 == 0 else "2026-05-01"
-        (p / "memory" / "initiatives" / f"init-{i}.md").write_text(
+        modified = sixty_days_ago_d if i % 10 == 0 else yesterday.isoformat()
+        init_path = p / "memory" / "initiatives" / f"init-{i}.md"
+        init_path.write_text(
             f'---\n'
             f'tars-summary: Initiative {i}\n'
             f'tars-status: {st}\n'
             f'tars-owner: "[[Person {i % 7}]]"\n'
-            f'tars-created: "2026-04-01"\n'
+            f'tars-created: "{forty_days_ago_d}"\n'
             f'tars-modified: "{modified}"\n'
             f'tags: [tars/initiative]\n'
             f'aliases: []\n'
             f'---\n# Initiative {i}\n', encoding="utf-8")
+        _set_mtime(init_path, sixty_days_ago_dt if i % 10 == 0 else today_dt)
     for i, name in enumerate(("note", "transcript", "doc"), start=1):
         (p / "inbox" / "pending" / f"item-{i}.txt").write_text(name, encoding="utf-8")
     paths["s9-advanced"] = p
