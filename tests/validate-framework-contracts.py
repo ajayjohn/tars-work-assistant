@@ -154,6 +154,7 @@ def validate_required_tool_surface() -> None:
     required = {
         "scaffold_workspace",
         "read_note",
+        "read_system_file",
         "write_note_from_content",
         "create_note",
         "append_note",

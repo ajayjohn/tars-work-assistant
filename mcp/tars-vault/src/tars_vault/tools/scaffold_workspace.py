@@ -8,9 +8,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import json
 import uuid
 
 from .. import _common
+
+
+ROOT = Path(__file__).resolve().parents[5]
 
 
 DIRECTORIES = [
@@ -140,17 +144,23 @@ def _obsidian_view_files() -> dict[str, str]:
         files: dict[str, str] = {}
         for path in sorted(directory.glob("*.base")):
             try:
-                files[path.name] = path.read_text(encoding="utf-8")
+                files[path.name] = _stamp_view(path.read_text(encoding="utf-8"))
             except OSError:
                 continue
         if files:
             return files
 
     return {
-        "inbox-pending.base": 'filters:\n  file.inFolder("inbox/pending")\n\nviews:\n  - type: table\n    name: "Pending Items"\n',
-        "all-people.base": 'filters:\n  file.hasTag("tars/person")\n\nviews:\n  - type: table\n    name: "All People"\n',
-        "all-initiatives.base": 'filters:\n  file.hasTag("tars/initiative")\n\nviews:\n  - type: table\n    name: "All Initiatives"\n',
+        "inbox-pending.base": _stamp_view('filters:\n  file.inFolder("inbox/pending")\n\nviews:\n  - type: table\n    name: "Pending Items"\n'),
+        "all-people.base": _stamp_view('filters:\n  file.hasTag("tars/person")\n\nviews:\n  - type: table\n    name: "All People"\n'),
+        "all-initiatives.base": _stamp_view('filters:\n  file.hasTag("tars/initiative")\n\nviews:\n  - type: table\n    name: "All Initiatives"\n'),
     }
+
+
+def _stamp_view(text: str) -> str:
+    if text.startswith("# generated-by: tars "):
+        return text
+    return f"# generated-by: tars {_plugin_version()}\n{text}"
 
 
 def _install_yaml(
@@ -160,6 +170,7 @@ def _install_yaml(
     persona: str,
     now: str,
 ) -> str:
+    plugin_version = _plugin_version()
     return f"""workspace_type: {workspace_type}
 workspace_path: "{workspace}"
 vault_path: "{workspace}"
@@ -167,10 +178,26 @@ obsidian_enabled: {"true" if obsidian_enabled else "false"}
 obsidian_vault_path: "{workspace if obsidian_enabled else ""}"
 installation_id: "{uuid.uuid4()}"
 persona: "{persona}"
-plugin_version: "3.4.4"
+plugin_version: "{plugin_version}"
 created: "{now}"
 last_session_at: "{now}"
+acknowledged_notices:
 """
+
+
+def _plugin_version() -> str:
+    try:
+        data = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        return str(data.get("version") or "")
+    except Exception:
+        return ""
+
+
+def _repo_seed(rel: str, fallback: str) -> str:
+    try:
+        return (ROOT / rel).read_text(encoding="utf-8")
+    except OSError:
+        return fallback
 
 
 def _maturity_yaml(now: str, obsidian_enabled: bool) -> str:
@@ -277,8 +304,8 @@ def scaffold_workspace(**kwargs: Any) -> dict:
         "_system/taxonomy.md": "# TARS taxonomy\n\nStarter taxonomy for people, initiatives, decisions, tasks, inbox, and journal entries.\n",
         "_system/kpis.md": "# KPIs\n\nAdd team, product, and initiative metrics here when useful.\n",
         "_system/schedule.md": "# Schedule\n\nRecurring and one-time TARS schedules.\n",
-        "_system/guardrails.yaml": "blocked_patterns:\n  - ssn\n  - credit_card\n  - api_key\nwarn_patterns:\n  - salary\n  - compensation\n  - performance_rating\n",
-        "_system/housekeeping-state.yaml": "last_run: null\nlast_success: null\nrun_count: 0\npending_inbox_count: 0\ncron_jobs:\n  daily_briefing: null\n  weekly_briefing: null\n  maintenance: null\nplugin_version: \"3.4.4\"\n",
+        "_system/guardrails.yaml": _repo_seed("_system/guardrails.yaml", "block_patterns: []\nwarn_patterns: []\n"),
+        "_system/housekeeping-state.yaml": _repo_seed("_system/housekeeping-state.yaml", f'plugin_version: "{_plugin_version()}"\n').replace('plugin_version: ""', f'plugin_version: "{_plugin_version()}"'),
         "index.md": _index_md(),
     }
 

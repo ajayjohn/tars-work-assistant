@@ -26,6 +26,7 @@ from tars_vault.tools.create_note import create_note
 from tars_vault.tools.detect_near_duplicates import detect_near_duplicates
 from tars_vault.tools.move_note import move_note
 from tars_vault.tools.read_note import read_note
+from tars_vault.tools.read_system_file import read_system_file
 from tars_vault.tools.resolve_alias import resolve_alias
 from tars_vault.tools.resolve_capability import resolve_capability
 from tars_vault.tools.runtime_info import runtime_info
@@ -34,6 +35,7 @@ from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.search_by_tag import search_by_tag
 from tars_vault.tools.update_frontmatter import update_frontmatter
 from tars_vault.tools.write_note_from_content import write_note_from_content
+from tars_vault.server import _call_handler_sync
 
 
 class ToolTests(unittest.TestCase):
@@ -362,6 +364,25 @@ class ToolTests(unittest.TestCase):
         r = scan_secrets(vault=str(self.vault), content="nothing to see here")
         self.assertEqual(r["classification"], "clean")
 
+    def test_scan_secrets_blocks_common_tokens(self) -> None:
+        shutil.copy(REPO / "_system" / "guardrails.yaml", self.vault / "_system" / "guardrails.yaml")
+        samples = {
+            "slack_bot_token": "xoxb-1234567890-abcdef0123456",
+            "github_pat": "ghp_" + "A" * 36,
+            "stripe_secret": "sk_live_" + "A" * 24,
+            "twilio_account_sid": "AC" + "f" * 32,
+            "sendgrid_api_key": "SG." + "a" * 22 + "." + "b" * 43,
+            "google_api_key": "AIza" + "z" * 35,
+            "openai_api_key": "sk-" + "A" * 24,
+            "anthropic_api_key": "sk-ant-api03-" + "A" * 30,
+        }
+        for name, sample in samples.items():
+            r = scan_secrets(vault=str(self.vault), content=f"key {sample}")
+            self.assertEqual(r["classification"], "block", name)
+            self.assertIn(name, {hit["name"] for hit in r["hits"]})
+        r = scan_secrets(vault=str(self.vault), content="just a normal sentence with sk- in it")
+        self.assertNotEqual(r["classification"], "block")
+
     # --- write_note_from_content is an alias ---
 
     def test_write_note_from_content_alias(self) -> None:
@@ -370,6 +391,151 @@ class ToolTests(unittest.TestCase):
             path="memory/people/h.md",
             frontmatter={"tags": ["tars/person"]},
             body="x",
+        )
+        self.assertEqual(r["status"], "ok")
+
+    def test_write_note_from_content_accepts_content_blob(self) -> None:
+        blob = "---\ntars-summary: hi\n---\nbody text\n"
+        r = _call_handler_sync(
+            "write_note_from_content",
+            {"vault": str(self.vault), "path": "memory/free.md", "content": blob},
+            "",
+        )
+        self.assertEqual(r["status"], "ok")
+        written = (self.vault / "memory" / "free.md").read_text()
+        self.assertIn("tars-summary: hi", written)
+        self.assertIn("body text", written)
+        self.assertGreater((self.vault / "memory" / "free.md").stat().st_size, 0)
+
+    def test_write_note_from_content_rejects_blob_and_split_args(self) -> None:
+        r = _call_handler_sync(
+            "write_note_from_content",
+            {
+                "vault": str(self.vault),
+                "path": "memory/free.md",
+                "content": "body",
+                "frontmatter": {"tars-summary": "x"},
+            },
+            "",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("either content or frontmatter/body", r["reason"])
+
+    def test_dispatcher_rejects_unknown_args(self) -> None:
+        r = _call_handler_sync(
+            "create_note",
+            {
+                "vault": str(self.vault),
+                "path": "memory/people/extra.md",
+                "frontmatter": {"tags": ["tars/person"]},
+                "body": "x",
+                "garbage": "x",
+            },
+            "",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("unknown argument", r["reason"])
+
+    def test_dispatcher_fails_closed_without_vault_signal(self) -> None:
+        cwd = Path.cwd()
+        old_env = os.environ.pop("TARS_VAULT_PATH", None)
+        try:
+            os.chdir(self.vault)
+            r = _call_handler_sync("read_note", {"file": "missing"}, "")
+        finally:
+            os.chdir(cwd)
+            if old_env is not None:
+                os.environ["TARS_VAULT_PATH"] = old_env
+        self.assertEqual(r["status"], "error")
+        self.assertIn("does not know which workspace", r["reason"])
+
+    def test_write_blocked_when_install_record_mismatches(self) -> None:
+        (self.vault / "_system" / "install.yaml").write_text(
+            'workspace_path: "/tmp/somewhere-else"\n'
+        )
+        r = _call_handler_sync(
+            "create_note",
+            {
+                "vault": str(self.vault),
+                "path": "memory/blocked.md",
+                "frontmatter": {"tags": ["tars/person"]},
+                "body": "x",
+            },
+            "",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("does not match", r["reason"])
+        self.assertFalse((self.vault / "memory" / "blocked.md").exists())
+
+    def test_read_allowed_when_install_record_mismatches(self) -> None:
+        (self.vault / "_system" / "install.yaml").write_text(
+            'workspace_path: "/tmp/somewhere-else"\n'
+        )
+        r = _call_handler_sync(
+            "read_note",
+            {"vault": str(self.vault), "file": "missing"},
+            "",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("not found", r["reason"])
+
+    def test_protected_paths_block_direct_write_tools(self) -> None:
+        r = create_note(
+            vault=str(self.vault),
+            path="_system/install.md",
+            frontmatter={"tags": ["tars/system"]},
+            body="x",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("managed by TARS", r["reason"])
+        (self.vault / "_system" / "config.md").write_text("---\ntags: [tars/system]\n---\n")
+        r = update_frontmatter(
+            vault=str(self.vault),
+            file="_system/config.md",
+            updates={"tars-summary": "x"},
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("managed by TARS", r["reason"])
+
+    def test_read_system_file_parses_yaml(self) -> None:
+        (self.vault / "_system" / "sample.yaml").write_text("alpha: 1\nitems: [a, b]\n")
+        r = read_system_file(vault=str(self.vault), file="sample.yaml")
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["data"]["alpha"], 1)
+        self.assertEqual(r["data"]["items"], ["a", "b"])
+
+    def test_create_note_schema_validation(self) -> None:
+        shutil.copy(REPO / "_system" / "schemas.yaml", self.vault / "_system" / "schemas.yaml")
+        r = create_note(
+            vault=str(self.vault),
+            path="memory/people/schema-missing.md",
+            frontmatter={"tags": ["tars/person"], "tars-summary": "x"},
+            body="x",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertIn("tars-staleness", r["reason"])
+        r = create_note(
+            vault=str(self.vault),
+            path="memory/people/schema-ok.md",
+            frontmatter={
+                "tags": ["tars/person"],
+                "tars-summary": "x",
+                "tars-staleness": "durable",
+                "tars-created": "2026-05-07",
+                "tars-modified": "2026-05-07",
+            },
+            body="x",
+        )
+        self.assertEqual(r["status"], "ok")
+
+    def test_create_note_schema_validate_false_escape_hatch(self) -> None:
+        shutil.copy(REPO / "_system" / "schemas.yaml", self.vault / "_system" / "schemas.yaml")
+        r = create_note(
+            vault=str(self.vault),
+            path="memory/people/schema-skip.md",
+            frontmatter={"tags": ["tars/person"], "tars-summary": "x"},
+            body="x",
+            validate=False,
         )
         self.assertEqual(r["status"], "ok")
 

@@ -42,6 +42,7 @@ REQUIRED_TOOLS = {
     "fts_search",
     "move_note",
     "read_note",
+    "read_system_file",
     "refresh_integrations",
     "rerank",
     "resolve_alias",

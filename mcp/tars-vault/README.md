@@ -23,7 +23,7 @@ Environment variables:
 ## Tools
 
 - `create_note`, `append_note`, `write_note_from_content`
-- `update_frontmatter`, `search_by_tag`, `read_note`
+- `update_frontmatter`, `search_by_tag`, `read_note`, `read_system_file`
 - `archive_note`, `move_note`, `classify_file`, `detect_near_duplicates`
 - `resolve_capability`, `refresh_integrations`
 - `scan_secrets`, `fts_search`, `semantic_search`, `rerank`

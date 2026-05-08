@@ -113,6 +113,8 @@ def archive_note(**kwargs: Any) -> dict:
         return _common.error(str(exc))
     if not note_p.is_file():
         return _common.error(f"note not found: {note_p.relative_to(vault_p)}")
+    if _common.is_protected_path(vault_p, note_p):
+        return _common.error(_common.protected_path_reason(vault_p, note_p))
 
     fm, _body = _common.split_frontmatter(_common.read_note_text(note_p))
     fm = fm or {}
@@ -162,6 +164,7 @@ def archive_note(**kwargs: Any) -> dict:
         file=str(note_p.relative_to(vault_p)),
         updates=upd_payload,
         allow_user_properties=True,
+        allow_protected_paths=True,
     )
     if upd_result.get("status") != "ok":
         return _common.error(f"tag-update failed: {upd_result.get('reason')}")
@@ -171,6 +174,7 @@ def archive_note(**kwargs: Any) -> dict:
         vault=str(vault_p),
         src=str(note_p.relative_to(vault_p)),
         dst=target_rel,
+        allow_protected_paths=True,
     )
     if mv_result.get("status") != "ok":
         return _common.error(f"move failed: {mv_result.get('reason')}")

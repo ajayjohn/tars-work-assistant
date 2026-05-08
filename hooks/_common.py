@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,89 @@ def read_install_config(vault: Path | None = None) -> dict[str, Any] | None:
     if not target.is_file():
         return None
     return _read_install_yaml(target)
+
+
+def read_acknowledged_notices(vault: Path) -> dict[str, datetime]:
+    target = Path(vault) / "_system" / "install.yaml"
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    notices: dict[str, datetime] = {}
+    in_block = False
+    for raw in text.splitlines():
+        if re.match(r"^acknowledged_notices\s*:\s*$", raw):
+            in_block = True
+            continue
+        if in_block and raw and not raw[0].isspace():
+            break
+        if not in_block:
+            continue
+        m = re.match(r"^\s+([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$", raw)
+        if not m:
+            continue
+        value = m.group(2).strip().strip('"').strip("'")
+        if not value:
+            continue
+        try:
+            notices[m.group(1)] = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+    return notices
+
+
+def is_notice_suppressed(vault: Path, notice_id: str, ttl_days: int = 7) -> bool:
+    seen = read_acknowledged_notices(vault).get(notice_id)
+    if not seen:
+        return False
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).days < ttl_days
+
+
+def mark_notice_acknowledged(vault: Path, notice_id: str, when: datetime | None = None) -> None:
+    target = Path(vault) / "_system" / "install.yaml"
+    when = when or datetime.now(timezone.utc)
+    stamp = when.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        text = target.read_text(encoding="utf-8") if target.is_file() else ""
+    except (OSError, UnicodeDecodeError):
+        return
+    lines = text.splitlines()
+    out: list[str] = []
+    in_block = False
+    wrote = False
+    found_block = False
+    for raw in lines:
+        if re.match(r"^acknowledged_notices\s*:\s*$", raw):
+            found_block = True
+            in_block = True
+            out.append(raw)
+            continue
+        if in_block and raw and not raw[0].isspace():
+            if not wrote:
+                out.append(f"  {notice_id}: \"{stamp}\"")
+                wrote = True
+            in_block = False
+        if in_block:
+            m = re.match(r"^(\s+)([A-Za-z0-9_-]+)\s*:", raw)
+            if m and m.group(2) == notice_id:
+                out.append(f"{m.group(1)}{notice_id}: \"{stamp}\"")
+                wrote = True
+                continue
+        out.append(raw)
+    if in_block and not wrote:
+        out.append(f"  {notice_id}: \"{stamp}\"")
+    if not found_block:
+        if out and out[-1].strip():
+            out.append("")
+        out.append("acknowledged_notices:")
+        out.append(f"  {notice_id}: \"{stamp}\"")
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("\n".join(out) + "\n", encoding="utf-8")
+    except OSError:
+        return
 
 
 def _is_unexpanded_var(value: str) -> bool:

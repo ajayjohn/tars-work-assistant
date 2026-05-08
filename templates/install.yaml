@@ -48,3 +48,7 @@ last_session_at: ""
 # Used by SessionStart and /maintain to enforce mutual exclusion: a job registered
 # with one scheduler is never silently re-registered with the other.
 scheduler_type: ""
+
+# Notice IDs recently shown or handled. SessionStart uses this to avoid
+# repeating the same housekeeping line every session.
+acknowledged_notices:

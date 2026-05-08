@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.5.0 (2026-05-08)
+
+### Added
+
+- **Session start now uses plain, state-aware guidance.** TARS avoids the old wall of setup jargon, suppresses repeated schedule and integration notices, shows empty-folder and welcome-back hints, and surfaces stale initiatives, overdue tasks, inbox items, version drift, and non-TARS frontmatter in user-facing language.
+- **The local helper can read managed system files.** `read_system_file` returns parsed YAML for system settings while keeping traversal and unsupported file types blocked.
+
+### Fixed
+
+- **Migration runs no longer end with a traceback.** The migration journal handles older result shapes safely, stamps successful runs, and unexpected failures are converted into a one-line error with a telemetry log.
+- **Fresh seeds no longer claim to be on an old plugin version.** New workspaces stamp the live plugin version during setup instead of inheriting a stale migration state.
+- **Workspace writes now fail closed.** MCP writes are blocked when the install record points at another workspace, unknown tool arguments are rejected, and automatic vault resolution no longer falls back to an arbitrary current directory.
+- **Freeform note writes no longer create empty files.** `write_note_from_content` accepts full Markdown content or split frontmatter/body, rejects mixed shapes, and shares create-time schema validation.
+- **Created notes are validated against workspace schemas.** Managed notes with missing required fields or invalid enum values now fail before anything is written, with `validate=false` available for intentional partial stubs.
+- **Managed paths are protected.** Direct writes, moves, archives, and frontmatter updates are blocked for TARS system areas and generated views unless an internal maintenance flow opts in.
+- **Secret scanning catches more common tokens.** Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic key patterns are now blocked.
+- **Obsidian views carry a generated-by version stamp.** Newly scaffolded views include the plugin version so stale generated views can be detected later.
+
 ## v3.4.4 (2026-05-07)
 
 ### Fixed

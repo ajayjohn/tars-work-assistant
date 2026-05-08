@@ -21,6 +21,7 @@ help:
     - "Continue deferred setup: `/welcome --continue-setup`"
     - "Enable Obsidian later: `/welcome --enable-obsidian`"
     - "Disable Obsidian dependency: `/welcome --disable-obsidian`"
+    - "Enable scheduled jobs: `/welcome --setup-schedules`"
     - "Relocate a moved workspace: `/welcome --relocate`"
     - "Change persona later: `/welcome --change-persona`"
   scope: setup,bootstrap,onboarding,welcome,initialize
@@ -228,6 +229,12 @@ You can continue setup later with `/welcome --continue-setup` or by saying
 
 TARS is ready whenever you want to process something.
 ```
+
+If the user runs `/welcome --setup-schedules`, detect the available scheduler,
+register the standard daily briefing, weekly briefing, weekly maintenance, and
+lint jobs, then update the install and housekeeping records. If no scheduler is
+available in the current runtime, say: "TARS couldn't enable scheduled jobs in
+this session. You can still use every command manually."
 
 Do not include a long directory listing. Do not recommend namespaced command
 syntax; use plain TARS slash commands or natural language.
