@@ -16,17 +16,23 @@ The build model is:
 
 The root build script currently creates `tars-cowork-plugin/` and copies:
 - `skills/`
+- `commands/`
 - Python scripts from `scripts/`
 - `templates/`
-- `_system/`
-- `_views/`
+- source Obsidian views into `templates/views/`
+- `hooks/`
+- `mcp/tars-vault/`
 - `.claude/skills/`
 - `LICENSE`
 - `CLAUDE.md`
+- `requirements.txt`
+- `requirements-search.txt`
+- `.claude-plugin/mcp-servers.json`
 - `.mcp.json` when present
 
 It also:
 - generates a minimal distribution `plugin.json`
+- writes a plugin-root `.mcp.json` from the manifest's `mcpServers`
 - syncs version and description into `.claude-plugin/marketplace.json`
 - writes a packaged README
 - produces `tars-cowork-plugin/Archive.zip`
@@ -39,6 +45,7 @@ The installable distribution relies on directory-based discovery at runtime. The
 - description
 - author
 - license
+- bundled `mcpServers` metadata for `tars-vault`
 
 The repository remains the place where framework source, tests, and documentation live.
 
@@ -51,7 +58,7 @@ Use this sequence for release preparation:
 3. Update `.claude-plugin/plugin.json` if version or release metadata changed.
 4. Run validators from `tests/`.
 5. Run `./build-plugin.sh`.
-6. Verify the packaged plugin contents and packaged README.
+6. Run `python3 tests/validate-release-artifact.py` to verify the packaged plugin contents, helper startup, and scaffold behavior.
 7. Tag and publish the GitHub release artifact.
 
 ## Repository versus distribution

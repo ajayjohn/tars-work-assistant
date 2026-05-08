@@ -54,9 +54,10 @@ TARS operates on three verbs:
 |------|---------|----------|
 | `mcp__tars_vault__create_note` | Create a note with frontmatter + body | `obsidian create` + `obsidian property:set` |
 | `mcp__tars_vault__append_note` | Append content; auto-chunks at 40KB | `obsidian append` |
-| `mcp__tars_vault__write_note_from_content` | Full-content create when no template is available | `obsidian create --template` fallback |
+| `mcp__tars_vault__write_note_from_content` | Create a freeform note from `frontmatter` + `body`, or from a single `content` blob with inline frontmatter | manual `obsidian create` |
 | `mcp__tars_vault__update_frontmatter` | Validated single-property update | `obsidian property:set` |
 | `mcp__tars_vault__read_note` | Read with frontmatter as structured JSON | `obsidian read` |
+| `mcp__tars_vault__read_system_file` | Read a managed system file with YAML parsed as structured data | manual system-file reads |
 | `mcp__tars_vault__search_by_tag` | Tag, query, and frontmatter-filtered search | manual file scans |
 | `mcp__tars_vault__archive_note` | Tag + move to archive with guardrails | manual tag + move |
 | `mcp__tars_vault__move_note` | Move preserving wikilinks | manual move |

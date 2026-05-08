@@ -44,6 +44,8 @@ def update_frontmatter(**kwargs: Any) -> dict:
         return _common.error(str(exc))
     if not note_p.is_file():
         return _common.error(f"note not found: {note_p.relative_to(vault_p)}")
+    if _common.is_protected_path(vault_p, note_p) and not kwargs.get("allow_protected_paths"):
+        return _common.error(_common.protected_path_reason(vault_p, note_p))
 
     reserved_non_prefix = {"tags", "aliases"}
     if not allow_user:

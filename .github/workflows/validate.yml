@@ -97,3 +97,14 @@ jobs:
           else
             echo "::warning::CHANGELOG.md was not updated"
           fi
+
+      - name: Run regression suite (PRD-18)
+        run: bash scripts/regression-suite.sh
+
+      - name: Upload regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-report
+          path: tests/regression/last-run.json
+          if-no-files-found: warn

@@ -17,7 +17,7 @@ TARS is built around a few core ideas:
 - Tasks and durable memory always go through review before persistence.
 - Cold-start friction is addressed by `/start`, progressive `/welcome`, seven onboarding personas, and graceful degradation when integrations are missing.
 - Wikilink hygiene is centralized: every `[[…]]` flows through `format_wikilink`; smart-quote and Obsidian-illegal links are rejected at the write side; legacy broken links can be repaired in bulk.
-- Periodic work runs only via cron jobs registered during `/welcome` — Claude does not run in the background, so every staleness, drift, and rollup feature is bound to a single `tars-weekly-maintenance` job that opens a session and writes a numbered review queue for next time.
+- Scheduled work is optional and registered through `/welcome --setup-schedules` when a scheduler is available. Claude does not run in the background by itself, so weekly staleness, drift, and rollup work is surfaced through scheduled jobs or manual `/maintain --weekly`.
 
 ## Try it in 90 seconds
 
@@ -54,7 +54,7 @@ Core user-facing capabilities:
 - Durable memory capture for people, initiatives, decisions, products, vendors, competitors, and organizational context
 - Hybrid fast lookup — FTS5 over memory, semantic over journal + transcripts + contexts, plus integrations
 - Strategic analysis (five modes), communications drafting (RASCI + brand-aware), initiative planning
-- `/lint --actions` materialized review queue (subsets: wikilinks, patterns, curator) + `/maintain --weekly` cron-fired pipeline
+- `/lint --actions` materialized review queue (subsets: wikilinks, patterns, curator) + `/maintain --weekly` scheduled pipeline
 - `/learn --review-patterns` for observed-preference learning (user model + workflow-alias proposals)
 - `/create` office output orchestration via Anthropic's first-party skills
 
@@ -120,11 +120,13 @@ Slash commands are shortcuts. Natural-language requests work too: "process every
 
 TARS is designed to preserve signal and avoid silent drift:
 - It checks the workspace before writing and classifies findings as NEW, UPDATE, REDUNDANT, or CONTRADICTS.
+- It refuses workspace writes when the local helper cannot resolve a real TARS workspace or when the install record points at a different folder.
+- It validates managed note frontmatter against workspace schemas before create-time writes.
 - It uses the durability test before proposing memory persistence.
 - It uses the accountability test before proposing tasks.
 - It preserves transcript text so later queries can inspect what was actually said.
 - It records framework issues and user improvement ideas in `_system/backlog/`.
-- It performs scheduled or session-start maintenance to keep schemas, links, and archival state healthy.
+- It performs scheduled or session-start maintenance to keep schemas, links, integration indexes, and archival state healthy.
 - It coaches lightly through Daily Digest suggestions, milestone moments, and `/help`, with controls to show fewer tips or turn coaching off.
 
 ## Documentation map

@@ -40,6 +40,7 @@ import importlib.util
 import json
 import re
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -175,12 +176,32 @@ def _load_migration(path: Path):
 # Journal writer
 # ---------------------------------------------------------------------------
 
-def _write_journal(vault: Path, results: list[dict], plugin_ver: str) -> Path:
+def _normalise_result(entry: dict, fallback: str) -> dict:
+    result = dict(entry)
+    migration = result.get("migration") or result.get("name") or fallback
+    result["migration"] = str(migration)
+    result.setdefault("dry_run", False)
+    result.setdefault("changes", [])
+    result.setdefault("errors", [])
+    result.setdefault("skipped", 0)
+    return result
+
+
+def _write_journal(vault: Path, results: list[dict], plugin_ver: str) -> Path | None:
+    if not results:
+        return None
+    valid = [
+        _normalise_result(r, f"run-{idx + 1}")
+        for idx, r in enumerate(results)
+        if isinstance(r, dict)
+    ]
+    if not valid:
+        valid = [_normalise_result({}, "run")]
     today = datetime.now().strftime("%Y-%m-%d")
     month = datetime.now().strftime("%Y-%m")
     journal_dir = vault / "journal" / month
     journal_dir.mkdir(parents=True, exist_ok=True)
-    slug_parts = "-".join(r["migration"].replace(".", "-") for r in results[:3])
+    slug_parts = "-".join(r["migration"].replace(".", "-") for r in valid[:3]) or "run"
     filename = f"{today}-migrations-{slug_parts}.md"
     target = journal_dir / filename
 
@@ -194,7 +215,7 @@ def _write_journal(vault: Path, results: list[dict], plugin_ver: str) -> Path:
         f"# Migration run — {today}",
         "",
     ]
-    for r in results:
+    for r in valid:
         dry = " (dry run)" if r.get("dry_run") else ""
         lines += [
             f"## {r['migration']}{dry}",
@@ -217,6 +238,36 @@ def _write_journal(vault: Path, results: list[dict], plugin_ver: str) -> Path:
 
     target.write_text("\n".join(lines), encoding="utf-8")
     return target
+
+
+def _vault_arg_or_none() -> Path | None:
+    for idx, arg in enumerate(sys.argv):
+        if arg == "--vault" and idx + 1 < len(sys.argv):
+            return Path(sys.argv[idx + 1]).expanduser()
+        if arg.startswith("--vault="):
+            return Path(arg.split("=", 1)[1]).expanduser()
+    return None
+
+
+def _user_friendly_exit(exc: BaseException, vault: Path | None) -> int:
+    err_log = None
+    if vault:
+        try:
+            err_dir = vault / "_system" / "telemetry"
+            err_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+            err_log = err_dir / f"run-migrations-error-{ts}.log"
+            err_log.write_text("".join(traceback.format_exception(exc)), encoding="utf-8")
+        except OSError:
+            err_log = None
+    print(
+        "TARS migrations: an unexpected error occurred. Migrations that completed "
+        "before the error are already applied.",
+        file=sys.stderr,
+    )
+    if err_log:
+        print(f"Details written to {err_log}", file=sys.stderr)
+    return 1
 
 
 # ---------------------------------------------------------------------------
@@ -296,6 +347,8 @@ def main() -> int:
         except Exception as exc:
             result = {"migration": slug, "dry_run": dry_run, "changes": [], "errors": [{"file": "runner", "error": str(exc)}], "skipped": 0}
             any_error = True
+        if isinstance(result, dict) and not result.get("migration"):
+            result["migration"] = slug
 
         if result.get("errors"):
             any_error = True
@@ -321,7 +374,7 @@ def main() -> int:
     # Write journal entry.
     if all_results and not dry_run:
         journal_path = _write_journal(vault, all_results, plugin_ver)
-        if not args.json_output:
+        if journal_path and not args.json_output:
             print(f"\nJournal entry: {journal_path.relative_to(vault)}")
 
     if args.json_output:
@@ -337,4 +390,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        sys.exit(_user_friendly_exit(exc, _vault_arg_or_none()))

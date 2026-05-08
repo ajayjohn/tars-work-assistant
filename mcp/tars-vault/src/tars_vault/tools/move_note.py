@@ -47,6 +47,11 @@ def move_note(**kwargs: Any) -> dict:
         return _common.error(f"source not found: {src_p.relative_to(vault_p)}")
     if dst_p.exists():
         return _common.error(f"destination already exists: {dst_p.relative_to(vault_p)}")
+    allow_protected = bool(kwargs.get("allow_protected_paths", False))
+    if _common.is_protected_path(vault_p, src_p) and not allow_protected:
+        return _common.error(_common.protected_path_reason(vault_p, src_p))
+    if _common.is_protected_path(vault_p, dst_p) and not allow_protected:
+        return _common.error(_common.protected_path_reason(vault_p, dst_p))
 
     dst_p.parent.mkdir(parents=True, exist_ok=True)
     src_p.rename(dst_p)

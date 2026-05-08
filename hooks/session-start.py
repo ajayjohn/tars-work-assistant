@@ -21,11 +21,20 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import in_recursion, read_event, read_install_config, resolve_vault, write_output
+from _common import (
+    in_recursion,
+    is_notice_suppressed,
+    mark_notice_acknowledged,
+    read_event,
+    read_install_config,
+    resolve_vault,
+    write_output,
+)
 
 
 _REGISTRY_TTL_SECONDS = 24 * 60 * 60  # 24h per CLAUDE.md startup-checks §6
@@ -37,18 +46,8 @@ def _unexpanded_env_notice(status: dict) -> str:
         return ""
     raw = status.get("raw_env_value", "${TARS_VAULT_PATH}")
     return (
-        "⚠️  TARS CONFIGURATION ERROR: TARS_VAULT_PATH is not resolved.\n"
-        f"   The MCP server received the literal string \"{raw}\" instead of an\n"
-        "   absolute path. Claude Code does not expand shell variables in .mcp.json\n"
-        "   env blocks. Writes will land in a mis-named directory and be invisible\n"
-        "   to TARS.\n\n"
-        "   Fix: open your .mcp.json (or the root ~/.claude/.mcp.json) and replace\n"
-        f"   \"{raw}\" with the absolute path to your workspace, e.g.\n"
-        "   \"~/Documents/TARS Workspace\".\n\n"
-        "   To relocate files already written to the wrong directory, run:\n"
-        "     python3 scripts/migrate-stranded-vault-files.py --vault /path/to/workspace --dry-run\n"
-        "   then re-run with --apply after reviewing the plan.\n\n"
-        "   Workspace writes are BLOCKED until TARS_VAULT_PATH is corrected."
+        f"TARS setup needs attention: TARS_VAULT_PATH is still the literal value "
+        f'"{raw}". Set it to your real workspace path before writing.'
     )
 
 
@@ -143,16 +142,12 @@ def _vault_notice(status: dict) -> str:
         install = status.get("install") or {}
         stored = install.get("workspace_path") or install.get("vault_path") or "(unset)"
         return (
-            "TARS install warning: this folder does not match the workspace recorded in "
-            "_system/install.yaml.\n"
-            f"  Recorded workspace_path: {stored}\n"
-            "  If you moved or copied the workspace, run /welcome --relocate to update "
-            "the install record. Until then, writes are discouraged from this folder."
+            "TARS install warning: this folder does not match the recorded workspace. "
+            f"Recorded path: {stored}. Run `/welcome --relocate` before writing here."
         )
     if status.get("source") == "cwd-config":
         return (
-            "TARS notice: this workspace has no _system/install.yaml. Run /welcome to "
-            "create one. Until then, move detection is disabled."
+            "TARS setup is incomplete here. Run `/welcome` to finish workspace setup."
         )
     return ""
 
@@ -172,30 +167,42 @@ def _claude_home_workspace_notice(vault: Path | None) -> str:
     return (
         "TARS configuration warning: the active workspace resolves under ~/.claude. "
         "That folder is usually application state, not a transparent TARS workspace. "
-        "Use a folder such as ~/Documents/TARS Workspace and run /welcome again, or "
-        "run `python3 scripts/doctor.py --workspace <path>` to inspect the setup."
+        "Use a folder such as ~/Documents/TARS Workspace and run `/welcome` again."
     )
 
 
 def _registry_notice(vault: Path) -> str:
-    """Stale or missing tools-registry → user-visible notice."""
+    """Refresh stale or missing integrations registry. Notice only on failure."""
     target = vault / "_system" / "tools-registry.yaml"
-    if not target.is_file():
-        return (
-            "TARS notice: _system/tools-registry.yaml is missing. Capability "
-            "resolution will fall back to defaults — call "
-            "mcp__tars_vault__refresh_integrations to rebuild it."
-        )
+    needs_refresh = not target.is_file()
     try:
         age = time.time() - target.stat().st_mtime
     except OSError:
+        age = 0
+    needs_refresh = needs_refresh or age > _REGISTRY_TTL_SECONDS
+    if not needs_refresh:
         return ""
-    if age > _REGISTRY_TTL_SECONDS:
-        hours = int(age / 3600)
-        return (
-            f"TARS notice: _system/tools-registry.yaml is {hours}h old (TTL is 24h). "
-            "Run mcp__tars_vault__refresh_integrations to refresh capability mappings."
+    runner = ROOT.parent / "scripts" / "discover-mcp-tools.py"
+    if not runner.is_file():
+        return "TARS couldn't refresh its integrations index. Run `/doctor` when you have a minute."
+    try:
+        env = dict(os.environ)
+        env["TARS_IN_HOOK"] = "1"
+        result = subprocess.run(
+            [sys.executable, str(runner), "--vault", str(vault), "--apply", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=env,
         )
+        if result.returncode == 0:
+            return ""
+    except Exception:
+        pass
+    if is_notice_suppressed(vault, "integrations_refresh_failed"):
+        return ""
+    mark_notice_acknowledged(vault, "integrations_refresh_failed")
+    return "TARS couldn't refresh its integrations index. Run `/doctor` when you have a minute."
     return ""
 
 
@@ -291,20 +298,16 @@ def _cron_notice(vault: Path) -> str:
     parts: list[str] = []
 
     if unregistered:
+        if is_notice_suppressed(vault, "schedules_not_registered"):
+            return ""
+        mark_notice_acknowledged(vault, "schedules_not_registered")
         parts.append(
-            "TARS notice: cron jobs not registered: "
-            + ", ".join(unregistered)
-            + ". Run /welcome step 7 to register them — Claude does not run in the "
-            "background, so unregistered jobs simply never fire."
+            "TARS scheduled jobs aren't running yet. Run `/welcome --setup-schedules` to enable them."
         )
 
     if expiring_soon:
         parts.append(
-            "TARS notice: CronCreate job(s) expiring soon: "
-            + ", ".join(expiring_soon)
-            + ". /maintain will re-register them automatically. "
-            "If /maintain is not scheduled, re-run /welcome step 7 or run "
-            "`/maintain` manually to renew."
+            "Some TARS scheduled jobs need renewal soon. Run `/maintain` to refresh them."
         )
 
     return "\n\n".join(parts)
@@ -312,6 +315,9 @@ def _cron_notice(vault: Path) -> str:
 
 def _migration_notice(vault: Path) -> str:
     """Check for pending migrations and surface a one-line notice if any exist."""
+    if _is_uninitialised_fresh_workspace(vault):
+        _stamp_housekeeping_version(vault, _live_plugin_version())
+        return ""
     runner = ROOT.parent / "scripts" / "run-migrations.py"
     if not runner.is_file():
         return ""
@@ -331,13 +337,226 @@ def _migration_notice(vault: Path) -> str:
                 n = int(m.group(1))
                 if n > 0:
                     return (
-                        f"TARS notice: {n} pending migration(s) detected. "
-                        "Run /maintain migrations (or `python3 scripts/run-migrations.py "
-                        f"--vault {vault} --dry-run`) to review and apply."
+                        "TARS has updates ready for your workspace. Run `/maintain migrations` to apply them."
                     )
     except Exception:
         pass
     return ""
+
+
+def _live_plugin_version() -> str:
+    try:
+        import json
+
+        data = json.loads((ROOT.parent / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        return str(data.get("version") or "")
+    except Exception:
+        return ""
+
+
+def _housekeeping_version(vault: Path) -> str:
+    target = vault / "_system" / "housekeeping-state.yaml"
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    for line in text.splitlines():
+        m = re.match(r"^\s*plugin_version\s*:\s*(.*?)\s*$", line)
+        if m:
+            return m.group(1).strip().strip('"').strip("'")
+    return ""
+
+
+def _stamp_housekeeping_version(vault: Path, version: str) -> None:
+    if not version:
+        return
+    target = vault / "_system" / "housekeeping-state.yaml"
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    lines = []
+    found = False
+    for raw in text.splitlines():
+        if re.match(r"^\s*plugin_version\s*:", raw):
+            leading = len(raw) - len(raw.lstrip())
+            lines.append(" " * leading + f'plugin_version: "{version}"')
+            found = True
+        else:
+            lines.append(raw)
+    if not found:
+        lines.append(f'plugin_version: "{version}"')
+    try:
+        target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def _install_value(vault: Path, key: str) -> str:
+    install = read_install_config(vault) or {}
+    value = install.get(key)
+    return str(value or "")
+
+
+def _stamp_install_version(vault: Path, version: str) -> None:
+    target = vault / "_system" / "install.yaml"
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    lines = []
+    found = False
+    for raw in text.splitlines():
+        if re.match(r"^\s*plugin_version\s*:", raw):
+            lines.append(f'plugin_version: "{version}"')
+            found = True
+        else:
+            lines.append(raw)
+    if not found:
+        lines.append(f'plugin_version: "{version}"')
+    try:
+        target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def _parse_iso_date(value: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:
+            return None
+
+
+def _version_drift_notice(vault: Path) -> str:
+    live = _live_plugin_version()
+    recorded = _install_value(vault, "plugin_version")
+    if not live or not recorded or recorded == live:
+        return ""
+    if _housekeeping_version(vault) not in ("", live):
+        return ""
+    if is_notice_suppressed(vault, "version_drift"):
+        return ""
+    _stamp_install_version(vault, live)
+    mark_notice_acknowledged(vault, "version_drift")
+    return f"TARS was upgraded from {recorded} to {live}. No migration needed; refreshing your install record."
+
+
+def _welcome_back_notice(vault: Path) -> str:
+    last = _parse_iso_date(_install_value(vault, "last_session_at"))
+    if not last:
+        return ""
+    days = (date.today() - last).days
+    if days < 30 or is_notice_suppressed(vault, "welcome_back", ttl_days=30):
+        return ""
+    mark_notice_acknowledged(vault, "welcome_back")
+    note_count = sum(1 for _ in vault.rglob("*.md"))
+    detail = "Your workspace is still light" if note_count < 20 else "There may be useful changes to catch up on"
+    return f"Welcome back. You haven't used TARS in {days} days. {detail}. Run `/briefing --catchup` for a 60-second summary."
+
+
+def _pollution_notice(vault: Path) -> str:
+    allowed = {"tags", "aliases"}
+    polluted = 0
+    for md in vault.rglob("*.md"):
+        rel = str(md.relative_to(vault)).replace("\\", "/")
+        if rel.startswith(("_system/", "archive/")):
+            continue
+        try:
+            text = md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        fm = _parse_frontmatter_only(text)
+        if not fm:
+            continue
+        if any((k not in allowed and not k.startswith("tars-")) for k in fm):
+            polluted += 1
+    if polluted == 0 or is_notice_suppressed(vault, "frontmatter_pollution"):
+        return ""
+    mark_notice_acknowledged(vault, "frontmatter_pollution")
+    return f"{polluted} note(s) use non-TARS frontmatter and won't show up in structured search. Run `/lint --fix-prefixes` to migrate."
+
+
+def _parse_frontmatter_only(text: str) -> dict[str, str]:
+    m = re.match(r"^---\s*\n(.*?)\n---\s*\n?", text, re.DOTALL)
+    if not m:
+        return {}
+    out: dict[str, str] = {}
+    for raw in m.group(1).splitlines():
+        if ":" not in raw or raw.startswith(" "):
+            continue
+        key, _, value = raw.partition(":")
+        out[key.strip()] = value.strip()
+    return out
+
+
+def _state_aware_lines(vault: Path) -> list[str]:
+    """Power-user state insights (PRD-11). Each insight: at most one line.
+
+    Staleness is judged by `tars-modified` in frontmatter (the workspace's
+    truth) rather than filesystem mtime, which gets reset by backups, copies,
+    or git checkouts.
+    """
+    lines: list[str] = []
+    today = date.today()
+    cutoff = today - timedelta(days=30)
+
+    stale = 0
+    for md in (vault / "memory" / "initiatives").rglob("*.md"):
+        try:
+            fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+        if "tars/initiative" not in fm.get("tags", ""):
+            continue
+        if "active" not in fm.get("tars-status", ""):
+            continue
+        modified = fm.get("tars-modified", "").strip('"').strip("'")
+        if not modified:
+            continue
+        try:
+            if date.fromisoformat(modified[:10]) < cutoff:
+                stale += 1
+        except ValueError:
+            continue
+    if stale:
+        lines.append(f"{stale} active initiative(s) haven't been touched in 30+ days. Run `/lint --stale`.")
+
+    overdue = 0
+    today_iso = today.isoformat()
+    for md in (vault / "memory" / "tasks").rglob("*.md"):
+        try:
+            fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+        if "tars/task" in fm.get("tags", "") and fm.get("tars-status", "open") in ("open", "in-progress"):
+            due = fm.get("tars-due", "").strip('"').strip("'")
+            if due and due < today_iso:
+                overdue += 1
+    if overdue:
+        lines.append(f"{overdue} task(s) are overdue. Run `/tasks` to triage them.")
+
+    inbox_dir = vault / "inbox" / "pending"
+    pending = 0
+    if inbox_dir.is_dir():
+        pending = sum(1 for p in inbox_dir.iterdir() if p.is_file())
+    if pending:
+        lines.append(f"{pending} item(s) waiting in your inbox. Say \"process inbox\" to work through them.")
+    return lines
+
+
+def _is_uninitialised_fresh_workspace(vault: Path) -> bool:
+    if _housekeeping_version(vault):
+        return False
+    if any((vault / "memory").rglob("*.md")):
+        return False
+    if any((vault / "journal").rglob("*.md")):
+        return False
+    return True
 
 
 def _build_context(vault: Path | None, status: dict) -> str:
@@ -348,6 +567,39 @@ def _build_context(vault: Path | None, status: dict) -> str:
     if unexpanded:
         parts.append(unexpanded)
         return "\n\n".join(parts)
+
+    # Empty-folder hint (PRD-10): fires when no TARS workspace is reachable.
+    # That includes (a) resolver returned nothing, or (b) resolver returned an
+    # env- or CWD-rooted path that has no _system/ directory yet. Suppressed
+    # inside the plugin's own checkout so framework devs aren't pestered.
+    def _looks_like_workspace(p: Path | None) -> bool:
+        if p is None:
+            return False
+        sys_dir = p / "_system"
+        if not sys_dir.is_dir():
+            return False
+        return any(
+            (sys_dir / name).is_file()
+            for name in ("install.yaml", "config.md", "schemas.yaml")
+        )
+
+    def _is_plugin_checkout(p: Path | None) -> bool:
+        if p is None:
+            return False
+        try:
+            real = p.resolve()
+        except (OSError, RuntimeError):
+            return False
+        if (real / ".claude-plugin" / "plugin.json").is_file():
+            return True
+        parts = real.parts
+        return any(
+            seg in parts
+            for seg in (".claude/plugins/cache", ".claude/plugins/marketplaces")
+        )
+
+    if not _looks_like_workspace(vault) and not _is_plugin_checkout(vault):
+        return "This folder isn't a TARS workspace yet. Try `/start` for a 90-second demo, or `/welcome` to set one up."
 
     # Worktree isolation notice (informational, non-blocking).
     worktree = _worktree_notice()
@@ -361,6 +613,14 @@ def _build_context(vault: Path | None, status: dict) -> str:
     if claude_home:
         parts.append(claude_home)
     if vault and status.get("source") in ("env", "cwd-install", "cwd-config"):
+        for line in (
+            _welcome_back_notice(vault),
+            _version_drift_notice(vault),
+            _pollution_notice(vault),
+        ):
+            if line:
+                parts.append(line)
+        parts.extend(_state_aware_lines(vault))
         reg = _registry_notice(vault)
         if reg:
             parts.append(reg)

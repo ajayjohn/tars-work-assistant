@@ -41,3 +41,11 @@ trash/
 ROADMAP.md
 IMPLEMENTATION_PLAN.md
 COWORK_PLUGIN_ANALYSIS.md
+
+# Regression suite — local runs only (CI uploads as artifact)
+tests/regression/last-run.json
+tests/regression/layer-*.log
+tests/regression/scenarios.json
+tests/regression/adversarial.json
+tests/regression/perf.json
+tests/regression/qa-reverify.json

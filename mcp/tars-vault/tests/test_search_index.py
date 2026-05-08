@@ -111,7 +111,7 @@ def test_schema_and_fts_roundtrip(tmp_path: Path) -> None:
             path="memory/people/jane-smith.md",
             title="Jane Smith",
             tags=["tars/person"],
-            body="Jane leads platform and mobile at CSI. Reports to the CTO.",
+            body="Jane leads platform and mobile at Acme. Reports to the CTO.",
             tier="A",
             source_type="memory",
             date="2026-03-15",

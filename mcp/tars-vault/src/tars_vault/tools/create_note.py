@@ -33,7 +33,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
-from ..validators import validate_no_bad_wikilinks
+from ..validators import load_schemas, validate_against_schema, validate_no_bad_wikilinks
 
 
 # Paths under these vault-relative prefixes receive auto-alias treatment.
@@ -89,6 +89,8 @@ def create_note(**kwargs: Any) -> dict:
     body = kwargs.get("body", "")
     overwrite = bool(kwargs.get("overwrite", False))
     auto_alias = kwargs.get("auto_alias", True)  # default on
+    validate_schema = kwargs.get("validate", True)
+    allow_protected = bool(kwargs.get("allow_protected_paths", False))
 
     if not vault:
         return _common.error("missing 'vault' path")
@@ -113,11 +115,20 @@ def create_note(**kwargs: Any) -> dict:
     except ValueError as exc:
         return _common.error(str(exc))
 
+    if validate_schema:
+        schemas = load_schemas(vault_p)
+        if schemas:
+            schema_errors = validate_against_schema(frontmatter, schemas)
+            if schema_errors:
+                return _common.error("schema validation failed: " + "; ".join(schema_errors))
+
     if note_p.exists() and not overwrite:
         return _common.error(
             f"note already exists: {note_p.relative_to(vault_p)} "
             "(pass overwrite=true to replace)"
         )
+    if _common.is_protected_path(vault_p, note_p) and not allow_protected:
+        return _common.error(_common.protected_path_reason(vault_p, note_p))
 
     # Validate: any managed key (prefix tars-) is OK; permit common Obsidian
     # keys (`tags`, `aliases`) without prefix; reject any other non-prefix key

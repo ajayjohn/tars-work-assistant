@@ -48,6 +48,11 @@ All workspace mutations go through the local TARS helper, exposed internally as
 is complete.
 
 Never use direct filesystem writes for user workspace content from a skill.
+The helper is the enforcement layer: it fails closed when no real workspace is
+resolved, blocks writes when the install record points at another folder,
+rejects unknown tool arguments, validates managed frontmatter against schemas,
+and protects system paths from direct edits. Use `read_system_file` for managed
+YAML/Markdown reads under `_system/`.
 Never show raw helper tool names to nontechnical users when setup fails. Say
 "local TARS helper" first, with technical details only after recovery steps.
 Never hard-code external integration server names. Resolve integrations through

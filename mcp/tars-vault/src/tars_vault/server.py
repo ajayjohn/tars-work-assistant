@@ -1,4 +1,4 @@
-"""Local helper bootstrap for tars-vault (v3.4.4).
+"""Local helper bootstrap for tars-vault (v3.5.0).
 
 Wires list_tools + call_tool handlers against the tool modules under `tools/`.
 Each handler is a synchronous `(**kwargs) -> dict` function; this module
@@ -14,9 +14,11 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
 
 from . import tools as _tools
+from . import _common
 
 
 def _resolve_handler(name: str):
@@ -49,6 +51,17 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["file"],
         },
     },
+    "read_system_file": {
+        "description": "Read a managed system file and parse YAML files into structured data.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "file": {"type": "string", "description": "Path under _system/."},
+                "path": {"type": "string", "description": "Compatibility alias for file."},
+            },
+        },
+    },
     "create_note": {
         "description": "Create a new vault note with frontmatter. Fails if path exists unless overwrite=true.",
         "inputSchema": {
@@ -62,6 +75,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "body": {"type": "string"},
                 "overwrite": {"type": "boolean"},
                 "allow_user_properties": {"type": "boolean"},
+                "allow_protected_paths": {"type": "boolean"},
+                "auto_alias": {"type": "boolean"},
+                "validate": {"type": "boolean"},
             },
             "required": ["path"],
         },
@@ -88,7 +104,12 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "path": {"type": "string"},
                 "frontmatter": {"type": "object"},
                 "body": {"type": "string"},
+                "content": {"type": "string"},
                 "overwrite": {"type": "boolean"},
+                "allow_user_properties": {"type": "boolean"},
+                "allow_protected_paths": {"type": "boolean"},
+                "auto_alias": {"type": "boolean"},
+                "validate": {"type": "boolean"},
             },
             "required": ["path"],
         },
@@ -104,6 +125,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "property": {"type": "string"},
                 "value": {},
                 "allow_user_properties": {"type": "boolean"},
+                "allow_protected_paths": {"type": "boolean"},
             },
             "required": ["file"],
         },
@@ -133,6 +155,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "reason": {"type": "string"},
                 "force": {"type": "boolean"},
                 "dry_run": {"type": "boolean"},
+                "allow_protected_paths": {"type": "boolean"},
             },
             "required": ["file"],
         },
@@ -146,6 +169,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "src": {"type": "string"},
                 "dst": {"type": "string"},
                 "rewrite_wikilinks": {"type": "boolean"},
+                "allow_protected_paths": {"type": "boolean"},
             },
             "required": ["src", "dst"],
         },
@@ -319,6 +343,62 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 
+WRITE_TOOLS = {
+    "append_note",
+    "archive_note",
+    "create_note",
+    "move_note",
+    "refresh_integrations",
+    "scaffold_workspace",
+    "update_frontmatter",
+    "write_note_from_content",
+}
+
+READ_TOOLS = set(TOOL_REGISTRY) - WRITE_TOOLS
+
+
+def _validate_kwargs(tool_name: str, schema: dict[str, Any], kwargs: dict[str, Any]) -> str | None:
+    declared = set(schema.get("properties", {}).keys())
+    extras = sorted(k for k in kwargs if k not in declared)
+    if extras:
+        label = "argument" if len(extras) == 1 else "arguments"
+        return f"unknown {label} for {tool_name}: {', '.join(extras)}"
+    return None
+
+
+def _resolve_call_vault(args: dict[str, Any], default_vault: str | None) -> tuple[Path | None, str | None]:
+    if args.get("vault"):
+        return _common.resolve_vault_path(args["vault"]), None
+    vault, err = _common.resolve_vault_strict(env_value=default_vault or None)
+    if err:
+        return None, err
+    return vault, None
+
+
+def _enforce_install_alignment(tool_name: str, vault: Path) -> dict[str, Any] | None:
+    if os.environ.get("TARS_VAULT_WRITE_ANYWAY") == "1":
+        return None
+    aligned, warning = _common.verify_install_alignment(vault)
+    if aligned:
+        return None
+    if tool_name in WRITE_TOOLS:
+        return _common.error(warning or "workspace install record does not match this folder")
+    try:
+        from .telemetry import append_event
+
+        append_event(
+            vault,
+            {
+                "event": "vault_alignment_warning",
+                "tool": tool_name,
+                "warning": warning,
+            },
+        )
+    except Exception:
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # MCP server transport
 # ---------------------------------------------------------------------------
@@ -388,8 +468,18 @@ def _call_handler_sync(name: str, arguments: dict | None, default_vault: str) ->
     if handler is None:
         return {"status": "error", "reason": f"unknown tool: {name}"}
     args = dict(arguments or {})
-    if "vault" not in args and default_vault:
-        args["vault"] = default_vault
+    schema = TOOL_SCHEMAS.get(name, {}).get("inputSchema", {})
+    kw_error = _validate_kwargs(name, schema, args)
+    if kw_error:
+        return _common.error(kw_error)
+    vault, vault_error = _resolve_call_vault(args, default_vault)
+    if vault_error:
+        return _common.error(vault_error)
+    if vault is not None:
+        args["vault"] = str(vault)
+        alignment_error = _enforce_install_alignment(name, vault)
+        if alignment_error:
+            return alignment_error
     try:
         result = handler(**args)
     except TypeError as exc:
@@ -448,7 +538,7 @@ def _run_minimal_stdio(vault_path: str) -> int:
                         "result": {
                             "protocolVersion": protocol,
                             "capabilities": {"tools": {}},
-                            "serverInfo": {"name": "tars-vault", "version": "3.4.4"},
+                            "serverInfo": {"name": "tars-vault", "version": "3.5.0"},
                         },
                     }
                 )
@@ -533,7 +623,7 @@ def run_stdio(vault_path: str) -> int:
                 write_stream,
                 InitializationOptions(
                     server_name="tars-vault",
-                    server_version="3.4.4",
+                    server_version="3.5.0",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},

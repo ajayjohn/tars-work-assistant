@@ -27,6 +27,39 @@ block_patterns:
   - name: aws_key
     pattern: 'AKIA[A-Z0-9]{16}'
     description: AWS access key
+  - name: slack_bot_token
+    pattern: 'xox[baprs]-[A-Za-z0-9-]{10,}'
+    description: Slack bot/app token
+  - name: github_pat
+    pattern: '\b(ghp|gho|ghu|ghr|ghs)_[A-Za-z0-9]{36,}\b'
+    description: GitHub personal access token
+  - name: stripe_secret
+    pattern: '\bsk_(live|test)_[A-Za-z0-9]{20,}\b'
+    description: Stripe API secret key
+  - name: stripe_publishable
+    pattern: '\bpk_(live|test)_[A-Za-z0-9]{20,}\b'
+    description: Stripe publishable key
+  - name: stripe_webhook
+    pattern: '\bwhsec_[A-Za-z0-9]{20,}\b'
+    description: Stripe webhook signing secret
+  - name: twilio_account_sid
+    pattern: '\bAC[0-9a-fA-F]{32}\b'
+    description: Twilio Account SID
+  - name: twilio_api_key
+    pattern: '\bSK[0-9a-fA-F]{32}\b'
+    description: Twilio API key SID
+  - name: sendgrid_api_key
+    pattern: 'SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}'
+    description: SendGrid API key
+  - name: google_api_key
+    pattern: '\bAIza[0-9A-Za-z_\-]{35}\b'
+    description: Google API key
+  - name: openai_api_key
+    pattern: '\bsk-[A-Za-z0-9]{20,}\b'
+    description: OpenAI API key
+  - name: anthropic_api_key
+    pattern: '\bsk-ant-[A-Za-z0-9_\-]{20,}\b'
+    description: Anthropic API key
 
 # Warn patterns: flag for user review before persisting
 warn_patterns:

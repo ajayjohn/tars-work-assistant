@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -23,6 +24,98 @@ from typing import Any
 def resolve_vault_path(vault: str | Path) -> Path:
     """Normalize a vault path argument to an absolute, resolved Path."""
     return Path(vault).expanduser().resolve()
+
+
+def _is_unexpanded_var(value: str) -> bool:
+    return bool(re.search(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*", value))
+
+
+def resolve_vault_strict(
+    *,
+    env_value: str | None = None,
+    cwd: Path | None = None,
+    install_record: Path | None = None,
+) -> tuple[Path | None, str | None]:
+    """Resolve a vault without ever falling back to an arbitrary CWD."""
+    raw_env = env_value if env_value is not None else os.environ.get("TARS_VAULT_PATH")
+    current = (cwd or Path.cwd()).expanduser()
+
+    if raw_env:
+        if _is_unexpanded_var(raw_env):
+            return None, (
+                f'TARS_VAULT_PATH was passed as the literal string "{raw_env}". '
+                "Set it to the real path to your TARS workspace, or run from inside "
+                "that workspace."
+            )
+        env_path = Path(raw_env).expanduser().resolve()
+        if (env_path / "_system").is_dir():
+            return env_path, None
+        return None, (
+            f"TARS_VAULT_PATH is set to {env_path}, but that folder is not a "
+            "TARS workspace. Run `/welcome` there first, or correct the path."
+        )
+
+    if (current / "_system" / "install.yaml").is_file():
+        return current.resolve(), None
+    if (current / "_system" / "config.md").is_file():
+        return current.resolve(), None
+
+    if install_record and install_record.is_dir() and (install_record / "_system").is_dir():
+        return install_record.expanduser().resolve(), None
+
+    return None, (
+        "TARS does not know which workspace to use. Set TARS_VAULT_PATH to "
+        "your workspace folder, or run from inside it."
+    )
+
+
+def read_install_workspace_path(vault: Path) -> str | None:
+    """Read workspace_path/vault_path from a vault install record."""
+    install = Path(vault) / "_system" / "install.yaml"
+    if not install.is_file():
+        return None
+    try:
+        text = install.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    fallback: str | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = re.match(r"^(workspace_path|vault_path)\s*:\s*(.*?)\s*$", line)
+        if not m:
+            continue
+        value = m.group(2).strip().strip('"').strip("'")
+        if not value:
+            continue
+        if m.group(1) == "workspace_path":
+            return value
+        fallback = value
+    return fallback
+
+
+def verify_install_alignment(vault: str | Path) -> tuple[bool, str | None]:
+    """Return whether the vault path matches its install record.
+
+    Missing install records are allowed for first-run scaffolding. A case-only
+    difference is treated as aligned to avoid false positives on common macOS
+    case-insensitive volumes.
+    """
+    actual = Path(vault).expanduser().resolve()
+    recorded = read_install_workspace_path(actual)
+    if not recorded:
+        return True, None
+    try:
+        recorded_real = Path(recorded).expanduser().resolve()
+    except (OSError, RuntimeError):
+        return True, None
+    if recorded_real == actual or str(recorded_real).lower() == str(actual).lower():
+        return True, None
+    return False, (
+        f"This folder ({actual}) does not match the workspace recorded in "
+        f"the install record ({recorded_real}). Run `/welcome --relocate` before writing."
+    )
 
 
 def resolve_note_path(vault: Path, file_or_path: str) -> Path:
@@ -52,6 +145,26 @@ def resolve_note_path(vault: Path, file_or_path: str) -> Path:
     return p
 
 
+_PROTECTED_PREFIXES = ("_system/", "_views/", "archive/")
+_PROTECTED_FILES = {"index.md"}
+
+
+def is_protected_path(vault: Path, path: Path) -> bool:
+    try:
+        rel = str(path.resolve().relative_to(Path(vault).resolve())).replace("\\", "/")
+    except ValueError:
+        return True
+    return rel in _PROTECTED_FILES or any(rel.startswith(prefix) for prefix in _PROTECTED_PREFIXES)
+
+
+def protected_path_reason(vault: Path, path: Path) -> str:
+    try:
+        rel = str(path.resolve().relative_to(Path(vault).resolve())).replace("\\", "/")
+    except ValueError:
+        rel = str(path)
+    return f"{rel} is managed by TARS. Use `/welcome`, `/doctor`, or `/maintain` instead of editing it directly."
+
+
 # ---------------------------------------------------------------------------
 # Frontmatter parser (stdlib-only)
 # ---------------------------------------------------------------------------
@@ -67,6 +180,12 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any] | None, str]:
     fm = parse_simple_yaml(m.group(1))
     body = text[m.end():]
     return fm, body
+
+
+def parse_full_content(blob: str) -> tuple[dict[str, Any], str]:
+    """Split a full Markdown document into frontmatter and body."""
+    fm, body = split_frontmatter(blob)
+    return fm or {}, body
 
 
 def parse_simple_yaml(src: str) -> dict[str, Any]:

@@ -3,6 +3,12 @@
 Verifies the package imports cleanly and exposes the expected tool surface.
 """
 import importlib
+import sys
+from pathlib import Path
+
+
+REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO / "mcp" / "tars-vault" / "src"))
 
 
 EXPECTED_TOOLS = {
@@ -11,13 +17,18 @@ EXPECTED_TOOLS = {
     "classify_file",
     "create_note",
     "detect_near_duplicates",
+    "format_wikilink",
     "fts_search",
     "move_note",
     "read_note",
+    "read_system_file",
     "refresh_integrations",
     "rerank",
+    "resolve_alias",
     "resolve_capability",
+    "runtime_info",
     "scan_secrets",
+    "scaffold_workspace",
     "search_by_tag",
     "semantic_search",
     "update_frontmatter",
