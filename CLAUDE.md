@@ -88,7 +88,6 @@ universal constraints.
 |---|---|
 | `core` | identity, routing, constraints, help |
 | `welcome` | first-run setup and mode switching |
-| `start` | zero-setup preview with pasted content |
 | `doctor` | local helper and workspace health check |
 | `meeting` | transcript processing |
 | `maintain` | inbox processing, sync, archive sweep |

@@ -8,7 +8,6 @@ Use this checklist whenever you change the framework. TARS is opinionated and th
 - Update or add the matching file in `commands/` if the skill is user-invocable
 - Update routing or protocol references in `skills/core/SKILL.md` and affected skills
 - Update [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) if the public surface changed
-- Update [reference/workflows.md](reference/workflows.md) if the workflow model changed
 - Update [CHANGELOG.md](CHANGELOG.md)
 - Run `python3 tests/validate-routing.py`
 - Run `python3 tests/validate-docs.py`
@@ -18,7 +17,6 @@ Use this checklist whenever you change the framework. TARS is opinionated and th
 - Keep `templates/`, `_system/schemas.yaml`, and the relevant skill instructions in sync
 - Update `_views/` if properties or tags used in bases changed
 - Update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) if folder structure or note types changed
-- Update migration or compatibility references if the change affects existing vault data
 - Run `python3 tests/validate-templates.py`
 - Run `python3 tests/validate-frontmatter.py`
 
@@ -26,7 +24,7 @@ Use this checklist whenever you change the framework. TARS is opinionated and th
 
 - Update the script under `scripts/`
 - Update any skills that invoke or depend on that script
-- Update [docs/BUILD.md](docs/BUILD.md) or [reference/shortcuts.md](reference/shortcuts.md) when packaging or scheduled behavior changes
+- Update [docs/BUILD.md](docs/BUILD.md) or `_system/schedule.md` when packaging or scheduled behavior changes
 - Update [CHANGELOG.md](CHANGELOG.md)
 - Run `python3 tests/validate-scripts.py`
 - Run `python3 tests/validate-docs.py`
@@ -58,7 +56,7 @@ python3 tests/validate-routing.py
 python3 tests/validate-templates.py
 python3 tests/validate-scripts.py
 python3 tests/validate-docs.py
-python3 tests/smoke-tests.py
+python3 tests/test_real_world_smoke.py
 ```
 
 If you touch packaging or release metadata, also run:

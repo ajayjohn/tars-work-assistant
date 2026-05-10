@@ -7,24 +7,14 @@ FAIL=0
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1"; FAIL=1; }
 
-[ -f commands/start.md ] && pass "/start command exists" || fail "/start command missing"
-[ -f skills/start/SKILL.md ] && pass "/start skill exists" || fail "/start skill missing"
-grep -q "preview-only" skills/start/SKILL.md && pass "/start preview-only stated" || fail "/start preview-only missing"
-grep -qi "Do not write" skills/start/SKILL.md && pass "/start forbids default writes" || fail "/start write guard missing"
-
 [ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
 [ -f commands/doctor.md ] && pass "/doctor command exists" || fail "/doctor command missing"
 [ -f skills/doctor/SKILL.md ] && pass "/doctor skill exists" || fail "/doctor skill missing"
 grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
-grep -q "skills/start/" skills/core/SKILL.md && pass "/start routed" || fail "/start route missing"
 grep -q "skills/doctor/" skills/core/SKILL.md && pass "/doctor routed" || fail "/doctor route missing"
 grep -q -- "--continue-setup" skills/welcome/SKILL.md && pass "welcome continue setup documented" || fail "welcome continue setup missing"
 grep -q "Natural-language example" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && pass "generated index natural-language examples" || fail "index natural-language examples missing"
 grep -qi "process everything in my inbox" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py commands/README.md && pass "inbox natural-language example" || fail "inbox natural-language example missing"
-
-for f in examples/pm-customer-call.md examples/eng-design-discussion.md examples/sales-discovery-call.md examples/README.md; do
-  [ -f "$f" ] && pass "example exists: $f" || fail "missing example: $f"
-done
 
 grep -q "workspace_type" templates/install.yaml && pass "install has workspace_type" || fail "install missing workspace_type"
 grep -q "workspace_path" templates/install.yaml && pass "install has workspace_path" || fail "install missing workspace_path"
@@ -52,9 +42,6 @@ grep -q "Do not recommend \`/briefing\` as a starter action" skills/welcome/SKIL
 grep -q "commands/welcome.md" tests/validate-release-artifact.py && pass "artifact validation checks packaged commands" || fail "artifact command validation missing"
 grep -q "claude_home" hooks/pre-tool-use.py && pass "pre-tool blocks accidental ~/.claude writes" || fail "pre-tool ~/.claude guard missing"
 grep -q "TARS Workspace" hooks/session-start.py skills/welcome/SKILL.md docs/GETTING-STARTED.md && pass "Documents workspace default documented" || fail "Documents workspace default missing"
-[ -f scripts/migrate-install-record.py ] && pass "existing-user migration script exists" || fail "migration script missing"
-grep -q "workspace_type" scripts/migrate-install-record.py && pass "migration backfills workspace_type" || fail "migration missing workspace_type"
-grep -q "obsidian_enabled" scripts/migrate-install-record.py && pass "migration backfills obsidian flag" || fail "migration missing obsidian flag"
 [ -f scripts/doctor.py ] && pass "runtime doctor exists" || fail "runtime doctor missing"
 python3 scripts/doctor.py --workspace /tmp/tars-doctor-validation --json >/tmp/tars-doctor-validation.json 2>/tmp/tars-doctor-validation.err || true
 python3 - <<'PY'

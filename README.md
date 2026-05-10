@@ -15,26 +15,17 @@ TARS is built around a few core ideas:
 - Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
 - Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and workspace filing.
 - Tasks and durable memory always go through review before persistence.
-- Cold-start friction is addressed by `/start`, progressive `/welcome`, seven onboarding personas, and graceful degradation when integrations are missing.
+- Cold-start friction is addressed by progressive `/welcome`, seven onboarding personas, and graceful degradation when integrations are missing.
 - Wikilink hygiene is centralized: every `[[…]]` flows through `format_wikilink`; smart-quote and Obsidian-illegal links are rejected at the write side; legacy broken links can be repaired in bulk.
 - Scheduled work is optional and registered through `/welcome --setup-schedules` when a scheduler is available. Claude does not run in the background by itself, so weekly staleness, drift, and rollup work is surfaced through scheduled jobs or manual `/maintain --weekly`.
 
-## Try it in 90 seconds
+## First run
 
-After installing the plugin, run `/start` and paste your own content. It works without setup, integrations, or Obsidian.
+After installing the plugin, run `/welcome`. It creates a local Markdown workspace, records your identity and persona, and then guides you into a first paste-or-upload workflow before anything is saved.
 
 ```text
-/start
-Paste a meeting transcript and extract decisions, risks, and follow-up items.
-
-/start
-Paste a sales discovery call and draft a follow-up email.
-
-/start
-Paste a design discussion and identify decisions, open questions, risks, and tasks.
+/welcome
 ```
-
-No transcript handy? Try one of `examples/`.
 
 ## What you get over time
 
@@ -44,7 +35,7 @@ No transcript handy? Try one of `examples/`.
 
 ## What ships in the framework
 
-The framework ships with 15 skills, 16 commands, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
+The framework ships with 14 skills, 14 slash-command wrappers, note templates, office content outlines, seven personas, live views for Obsidian mode, and deterministic maintenance scripts.
 
 Core user-facing capabilities:
 - Daily and weekly briefings with calendar, task, people, and initiative context (plus a Monday telemetry footer)
@@ -63,7 +54,7 @@ Core user-facing capabilities:
 The framework uses this high-level structure:
 
 ```text
-skills/           Behavioral and workflow protocols (15 skills)
+skills/           Behavioral and workflow protocols (14 skills)
 commands/         Thin slash-command wrappers into the skills
 hooks/            SessionStart / PreToolUse / PostToolUse / PreCompact / SessionEnd
 mcp/tars-vault/   Local TARS helper + retrieval + organization tools
@@ -97,14 +88,13 @@ The plugin/workspace boundary is strict: plugin-shipped skills are read-only fro
 
 1. Install the framework from the marketplace or from a local checkout.
 2. Point TARS at a local folder for your Markdown workspace.
-3. Run `/start` to preview what TARS does with pasted content.
-4. Run `/welcome` to scaffold the workspace, pick a persona, and set your identity.
+3. Run `/welcome` to scaffold the workspace, pick a persona, and set your identity.
+4. Paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes when welcome offers the first guided workflow.
 5. Continue deeper setup later with `/welcome --continue-setup`; enable Obsidian with `/welcome --enable-obsidian` if you want live views.
 
 Examples:
 
 ```text
-/start
 /welcome
 /briefing
 /meeting
@@ -138,7 +128,6 @@ Start here depending on what you need:
 - [CONTRIBUTING.md](CONTRIBUTING.md) for maintenance and change hygiene
 - [CHANGELOG.md](CHANGELOG.md) for release history
 - [docs/CATALOG.md](docs/CATALOG.md) for the product and adoption overview
-- [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) for legacy vault migration (v3.0 → v3.1; v3.1 → v3.3 handled via automated hook)
 - [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) for Claude Remote Control on mobile
 
 ## License

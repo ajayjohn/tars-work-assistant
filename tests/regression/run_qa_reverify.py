@@ -127,21 +127,33 @@ def main() -> int:
         f"seed_value={seed_value!r}",
     ))
 
-    # C6: run-migrations.py against fresh workspace exits 0
+    # C6: legacy migrations removed; stale install version is handled as a
+    # lightweight record refresh with no migration prompt.
+    install_yaml = s4 / "_system" / "install.yaml"
+    text = install_yaml.read_text(encoding="utf-8")
+    text = re.sub(r'^plugin_version:\s*".*"$', 'plugin_version: "3.2.0"', text, flags=re.MULTILINE)
+    text = re.sub(r"acknowledged_notices:\n(?:\s+.*\n)*", "acknowledged_notices:\n", text)
+    install_yaml.write_text(text, encoding="utf-8")
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "run-migrations.py"),
-         "--vault", str(s2), "--apply"],
+        [sys.executable, str(REPO_ROOT / "hooks" / "session-start.py")],
+        env={**os.environ, "TARS_VAULT_PATH": str(s4)},
+        cwd=str(s4),
         capture_output=True, text=True, timeout=60,
     )
+    context = ""
+    try:
+        context = json.loads(proc.stdout).get("hookSpecificOutput", {}).get("additionalContext", "")
+    except Exception:
+        pass
     results.append(_check(
-        "C6 run-migrations.py exits 0 (no traceback)",
-        proc.returncode == 0 and "Traceback" not in proc.stderr,
-        f"rc={proc.returncode}, stderr_head={proc.stderr[:200]!r}",
+        "C6 stale version refresh has no migration prompt",
+        proc.returncode == 0 and "No migration needed" in context and ("/maintain " + "migrations") not in context,
+        f"rc={proc.returncode}, context={context!r}, stderr_head={proc.stderr[:200]!r}",
     ))
 
     # M1 pollution detection (script + SessionStart hint)
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "lint-frontmatter-pollution.py"),
+        [sys.executable, str(REPO_ROOT / "scripts" / "health-check.py"),
          "--vault", str(s6), "--json"],
         capture_output=True, text=True, timeout=30,
     )
@@ -151,9 +163,9 @@ def main() -> int:
     except Exception:
         pass
     results.append(_check(
-        "M1 pollution scanner finds non-tars frontmatter",
-        proc.returncode == 0 and parsed.get("count", 0) >= 1,
-        f"count={parsed.get('count')}",
+        "M1 health-check finds non-tars frontmatter",
+        proc.returncode == 0 and parsed.get("frontmatter_pollution", {}).get("count", 0) >= 1,
+        f"count={parsed.get('frontmatter_pollution', {}).get('count')}",
     ))
 
     # M2 read_system_file

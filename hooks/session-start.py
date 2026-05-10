@@ -116,8 +116,7 @@ def _worktree_notice() -> str:
     if not profile_populated:
         return (
             "You are running TARS from a git worktree. To try TARS, point it at a "
-            "local Markdown workspace and run `/start` for a 90-second demo or "
-            "`/welcome` for setup.\n\n"
+            "local Markdown workspace and run `/welcome` for setup.\n\n"
             "Framework development docs: docs/ARCHITECTURE.md, CONTRIBUTING.md."
         )
 
@@ -313,37 +312,6 @@ def _cron_notice(vault: Path) -> str:
     return "\n\n".join(parts)
 
 
-def _migration_notice(vault: Path) -> str:
-    """Check for pending migrations and surface a one-line notice if any exist."""
-    if _is_uninitialised_fresh_workspace(vault):
-        _stamp_housekeeping_version(vault, _live_plugin_version())
-        return ""
-    runner = ROOT.parent / "scripts" / "run-migrations.py"
-    if not runner.is_file():
-        return ""
-    try:
-        result = subprocess.run(
-            [sys.executable, str(runner), "--vault", str(vault), "--list"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            return ""
-        # Parse output for "Pending (N):" line.
-        for line in result.stdout.splitlines():
-            m = __import__("re").match(r"Pending \((\d+)\):", line.strip())
-            if m:
-                n = int(m.group(1))
-                if n > 0:
-                    return (
-                        "TARS has updates ready for your workspace. Run `/maintain migrations` to apply them."
-                    )
-    except Exception:
-        pass
-    return ""
-
-
 def _live_plugin_version() -> str:
     try:
         import json
@@ -365,31 +333,6 @@ def _housekeeping_version(vault: Path) -> str:
         if m:
             return m.group(1).strip().strip('"').strip("'")
     return ""
-
-
-def _stamp_housekeeping_version(vault: Path, version: str) -> None:
-    if not version:
-        return
-    target = vault / "_system" / "housekeeping-state.yaml"
-    try:
-        text = target.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return
-    lines = []
-    found = False
-    for raw in text.splitlines():
-        if re.match(r"^\s*plugin_version\s*:", raw):
-            leading = len(raw) - len(raw.lstrip())
-            lines.append(" " * leading + f'plugin_version: "{version}"')
-            found = True
-        else:
-            lines.append(raw)
-    if not found:
-        lines.append(f'plugin_version: "{version}"')
-    try:
-        target.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    except OSError:
-        return
 
 
 def _install_value(vault: Path, key: str) -> str:
@@ -549,16 +492,6 @@ def _state_aware_lines(vault: Path) -> list[str]:
     return lines
 
 
-def _is_uninitialised_fresh_workspace(vault: Path) -> bool:
-    if _housekeeping_version(vault):
-        return False
-    if any((vault / "memory").rglob("*.md")):
-        return False
-    if any((vault / "journal").rglob("*.md")):
-        return False
-    return True
-
-
 def _build_context(vault: Path | None, status: dict) -> str:
     parts: list[str] = []
 
@@ -599,7 +532,7 @@ def _build_context(vault: Path | None, status: dict) -> str:
         )
 
     if not _looks_like_workspace(vault) and not _is_plugin_checkout(vault):
-        return "This folder isn't a TARS workspace yet. Try `/start` for a 90-second demo, or `/welcome` to set one up."
+        return "This folder isn't a TARS workspace yet. Run `/welcome` to set one up."
 
     # Worktree isolation notice (informational, non-blocking).
     worktree = _worktree_notice()
@@ -627,9 +560,6 @@ def _build_context(vault: Path | None, status: dict) -> str:
         cron = _cron_notice(vault)
         if cron:
             parts.append(cron)
-        migration = _migration_notice(vault)
-        if migration:
-            parts.append(migration)
     return "\n\n".join(parts)
 
 

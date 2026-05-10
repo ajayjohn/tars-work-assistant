@@ -15,16 +15,7 @@ You need:
 Markdown files are plain text files you can open in any text editor. If you do
 not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
-If you are starting fresh, create an empty folder. If you are migrating from an earlier TARS setup, migrate the old workspace before using this guide. If you are upgrading from v3.0 -> v3.1, see [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md). Later workspace migrations are handled through `/maintain migrations`; SessionStart only shows a short update line when work is actually pending.
-
-Existing Obsidian-based TARS users can backfill the new workspace fields without moving data:
-
-```text
-python3 scripts/migrate-install-record.py --vault /path/to/existing/vault
-python3 scripts/migrate-install-record.py --vault /path/to/existing/vault --apply
-```
-
-The script defaults legacy installs to `workspace_type: obsidian` so current users keep their existing views. Switch later with `/welcome --disable-obsidian` if you want Claude-first operation.
+If you are starting fresh, create an empty folder. This branch supports fresh v3.5 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
 
 ## Installation
 
@@ -63,7 +54,7 @@ It checks Python, the bundled local helper, the resolved workspace path, write p
 
 ## First-run setup
 
-Run `/start` first if you want a no-setup demo with pasted content. Run `/welcome` when you are ready to create the workspace.
+Run `/welcome` to create the workspace and start the guided first-run flow.
 
 The welcome flow:
 - shows the Claude-selected folder and active TARS workspace so files are not silently created somewhere else
@@ -249,5 +240,4 @@ If you want to understand the system in more depth:
 - read [README.md](README.md) for the product overview
 - read [ARCHITECTURE.md](ARCHITECTURE.md) for the full framework model
 - read [CLAUDE.md](CLAUDE.md) for the live agent operating rules
-- read [docs/MIGRATION-v3.0-to-v3.1.md](docs/MIGRATION-v3.0-to-v3.1.md) if you are upgrading a v3.0 vault
 - read [docs/MOBILE-USAGE.md](docs/MOBILE-USAGE.md) to use TARS from a phone via Claude Remote Control

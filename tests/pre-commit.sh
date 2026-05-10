@@ -45,7 +45,7 @@ for file in $STAGED_FILES; do
         scripts/*)
             TESTS_TO_RUN="$TESTS_TO_RUN scripts"
             ;;
-        reference/*)
+        _system/*)
             TESTS_TO_RUN="$TESTS_TO_RUN templates"
             ;;
         .claude-plugin/plugin.json|plugin.json)

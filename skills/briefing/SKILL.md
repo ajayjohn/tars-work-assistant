@@ -231,7 +231,7 @@ Your workspace is new. I don't have enough stored context for a real briefing ye
 Three useful next actions:
 1. Paste a recent meeting transcript and run `/meeting`
 2. Save one durable fact with `/learn`
-3. Run `/start` with an example from `examples/` to preview the full workflow
+3. Run `/welcome` and use the guided first paste-or-upload workflow to preview extraction before saving
 
 ## Next useful thing
 - Add your role, closest collaborators, and one active initiative in `/welcome` so tomorrow's briefing has useful context.
@@ -659,7 +659,7 @@ Catch-up is read-once. **Do not** write a journal entry or briefing file for thi
 
 ## Edge cases
 
-- Empty workspace (no tasks, no initiatives, no journal): say *"Your workspace is still light — no overdue items or stale initiatives. Try `/start` for a 90-second demo, `/welcome --setup-schedules` to wire up scheduled briefings, or `/meeting` to process a transcript."*
+- Empty workspace (no tasks, no initiatives, no journal): say *"Your workspace is still light — no overdue items or stale initiatives. Use `/welcome --continue-setup` to add context, `/welcome --setup-schedules` to wire up scheduled briefings, or `/meeting` to process a transcript."*
 - `last_session_at` missing or unparseable: skip Step 1's gate; default to running Step 2 anyway.
 - All sub-agents return empty: same fallback as the empty-workspace path.
 

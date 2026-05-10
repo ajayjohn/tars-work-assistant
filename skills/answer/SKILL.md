@@ -348,7 +348,7 @@ Three quick ways to seed it:
 2. Tell me a fact to remember: `/learn Sarah is the new VP Engineering`
 3. Run `/briefing` to see what's set up so far
 
-Or run `/start` for a no-setup demo of what TARS does with a paste.
+Run `/welcome` if this folder still needs setup, then use the guided first paste-or-upload workflow to see what TARS can extract.
 ```
 
 Do not present this block when the user asked an external or general-knowledge question.

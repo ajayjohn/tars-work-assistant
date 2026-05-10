@@ -15,7 +15,7 @@ triggers:
 help:
   purpose: |-
     Workspace maintenance scoped to ingest-adjacent workflows: inbox processing, calendar/task sync,
-    archive sweep, worktree hygiene, and pending workspace migrations. Hygiene checks (broken links,
+    archive sweep, and worktree hygiene. Hygiene checks (broken links,
     orphans, schema violations, staleness, contradictions, framework state drift) moved to
     `/lint` in v3.1.
   use_cases:
@@ -26,13 +26,12 @@ help:
     - "Run maintenance"
     - "List worktrees"
     - "Merge / prune worktrees"
-    - "Run pending migrations"
-  scope: maintenance,inbox,sync,archive,housekeeping,worktrees,migrations
+  scope: maintenance,inbox,sync,archive,housekeeping,worktrees
 ---
 
 # Maintain skill: inbox, sync, and archive
 
-Modes: **inbox** (classify and route pending items), **sync** (drift detection between workspace and external systems), **archive** (staleness-based sweep with guardrails), **worktrees** (git worktree hygiene), **migrations** (run pending schema migrations). A "maintenance" trigger runs inbox + sync + archive in sequence.
+Modes: **inbox** (classify and route pending items), **sync** (drift detection between workspace and external systems), **archive** (staleness-based sweep with guardrails), and **worktrees** (git worktree hygiene). A "maintenance" trigger runs inbox + sync + archive in sequence.
 
 When a `resolve_capability` call returns `status: "unavailable"`, follow the degradation messaging convention in `skills/core/SKILL.md` section "Degradation messaging convention".
 
@@ -57,7 +56,6 @@ All workspace writes go through `mcp__tars_vault__*` tools. External integration
 | Sync | "sync", "check for gaps" | Calendar gaps, task drift, memory freshness |
 | Archive | "archive sweep" | Staleness archival with 90d backlink + active-task guardrails |
 | Worktrees | "list worktrees", `/maintain worktrees` | Discover, merge, and prune git worktrees |
-| Migrations | "run migrations", `/maintain migrations` | Apply pending schema/vault-structure migrations |
 | Re-register | "re-register jobs", `/maintain --re-register` | Switch or renew scheduler registrations with mutual exclusion |
 | Maintenance | "run maintenance", "housekeeping", cron | Archive + sync; inbox only if non-empty |
 
@@ -272,48 +270,6 @@ Report counts: merged, pruned, skipped. Log to `_system/changelog/YYYY-MM-DD.md`
 - NEVER merge without showing the commit delta first.
 - NEVER prune a worktree that has commits ahead of main without explicit user confirmation.
 - NEVER run destructive git operations (reset, force-push) — merge and worktree-remove only.
-
----
-
-## Migrations mode (`/maintain migrations`)
-
-Triggered by: "run migrations", "run pending migrations", or as part of `/maintain --realign` (Phase 5).
-
-Applies pending schema and workspace-structure migrations that ship with each plugin version. Migrations are idempotent Python scripts in `scripts/migrations/`.
-
-### Step 1: Check pending migrations
-
-```bash
-python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --list
-```
-
-This compares `_system/housekeeping-state.yaml.plugin_version` against the available migration scripts and prints pending ones.
-
-### Step 2: Present the list
-
-```
-Pending migrations (workspace is at v3.1.x; plugin is v3.3.0):
-  1. v3.2.0-add-tars-category       — backfill tars-category on 228 task notes
-  2. v3.3.0-backfill-journal-aliases — add aliases to 13+ journal files with slug mismatch
-
-Run all? [all / pick specific N,M / dry-run first / skip]
-```
-
-Always offer dry-run first. Never apply without user acknowledgement.
-
-### Step 3: Apply
-
-```bash
-python3 scripts/run-migrations.py --vault $TARS_VAULT_PATH --apply [--migration v3.2.0-add-tars-category]
-```
-
-Each migration writes a results summary. On success, `housekeeping-state.yaml.plugin_version` advances to match the plugin.
-
-### Constraints
-
-- NEVER apply migrations without showing the dry-run diff first.
-- Migrations are additive-only — they set missing fields, never delete or rename user content.
-- A failed migration leaves a partial results file in `journal/YYYY-MM/migration-<id>-FAILED.md` and does NOT advance the version.
 
 ---
 

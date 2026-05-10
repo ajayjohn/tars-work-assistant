@@ -161,7 +161,7 @@ For text refinement without stakeholder context (grammar, clarity, style fixes o
 
 ## Context budget
 - Memory: Read target person's file + up to 2 related files
-- Reference: `reference/replacements.md`
+- Reference: `_system/alias-registry.md` and the helper's alias-resolution behavior
 
 ---
 

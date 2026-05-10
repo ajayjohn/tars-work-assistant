@@ -29,7 +29,7 @@ At a high level:
 - Obsidian Bases provide optional live query surfaces instead of hand-maintained index notes
 - Hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`) enforce write discipline, capture telemetry, and route Claude Code session transcripts into `inbox/pending/` for later `/meeting`-style review
 
-Only skill metadata loads eagerly at session start. With 15 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
+Only skill metadata loads eagerly at session start. With 14 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
 
 ## Repository layout
 
@@ -42,16 +42,14 @@ tars/
 ├── .mcp.json                 Project defaults for MCP servers (incl. tars-vault)
 ├── mcp/tars-vault/           Local TARS helper (Python)
 ├── hooks/                    SessionStart / *ToolUse / PreCompact / SessionEnd scripts
-├── skills/                   TARS protocol skills (15)
+├── skills/                   TARS protocol skills (14)
 ├── commands/                 Slash-command wrappers + README mapping
 ├── _system/                  Canonical v3.1 system files and defaults
 ├── _views/                   Obsidian `.base` query definitions
 ├── templates/                Canonical note templates (+ office outlines)
 ├── scripts/                  Deterministic stdlib-only maintenance and validation utilities
-├── scripts/githooks/         prepare-commit-msg + pre-push authorship guards
-├── tests/                    Validators, fixtures, and smoke tests
-├── archive/historical/       Retired legacy rebuild docs (pre-v3.0)
-├── docs/                     User and developer guides (architecture, build, migration, mobile)
+├── tests/                    Validators and regression tests
+├── docs/                     User and developer guides (architecture, build, mobile)
 ├── build-plugin.sh           Supported packaging entrypoint
 ├── requirements.txt          No required third-party deps for first setup
 ├── requirements-search.txt   Optional semantic-search deps: fastembed, sqlite-vec
@@ -61,13 +59,11 @@ tars/
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 15 skills, 16 commands, and deterministic scripts.
-
-Some older directories remain in the repository for compatibility, migration context, or packaging history. They should not be treated as the active TARS 3.0 runtime architecture unless a specific document says otherwise.
+The framework currently ships 14 skills, 14 slash-command wrappers, and deterministic scripts.
 
 ## Deployed workspace layout
 
-`/welcome` or a migration process should produce a workspace with this shape:
+`/welcome` produces a workspace with this shape:
 
 ```text
 _system/
@@ -143,7 +139,7 @@ The `skills/` directory is the behavioral core of the framework:
 - `meeting` handles transcript processing, matching, journaling, nuance capture, and follow-through
 - `briefing`, `tasks`, `learn`, `answer`, `think`, `communicate`, `initiative`, `create`, `lint`, `maintain`, and `welcome` cover the rest of the user-facing workflows
 
-The framework uses one core skill and twelve user-invocable skills (the `/lint` skill is new in v3.1, split out of `/maintain`). Resource files such as `skills/think/manifesto.md`, `skills/meeting/reference/nuance-pass-prompt.md`, and `skills/communicate/text-refinement.md` load only when a workflow needs them.
+The framework uses one core skill and thirteen user-invocable skills. Resource files such as `skills/think/manifesto.md`, `skills/meeting/resources/nuance-pass-prompt.md`, and `skills/communicate/text-refinement.md` load only when a workflow needs them.
 
 ### Write interface layer
 
@@ -236,14 +232,11 @@ These bases replaced `_index.md` as the primary query surface. They reduce drift
 - transcript and companion notes
 - unified `backlog-item.md` (issue | idea mode)
 - `brand-guidelines.md` with `tars-brand: true` for render-skill consumption
-- `integrations-v2.md` — capability-preference starter
 - `office/` — 8 structural content outlines for `/create`
 
 ### Script layer
 
-`scripts/` holds deterministic utilities that support the skills and release workflow. The active set is stdlib-only (optional deps wrapped in `try/except ImportError` with fallback parsers per PRD §26.2): schema validation, secret scanning, health checks (including the merged-in flagged-content sub-check), archival (memory + workflow staleness, v3.2), sync / hydration, search-index builder, wikilink fixer (incl. v3.2 `--repair-broken` mode), telemetry rollup (v3.2), integrations v2 migration, MCP tool discovery, capability classifier, version bump, plugin validation, packaging.
-
-Not every script is a runtime dependency for end users. Some are maintainer tools used during packaging, testing, or migration support. The `scripts/githooks/` folder holds the `prepare-commit-msg` + `pre-push` authorship guards installed by `scripts/githooks/install-githooks.sh`.
+`scripts/` holds deterministic utilities that support the skills and release workflow. The active set is stdlib-only (optional deps wrapped in `try/except ImportError` with fallback parsers per PRD §26.2): schema validation, secret scanning, health checks (including flagged-content and frontmatter-prefix sub-checks), archival (memory + workflow staleness, v3.2), sync / hydration, search-index builder, wikilink fixers, telemetry rollup (v3.2), MCP tool discovery, capability classifier, version bump, plugin validation, and packaging.
 
 ## Critical behavior changes in v3
 
@@ -253,7 +246,7 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - tasks and durable memory are reviewed before persistence
 - name resolution uses aliases, workspace search, and user confirmation instead of flat replacements only
 - maintenance state, schemas, and guardrails live in `_system/`
-- the active runtime structure is centered on the workspace, not a copied `reference/` bundle
+- the active runtime structure is centered on the workspace and `_system/` seeds
 
 ## What's new in v3.5
 

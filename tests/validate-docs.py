@@ -22,13 +22,13 @@ PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Files to scan for documentation consistency
 DOC_FILES = [
-    "ARCHITECTURE.md",
+    "docs/ARCHITECTURE.md",
     "README.md",
-    "GETTING-STARTED.md",
+    "docs/GETTING-STARTED.md",
     "CHANGELOG.md",
-    "CATALOG.md",
-    "reference/workflows.md",
-    "reference/shortcuts.md",
+    "docs/CATALOG.md",
+    "_system/schedule.md",
+    "_system/integrations.md",
 ]
 
 # Known placeholder/example skill names used in documentation templates
@@ -67,10 +67,10 @@ PROVIDER_TERMS = [
 
 # Files exempt from provider-agnostic check
 PROVIDER_EXEMPT_FILES = {
-    "reference/integrations.md",
-    "GETTING-STARTED.md",
+    "_system/integrations.md",
+    "docs/GETTING-STARTED.md",
     "CHANGELOG.md",
-    "CATALOG.md",
+    "docs/CATALOG.md",
 }
 
 # Canonical archival tier names
@@ -327,7 +327,7 @@ def check_provider_compliance(errors, warnings):
                 errors.append(
                     f"{relpath}:{lineno}: Hardcoded provider name "
                     f"'{match.group()}' — use provider-agnostic language "
-                    f"(provider names belong only in reference/integrations.md)"
+                    f"(provider names belong only in _system/integrations.md)"
                 )
 
     # Also check doc files (except exempt ones)
@@ -375,7 +375,7 @@ def check_count_consistency(errors, warnings):
     # Token baseline pattern
     token_pattern = re.compile(r"~?(\d+)\s+tokens?\b", re.IGNORECASE)
 
-    files_to_check = ["ARCHITECTURE.md", "README.md"]
+    files_to_check = ["docs/ARCHITECTURE.md", "README.md"]
 
     for relpath in files_to_check:
         content = read_file(relpath)
@@ -456,7 +456,7 @@ def check_count_consistency(errors, warnings):
                     )
 
         # Token baseline check in ARCHITECTURE.md
-        if relpath == "ARCHITECTURE.md":
+        if relpath == "docs/ARCHITECTURE.md":
             for match in token_pattern.finditer(content):
                 claimed_tokens = int(match.group(1))
                 lineno = content[:match.start()].count("\n") + 1
