@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""Validate reference file structure and taxonomy completeness."""
+"""Validate system seed file structure and taxonomy completeness."""
 
 import os
 import re
 import sys
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REFERENCE_DIR = os.path.join(PLUGIN_ROOT, "reference")
+SYSTEM_DIR = os.path.join(PLUGIN_ROOT, "_system")
 
-# Required reference files
-REQUIRED_REFERENCE_FILES = [
+# Required system seed files
+REQUIRED_SYSTEM_FILES = [
     "integrations.md",
     "taxonomy.md",
-    "replacements.md",
+    "alias-registry.md",
     "kpis.md",
     "schedule.md",
     "guardrails.yaml",
     "maturity.yaml",
-    ".housekeeping-state.yaml",
-    "workflows.md",
+    "housekeeping-state.yaml",
+    "schemas.yaml",
+    "config.md",
 ]
 
 # Memory types that should be defined in taxonomy.md
@@ -156,30 +157,30 @@ def validate_maturity(filepath, errors, warnings):
         errors.append(f"Cannot read maturity.yaml: {e}")
         return
 
-    required_fields = ["level", "stats", "milestones"]
+    required_fields = ["onboarding", "deferred_setup", "hydration", "coaching"]
     for field in required_fields:
         if field not in content:
             errors.append(f"maturity.yaml: Missing required field '{field}'")
 
 
 def validate_housekeeping_state(filepath, errors, warnings):
-    """Validate .housekeeping-state.yaml has required fields."""
+    """Validate housekeeping-state.yaml has required fields."""
     valid, err = is_valid_yaml_structure(filepath)
     if not valid:
-        errors.append(f".housekeeping-state.yaml: {err}")
+        errors.append(f"housekeeping-state.yaml: {err}")
         return
 
     try:
         with open(filepath) as f:
             content = f.read()
     except Exception as e:
-        errors.append(f"Cannot read .housekeeping-state.yaml: {e}")
+        errors.append(f"Cannot read housekeeping-state.yaml: {e}")
         return
 
-    required_fields = ["last_run", "last_success", "run_count"]
+    required_fields = ["last_maintenance", "last_health_check", "last_sync", "cron_jobs", "last_run"]
     for field in required_fields:
         if field not in content:
-            errors.append(f".housekeeping-state.yaml: Missing required field '{field}'")
+            errors.append(f"housekeeping-state.yaml: Missing required field '{field}'")
 
 
 def validate_integrations(filepath, errors, warnings):
@@ -230,55 +231,50 @@ def validate_getting_started(filepath, errors, warnings):
         warnings.append("GETTING-STARTED.md: Missing getting started / welcome content")
 
 
-def validate_workflows(filepath, errors, warnings):
-    """Validate workflows.md has common workflow patterns."""
+def validate_alias_registry(filepath, errors, warnings):
+    """Validate alias-registry.md has the canonical table shape."""
     try:
         with open(filepath) as f:
             content = f.read()
     except Exception as e:
-        errors.append(f"Cannot read workflows.md: {e}")
+        errors.append(f"Cannot read alias-registry.md: {e}")
         return
 
-    lines = [l for l in content.split("\n") if l.strip()]
-    if len(lines) < 15:
-        warnings.append(f"workflows.md seems too short ({len(lines)} non-empty lines, expected ~80)")
-
-    content_lower = content.lower()
-    # Check for expected workflow topics
-    expected_topics = ["meeting", "review", "analysis"]
-    for topic in expected_topics:
-        if topic not in content_lower:
-            warnings.append(f"workflows.md: Missing workflow pattern for '{topic}'")
+    required_headers = ["canonical", "aliases"]
+    lower = content.lower()
+    for header in required_headers:
+        if header not in lower:
+            warnings.append(f"alias-registry.md: Missing table/header text for '{header}'")
 
 
 def main():
     errors = []
     warnings = []
 
-    # --- 1. Check required reference files exist ---
-    for fname in REQUIRED_REFERENCE_FILES:
-        fpath = os.path.join(REFERENCE_DIR, fname)
+    # --- 1. Check required system seed files exist ---
+    for fname in REQUIRED_SYSTEM_FILES:
+        fpath = os.path.join(SYSTEM_DIR, fname)
         if not os.path.isfile(fpath):
-            errors.append(f"MISSING: reference/{fname}")
+            errors.append(f"MISSING: _system/{fname}")
 
-    # --- 2. Validate specific reference files ---
-    taxonomy = os.path.join(REFERENCE_DIR, "taxonomy.md")
+    # --- 2. Validate specific system seed files ---
+    taxonomy = os.path.join(SYSTEM_DIR, "taxonomy.md")
     if os.path.isfile(taxonomy):
         validate_taxonomy(taxonomy, errors, warnings)
 
-    guardrails = os.path.join(REFERENCE_DIR, "guardrails.yaml")
+    guardrails = os.path.join(SYSTEM_DIR, "guardrails.yaml")
     if os.path.isfile(guardrails):
         validate_guardrails(guardrails, errors, warnings)
 
-    maturity = os.path.join(REFERENCE_DIR, "maturity.yaml")
+    maturity = os.path.join(SYSTEM_DIR, "maturity.yaml")
     if os.path.isfile(maturity):
         validate_maturity(maturity, errors, warnings)
 
-    housekeeping = os.path.join(REFERENCE_DIR, ".housekeeping-state.yaml")
+    housekeeping = os.path.join(SYSTEM_DIR, "housekeeping-state.yaml")
     if os.path.isfile(housekeeping):
         validate_housekeeping_state(housekeeping, errors, warnings)
 
-    integrations = os.path.join(REFERENCE_DIR, "integrations.md")
+    integrations = os.path.join(SYSTEM_DIR, "integrations.md")
     if os.path.isfile(integrations):
         validate_integrations(integrations, errors, warnings)
 
@@ -292,55 +288,22 @@ def main():
     else:
         errors.append("MISSING: GETTING-STARTED.md (expected docs/GETTING-STARTED.md)")
 
-    workflows = os.path.join(REFERENCE_DIR, "workflows.md")
-    if os.path.isfile(workflows):
-        validate_workflows(workflows, errors, warnings)
+    alias_registry = os.path.join(SYSTEM_DIR, "alias-registry.md")
+    if os.path.isfile(alias_registry):
+        validate_alias_registry(alias_registry, errors, warnings)
 
     # --- 3. Check YAML files are parseable ---
     yaml_files = [
         "guardrails.yaml",
         "maturity.yaml",
-        ".housekeeping-state.yaml",
+        "housekeeping-state.yaml",
     ]
     for fname in yaml_files:
-        fpath = os.path.join(REFERENCE_DIR, fname)
+        fpath = os.path.join(SYSTEM_DIR, fname)
         if os.path.isfile(fpath):
             valid, err = is_valid_yaml_structure(fpath)
             if not valid:
-                errors.append(f"reference/{fname}: Invalid YAML structure — {err}")
-
-    # --- 4. Check memory directory structure ---
-    memory_dir = os.path.join(PLUGIN_ROOT, "memory")
-    if os.path.isdir(memory_dir):
-        # Check for master index
-        master_index = os.path.join(memory_dir, "_index.md")
-        if not os.path.isfile(master_index):
-            warnings.append("memory/_index.md (master index) not found")
-
-        # Check category subdirectories
-        expected_subdirs = ["people", "competitors", "decisions", "initiatives", "organizational-context", "products", "vendors"]
-        for subdir in expected_subdirs:
-            subpath = os.path.join(memory_dir, subdir)
-            if not os.path.isdir(subpath):
-                warnings.append(f"memory/{subdir}/ directory not found")
-    else:
-        warnings.append("memory/ directory not found")
-
-    # --- 5. Check inbox directory structure ---
-    inbox_dir = os.path.join(PLUGIN_ROOT, "inbox")
-    if os.path.isdir(inbox_dir):
-        expected_inbox_subdirs = ["pending", "processing", "completed", "failed"]
-        for subdir in expected_inbox_subdirs:
-            subpath = os.path.join(inbox_dir, subdir)
-            if not os.path.isdir(subpath):
-                warnings.append(f"inbox/{subdir}/ directory not found")
-    else:
-        warnings.append("inbox/ directory not found")
-
-    # --- 6. Check archive directory exists ---
-    archive_dir = os.path.join(PLUGIN_ROOT, "archive")
-    if not os.path.isdir(archive_dir):
-        warnings.append("archive/ directory not found")
+                errors.append(f"_system/{fname}: Invalid YAML structure — {err}")
 
     print_results(errors, warnings)
     return 1 if errors else 0

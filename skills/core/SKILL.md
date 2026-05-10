@@ -205,8 +205,8 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 | "Health check", "run maintenance" | `skills/maintain/` | `/maintain` |
 | "Process inbox", "check inbox" | `skills/maintain/` (inbox) | `/maintain inbox` |
 | "Check TARS install", "diagnose TARS", "local TARS helper not connected" | `skills/doctor/` | `/doctor` |
-| `/start`, "try TARS", "quick demo", first session with no `_system/config.md` | `skills/start/` | `/start` |
 | "Setup", "get started", "configure TARS", "onboard" | `skills/welcome/` | `/welcome` |
+| "try TARS", first session with no `_system/config.md` | `skills/welcome/` | `/welcome` |
 | "Continue TARS setup", "finish setup", `/welcome --continue-setup` | `skills/welcome/` (continue setup) | `/welcome --continue-setup` |
 | User corrects a fact, shares org context | `skills/learn/` (memory) | Proactive: offer to persist |
 
@@ -670,7 +670,7 @@ When users ask "what can you do?", "help", "show me commands", or similar:
 | Synthesize | `/answer`, `/briefing`, `/think` |
 | Produce | `/communicate`, `/create`, `/initiative` |
 | Maintain | `/lint`, `/maintain` |
-| Set up | `/start`, `/doctor`, `/welcome` |
+| Set up | `/doctor`, `/welcome` |
 
 If `_system/maturity.yaml` shows deferred setup incomplete, the recommended next workflow is:
 
@@ -680,7 +680,6 @@ If `_system/maturity.yaml` shows deferred setup incomplete, the recommended next
 
 | Skill | Purpose |
 |-------|---------|
-| `/start` | Zero-setup preview using pasted content, with optional persistence after setup |
 | `/doctor` | Install and workspace health check for the local TARS helper |
 | `/meeting` | Process meeting transcripts into journal, tasks, memory |
 | `/briefing` | Daily and weekly briefings with schedule, tasks, context, and restrained coaching |

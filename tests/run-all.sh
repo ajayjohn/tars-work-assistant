@@ -110,7 +110,7 @@ $(git ls-files --others --exclude-standard 2>/dev/null || true)"
                 scripts/*)
                     add_test scripts
                     ;;
-                reference/*)
+                _system/*)
                     add_test templates
                     ;;
                 .claude-plugin/*|*plugin.json)

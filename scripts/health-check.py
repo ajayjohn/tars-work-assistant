@@ -11,6 +11,8 @@ import sys
 import os
 import json
 import re
+import argparse
+import shutil
 from pathlib import Path
 from datetime import datetime, date
 
@@ -19,6 +21,44 @@ try:
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
+
+KEY_MAP = {
+    "title": None,
+    "pm": "tars-owner",
+    "owner": "tars-owner",
+    "status": "tars-status",
+    "state": "tars-status",
+    "start": "tars-start-date",
+    "end": "tars-target-date",
+    "target": "tars-target-date",
+    "due": "tars-due",
+    "priority": "tars-priority",
+    "category": "tars-category",
+    "summary": "tars-summary",
+    "description": "tars-summary",
+    "created": "tars-created",
+    "modified": "tars-modified",
+    "updated": "tars-modified",
+    "health": "tars-health",
+}
+
+TAG_NAMESPACE_MAP = {
+    "initiative": "tars/initiative",
+    "person": "tars/person",
+    "decision": "tars/decision",
+    "meeting": "tars/meeting",
+    "task": "tars/task",
+    "wisdom": "tars/wisdom",
+    "vendor": "tars/vendor",
+    "competitor": "tars/competitor",
+    "product": "tars/product",
+    "company": "tars/company",
+    "journal": "tars/journal",
+}
+
+RESERVED_NON_PREFIX = {"tags", "aliases"}
+POLLUTION_SKIP_PREFIXES = ("_system/", "_views/", "archive/")
+FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 
 def load_yaml_file(filepath):
@@ -364,19 +404,225 @@ def check_flagged_content(vault_path):
     return results
 
 
+def pollution_skip(rel_path):
+    rel = rel_path.as_posix()
+    return any(rel.startswith(prefix) for prefix in POLLUTION_SKIP_PREFIXES)
+
+
+def check_frontmatter_pollution(vault_path):
+    """Find notes with non-TARS frontmatter keys."""
+    vault = Path(vault_path)
+    offenders = []
+    for md_file in vault.rglob("*.md"):
+        rel = md_file.relative_to(vault)
+        if pollution_skip(rel):
+            continue
+        fm, _ = parse_frontmatter(md_file)
+        if not fm:
+            continue
+        bad_keys = [
+            key for key in fm
+            if key not in RESERVED_NON_PREFIX and not key.startswith("tars-")
+        ]
+        if bad_keys:
+            offenders.append({
+                "path": rel.as_posix(),
+                "bad_keys": bad_keys,
+                "tags": fm.get("tags") or [],
+            })
+    return offenders
+
+
+def split_frontmatter(text):
+    match = FRONTMATTER_RE.match(text)
+    if not match:
+        return None, text
+    return match.group(1), text[match.end():]
+
+
+def parse_frontmatter_block(block):
+    entries = []
+    in_list = None
+    for raw in block.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            entries.append((f"__raw__{len(entries)}", raw))
+            continue
+        if raw.startswith("  -") and in_list is not None:
+            in_list.append(stripped[1:].strip().strip('"').strip("'"))
+            continue
+        in_list = None
+        if ":" not in raw:
+            entries.append((f"__raw__{len(entries)}", raw))
+            continue
+        key, _, val = raw.partition(":")
+        key = key.strip()
+        val = val.strip()
+        if not val:
+            in_list = []
+            entries.append((key, in_list))
+            continue
+        if val.startswith("[") and val.endswith("]"):
+            inner = val[1:-1]
+            entries.append((
+                key,
+                [item.strip().strip('"').strip("'") for item in inner.split(",") if item.strip()],
+            ))
+            continue
+        entries.append((key, val.strip('"').strip("'")))
+    return entries
+
+
+def quote_frontmatter_value(value):
+    if value is None or value == "":
+        return '""'
+    if any(char in value for char in (":", "#", "[", "]", "'")) or " " in value:
+        if '"' not in value:
+            return f'"{value}"'
+    return value
+
+
+def emit_frontmatter_block(entries):
+    lines = []
+    for key, value in entries:
+        if key.startswith("__raw__"):
+            lines.append(value if isinstance(value, str) else "")
+        elif isinstance(value, list):
+            if value:
+                rendered = ", ".join(quote_frontmatter_value(item) for item in value)
+                lines.append(f"{key}: [{rendered}]")
+            else:
+                lines.append(f"{key}:")
+        else:
+            lines.append(f"{key}: {quote_frontmatter_value(value)}")
+    return "\n".join(lines)
+
+
+def migrate_frontmatter_entries(entries):
+    report = {"renamed": [], "dropped": [], "unmapped": [], "tags_namespaced": []}
+    migrated = []
+    seen_keys = set()
+
+    for key, value in entries:
+        if key.startswith("__raw__"):
+            migrated.append((key, value))
+            continue
+        if key in RESERVED_NON_PREFIX or key.startswith("tars-"):
+            if key == "tags" and isinstance(value, list):
+                new_tags = []
+                for tag in value:
+                    if tag in TAG_NAMESPACE_MAP:
+                        replacement = TAG_NAMESPACE_MAP[tag]
+                        report["tags_namespaced"].append({"from": tag, "to": replacement})
+                        new_tags.append(replacement)
+                    else:
+                        new_tags.append(tag)
+                deduped = []
+                seen_tags = set()
+                for tag in new_tags:
+                    if tag not in seen_tags:
+                        seen_tags.add(tag)
+                        deduped.append(tag)
+                migrated.append((key, deduped))
+                seen_keys.add(key)
+                continue
+            migrated.append((key, value))
+            seen_keys.add(key)
+            continue
+        if key in KEY_MAP:
+            target = KEY_MAP[key]
+            if target is None:
+                report["dropped"].append(key)
+                continue
+            if target in seen_keys:
+                report["dropped"].append(f"{key} (duplicate of existing {target})")
+                continue
+            migrated.append((target, value))
+            report["renamed"].append({"from": key, "to": target})
+            seen_keys.add(target)
+            continue
+        report["unmapped"].append(key)
+        migrated.append((key, value))
+
+    return migrated, report
+
+
+def fix_frontmatter_prefixes(vault_path, apply=False):
+    """Dry-run or apply canonical tars-* frontmatter prefix fixes."""
+    vault = Path(vault_path)
+    summary = {"scanned": 0, "changed": 0, "files": [], "unmapped_keys": set()}
+
+    for md_file in vault.rglob("*.md"):
+        rel = md_file.relative_to(vault)
+        if pollution_skip(rel):
+            continue
+        try:
+            text = md_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        block, body = split_frontmatter(text)
+        if block is None:
+            continue
+        summary["scanned"] += 1
+        entries = parse_frontmatter_block(block)
+        migrated, report = migrate_frontmatter_entries(entries)
+        if not (report["renamed"] or report["dropped"] or report["tags_namespaced"]):
+            if report["unmapped"]:
+                summary["unmapped_keys"].update(report["unmapped"])
+            continue
+        summary["changed"] += 1
+        summary["files"].append({"path": rel.as_posix(), **report})
+        summary["unmapped_keys"].update(report["unmapped"])
+        if apply:
+            backup = md_file.with_suffix(md_file.suffix + ".pre-migration")
+            if not backup.exists():
+                shutil.copy2(md_file, backup)
+            md_file.write_text(
+                "---\n" + emit_frontmatter_block(migrated) + "\n---\n" + body,
+                encoding="utf-8",
+            )
+
+    summary["unmapped_keys"] = sorted(summary["unmapped_keys"])
+    return summary
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Run TARS workspace health checks.")
+    parser.add_argument("vault_path", nargs="?", default=None)
+    parser.add_argument("--vault", dest="vault", default=None)
+    parser.add_argument("--json", action="store_true", help="Emit JSON output.")
+    parser.add_argument("--fix-prefixes", action="store_true",
+                        help="Dry-run canonical tars-* frontmatter prefix fixes.")
+    parser.add_argument("--apply", action="store_true",
+                        help="Apply fixes for --fix-prefixes.")
+    return parser.parse_args(argv)
+
+
 def main():
-    vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
+    args = parse_args(sys.argv[1:])
+    vault_path = args.vault or args.vault_path or "."
+
+    if args.fix_prefixes:
+        summary = fix_frontmatter_prefixes(vault_path, apply=args.apply)
+        print(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "mode": "frontmatter_prefixes",
+            "apply": args.apply,
+            "frontmatter_prefixes": summary,
+        }, indent=2))
+        return 0
 
     broken_links = check_broken_links(vault_path)
     stale_content = check_staleness(vault_path)
     duplicate_aliases = check_duplicate_aliases(vault_path)
     missing_fm = check_missing_frontmatter(vault_path)
     flagged = check_flagged_content(vault_path)
+    polluted = check_frontmatter_pollution(vault_path)
 
     flagged_total = sum(r["total_flags"] for r in flagged)
     flagged_stale = sum(r["stale_flags"] for r in flagged)
     critical = len(broken_links) + len(missing_fm)
-    warnings = len(stale_content) + len(duplicate_aliases) + flagged_stale
+    warnings = len(stale_content) + len(duplicate_aliases) + flagged_stale + len(polluted)
 
     output = {
         "timestamp": datetime.now().isoformat(),
@@ -398,11 +644,16 @@ def main():
             "stale_flags": flagged_stale,
             "results": flagged,
         },
+        "frontmatter_pollution": {
+            "count": len(polluted),
+            "offenders": polluted,
+            "fix_command": "scripts/health-check.py --vault <workspace> --fix-prefixes --apply",
+        },
     }
 
     print(json.dumps(output, indent=2))
-    sys.exit(0 if critical == 0 else 1)
+    return 0 if critical == 0 else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

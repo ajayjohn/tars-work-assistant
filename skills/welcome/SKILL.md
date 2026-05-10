@@ -210,7 +210,6 @@ Slash commands are optional. You do not need to remember them; natural language 
 
 | Shortcut | Natural-language example |
 |---|---|
-| `/start` | "Show me what TARS can do with this transcript" |
 | `/maintain inbox` | "Process everything in my inbox" |
 | `/meeting` | "Process this meeting transcript" |
 | `/learn` | "Remember that Sarah owns onboarding" |

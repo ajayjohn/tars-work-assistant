@@ -182,7 +182,7 @@ def scaffold(base: Path) -> dict:
         created=forty_days_ago_iso,
         last_session_at=fortnight_ago_iso,
     ))
-    _stamp_housekeeping_version(p, "3.2.0")
+    _stamp_housekeeping_version(p, live)
     paths["s4-stale-version"] = p
 
     # s5-path-mismatch

@@ -105,7 +105,7 @@ Slash commands are optional shortcuts. You can type natural-language requests an
 
 | What you want | Shortcut | Natural-language example |
 |---|---|---|
-| Try TARS with a paste | `/start` | "Show me what TARS can do with this transcript" |
+| Try TARS with a paste | `/meeting` | "Process this meeting transcript" |
 | Process raw files | `/maintain inbox` | "Process everything in my inbox" |
 | Process a meeting | `/meeting` | "Process this meeting transcript" |
 | Save durable context | `/learn` | "Remember Sarah owns onboarding" |

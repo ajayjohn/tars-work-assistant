@@ -28,10 +28,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Run smoke tests and schema validation
+      - name: Run framework validation
         run: |
-          python3 tests/smoke-tests.py . || echo "⚠ Some smoke tests failed (may be expected in CI without Obsidian)"
-          python3 scripts/validate-schema.py . || echo "⚠ Schema validation had issues"
+          tests/run-all.sh --full
+          tests/validate-workspace.sh
+          python3 scripts/validate-schema.py .
 
       - name: Extract version
         id: version

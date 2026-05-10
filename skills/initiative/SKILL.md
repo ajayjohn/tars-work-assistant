@@ -101,7 +101,7 @@ Generate KPI-based performance reports with trend analysis, separate from initia
 
 ### Step 1: Read KPI definitions
 
-Read `reference/kpis.md` to determine:
+Read `_system/kpis.md` to determine:
 - Which teams/initiatives to report on
 - Which metrics to pull
 - Data sources for each metric
@@ -165,7 +165,7 @@ Flag metrics that:
 - [Data-driven recommendation]
 ```
 
-Repeat for each team/initiative in `reference/kpis.md`.
+Repeat for each team/initiative in `_system/kpis.md`.
 
 ### Step 6: Save to journal
 
@@ -280,7 +280,7 @@ initiatives: [Initiative names]
 - Journal: Search current month + up to 2 relevant entries
 
 **Performance mode:**
-- Reference: `reference/kpis.md` (mandatory)
+- Reference: `_system/kpis.md` (mandatory)
 - Project tracker: Up to 3 queries per team/initiative
 - Memory: Read initiative files for context (up to 3)
 - Time tracking: Limited to configured integration

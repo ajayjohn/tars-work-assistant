@@ -19,7 +19,7 @@ REQUIRED_ROOT_DIRS = [
     "skills",
     "commands",
     "scripts",
-    "reference",
+    "_system",
     ".claude-plugin",
 ]
 

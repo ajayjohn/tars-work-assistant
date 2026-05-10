@@ -66,7 +66,6 @@ Use this sequence for release preparation:
 Repository source includes:
 - documentation
 - tests
-- migration and rebuild handoff documents
 - helper and compatibility files not required in the install artifact
 
 Distribution output includes only what the installed framework needs to run.

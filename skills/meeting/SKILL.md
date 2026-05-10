@@ -334,7 +334,7 @@ entry as the main summary.
 
 Spawn a sub-agent with `subagent_type="general-purpose"`, model Haiku,
 `max_turns=1`, temperature `0.2`. Feed it the verbatim prompt from
-`skills/meeting/reference/nuance-pass-prompt.md`, substituting
+`skills/meeting/resources/nuance-pass-prompt.md`, substituting
 `{{TRANSCRIPT_TEXT}}` with the full raw transcript (before any archival
 chunking). The prompt requires a single JSON object back.
 
@@ -505,7 +505,7 @@ Append the structured report from Step 7 to the journal entry body:
 - Remove filler words (the, a, an, and, or, for, to, in, on, at, of)
 - Example: "MCP Planning Session" becomes `mcp-planning`
 
-When the calendar title differs from the transcript header, keep `tars-calendar-title` in frontmatter for reference.
+When the calendar title differs from the transcript header, keep `tars-calendar-title` in frontmatter for later matching.
 
 ### Auto-alias (v3.3)
 

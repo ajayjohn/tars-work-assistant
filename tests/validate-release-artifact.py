@@ -20,7 +20,6 @@ REQUIRED_FILES = {
     ".claude-plugin/mcp-servers.json",
     ".mcp.json",
     "commands/welcome.md",
-    "commands/start.md",
     "commands/doctor.md",
     "skills/welcome/SKILL.md",
     "skills/doctor/SKILL.md",

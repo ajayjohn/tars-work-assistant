@@ -23,7 +23,7 @@ SCAFFOLD_MODULE = "tests.regression.scaffold_scenarios"
 # Each entry: (scenario, [substrings that MUST appear], [substrings that MUST NOT appear])
 EXPECTATIONS: list[tuple[str, list[str], list[str]]] = [
     ("s1-empty",
-     ["isn't a TARS workspace yet", "/start", "/welcome"],
+     ["isn't a TARS workspace yet", "/welcome"],
      ["mcp__", "python3 scripts/", "cron"]),
     ("s2-fresh-headless",
      ["scheduled jobs aren't running", "/welcome --setup-schedules"],
@@ -33,7 +33,7 @@ EXPECTATIONS: list[tuple[str, list[str], list[str]]] = [
      ["scheduled jobs aren't running", "/welcome --setup-schedules"],
      ["pending migration", "mcp__", "python3 scripts/", "cron"]),
     ("s4-stale-version",
-     ["TARS has updates ready", "/maintain migrations"],
+     ["TARS was upgraded", "No migration needed"],
      ["python3 scripts/", "cron", "step 7"]),
     ("s5-path-mismatch",
      ["does not match the recorded workspace", "/welcome --relocate"],
