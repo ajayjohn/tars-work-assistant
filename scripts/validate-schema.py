@@ -283,53 +283,6 @@ def scan_vault(vault_path, schemas, target_type=None):
     return results
 
 
-def validate_fixtures(vault_path, schemas):
-    """Validate test fixture files."""
-    fixtures_dir = Path(vault_path) / "tests" / "fixtures"
-    if not fixtures_dir.exists():
-        return []
-
-    results = []
-    for fixture_file in fixtures_dir.rglob("*.md"):
-        frontmatter, error = parse_frontmatter(fixture_file)
-
-        if error:
-            results.append({
-                "file": str(fixture_file.relative_to(Path(vault_path))),
-                "errors": [error],
-                "valid": False,
-            })
-            continue
-
-        if frontmatter is None:
-            continue
-
-        schema_type = detect_schema_type(frontmatter, schemas)
-        if schema_type is None:
-            continue
-
-        # Check if fixture name indicates expected validity
-        expect_valid = "invalid" not in fixture_file.stem.lower()
-        result = validate_note(
-            fixture_file.relative_to(Path(vault_path)),
-            frontmatter,
-            schema_type,
-            schemas[schema_type],
-        )
-
-        if expect_valid and not result["valid"]:
-            result["warnings"].append(
-                f"Valid fixture has validation errors: {result['errors']}"
-            )
-        elif not expect_valid and result["valid"]:
-            result["warnings"].append(
-                "Invalid fixture passes validation — update schema or fixture"
-            )
-
-        results.append(result)
-    return results
-
-
 def main():
     vault_path = sys.argv[1] if len(sys.argv) > 1 else "."
     target_type = None
@@ -344,7 +297,6 @@ def main():
         sys.exit(1)
 
     results = scan_vault(vault_path, schemas, target_type)
-    fixture_results = validate_fixtures(vault_path, schemas)
 
     total = len(results)
     valid = sum(1 for r in results if r["valid"])
@@ -359,7 +311,6 @@ def main():
             "invalid": invalid,
         },
         "errors": [r for r in results if not r["valid"]],
-        "fixture_results": fixture_results,
     }
 
     print(json.dumps(output, indent=2, default=str))

@@ -34,6 +34,10 @@ jobs:
           tests/validate-workspace.sh
           python3 scripts/validate-schema.py .
 
+      - name: Run regression suite (9 scenarios + adversarial + perf + qa-reverify)
+        run: |
+          bash scripts/regression-suite.sh
+
       - name: Extract version
         id: version
         run: |
@@ -163,51 +167,23 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           ARCHIVE="tars-v${VERSION}.zip"
 
-          # Create temporary build directory with v3 structure
-          mkdir -p build-temp/{.claude-plugin,.claude/skills}
+          # Single-source the build via build-plugin.sh. The script ships the
+          # full framework (skills, commands, hooks, mcp/tars-vault, scripts,
+          # templates, .claude/skills, requirements, README, plugin.json with
+          # mcpServers, generated .mcp.json) and writes
+          # tars-cowork-plugin/Archive.zip.
+          bash build-plugin.sh
 
-          # Copy v3 plugin files
-          cp -r skills templates scripts _system _views build-temp/
-          cp -r .claude/skills/* build-temp/.claude/skills/
-          cp CLAUDE.md LICENSE build-temp/
-          [ -f .mcp.json ] && cp .mcp.json build-temp/ || true
-          [ -f NOTICE ] && cp NOTICE build-temp/ || true
-
-          # Create minimal plugin.json and sync marketplace.json
-          python3 << 'PYTHON_SCRIPT'
-          import json
-
-          # Read source plugin.json
-          with open('.claude-plugin/plugin.json', 'r') as f:
-              source = json.load(f)
-
-          # Create minimal version (Cowork auto-discovers skills/commands from directory structure)
-          minimal = {
-              "name": source["name"],
-              "version": source["version"],
-              "description": source["description"],
-              "author": source["author"]
-          }
-          if "license" in source:
-              minimal["license"] = source["license"]
-
-          # Write minimal version
-          with open('build-temp/.claude-plugin/plugin.json', 'w') as f:
-              json.dump(minimal, f, indent=2)
-
-          print(f"✓ Created minimal plugin.json for Cowork distribution (v{minimal['version']})")
-          PYTHON_SCRIPT
-
-          # Create archive from build directory
-          cd build-temp
-          zip -r "../$ARCHIVE" . -x "*.pyc" -x "__pycache__/*"
-          cd ..
-
-          # Cleanup
-          rm -rf build-temp
+          # Preserve the public release filename so existing links/tags resolve.
+          cp tars-cowork-plugin/Archive.zip "$ARCHIVE"
 
           echo "archive=$ARCHIVE" >> "$GITHUB_ENV"
           echo "Built Cowork-compatible archive: $ARCHIVE"
+
+      - name: Validate built artifact
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          python3 tests/validate-release-artifact.py tars-cowork-plugin/Archive.zip
 
       - name: Extract changelog for release
         if: steps.tag_check.outputs.exists == 'false'

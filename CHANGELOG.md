@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.5.1 (2026-05-10)
+
+### Fixed
+
+- **Release workflow now ships a complete plugin.** `.github/workflows/release.yml` previously packaged its own zip that omitted `commands/`, `mcp/tars-vault/`, `hooks/`, `requirements*.txt`, the `mcpServers` field of `plugin.json`, and `.claude-plugin/mcp-servers.json`, while incorrectly bundling `_system/` (a user-workspace folder, not a framework asset). The workflow now invokes `build-plugin.sh` so the release artifact matches the canonical plugin layout, and runs `tests/validate-release-artifact.py` against the built zip so future drift fails CI.
+- **`_system/guardrails.yaml` is parseable again.** The `api_key` and `password_assignment` block patterns used `["\']` inside a single-quoted YAML string, which prematurely closed the string and made the file unparseable to PyYAML. Replaced with the YAML-correct `["'']` so `health-check.py` can run its flagged-content sub-check and `/lint --fix-prefixes` can detect frontmatter pollution.
+- **`scripts/health-check.py` and `scripts/scan-secrets.py` degrade instead of crash on a malformed `guardrails.yaml`.** Defensive parsing returns `None` and a diagnostic instead of a stack trace.
+
+### Changed
+
+- **Release pipeline now runs `scripts/regression-suite.sh` automatically.** The 9-scenario SessionStart matrix, adversarial probes, perf gate, notice-string lint, and QA-finding re-verifier are now release prerequisites, not optional local commands.
+- **`tests/validate-templates.py` now actually parses YAML files** when PyYAML is installed, instead of relying on a key-shaped-string heuristic. Catches the class of escape-sequence bug above before it ships.
+- **Lean cleanup follow-up.** Removed the dormant `validate_fixtures()` branch from `scripts/validate-schema.py`; the `tests/fixtures/` directory it scanned was retired in v3.5.0.
+
+### Deferred
+
+- Merging `scripts/fix-wikilinks.py` and `scripts/heal-wikilinks.py`: their concerns (bracket-artifact regex repair vs. fuzzy alias/distance resolution) are largely disjoint and `/lint` already chains them in the correct order. The duplication worth fixing is the shared frontmatter/quote parsing — a separate refactor.
+- Deeper consolidation of frontmatter-pollution parsing with the schema validator: requires a shared parser contract and is out of scope for a point release.
+
 ## v3.5.0 (2026-05-08)
 
 ### Added
