@@ -62,15 +62,17 @@ FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 
 def load_yaml_file(filepath):
-    """Load a YAML file."""
+    """Load a YAML file. Returns None on missing or unparseable input so callers
+    degrade instead of crashing the whole health-check run."""
     if not filepath.exists():
         return None
-    with open(filepath, "r") as f:
-        if HAS_YAML:
-            return yaml.safe_load(f)
-        else:
-            # Minimal fallback - return empty dict
+    try:
+        with open(filepath, "r") as f:
+            if HAS_YAML:
+                return yaml.safe_load(f)
             return {}
+    except Exception:
+        return None
 
 
 def parse_frontmatter(file_path):

@@ -162,10 +162,13 @@ def main() -> int:
         parsed = json.loads(proc.stdout)
     except Exception:
         pass
+    # health-check exits non-zero whenever it finds any critical issue, so on a
+    # polluted scenario rc==1 is the correct signal. The pollution check passes
+    # when JSON parsed cleanly and at least one polluted note was reported.
     results.append(_check(
         "M1 health-check finds non-tars frontmatter",
-        proc.returncode == 0 and parsed.get("frontmatter_pollution", {}).get("count", 0) >= 1,
-        f"count={parsed.get('frontmatter_pollution', {}).get('count')}",
+        bool(parsed) and parsed.get("frontmatter_pollution", {}).get("count", 0) >= 1,
+        f"rc={proc.returncode}, count={parsed.get('frontmatter_pollution', {}).get('count')}",
     ))
 
     # M2 read_system_file

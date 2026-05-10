@@ -42,9 +42,17 @@ EXPECTED_STALENESS_TIERS = [
 ]
 
 # Simple YAML validator (checks for valid key: value structure)
+try:
+    import yaml as _yaml
+    _HAS_YAML = True
+except ImportError:
+    _HAS_YAML = False
+
+
 def is_valid_yaml_structure(filepath):
-    """Basic validation that a YAML file has valid structure.
-    Returns (valid, error_message)."""
+    """Validate YAML structure. When PyYAML is available, parse the file end-to-end
+    so silent escape-sequence bugs (e.g. ``["\\']`` inside a single-quoted string)
+    surface here instead of crashing health-check.py at runtime."""
     try:
         with open(filepath) as f:
             content = f.read()
@@ -53,6 +61,12 @@ def is_valid_yaml_structure(filepath):
 
     if not content.strip():
         return False, "File is empty"
+
+    if _HAS_YAML:
+        try:
+            _yaml.safe_load(content)
+        except _yaml.YAMLError as e:
+            return False, f"YAML parse error: {e}"
 
     # Check for basic YAML structure (key: value or key:\n on at least some lines)
     has_keys = False
@@ -67,7 +81,6 @@ def is_valid_yaml_structure(filepath):
     if not has_keys:
         return False, "No YAML key-value pairs found"
 
-    # Check for common YAML errors
     lines = content.split("\n")
     for i, line in enumerate(lines, 1):
         if "\t" in line and not line.strip().startswith("#"):

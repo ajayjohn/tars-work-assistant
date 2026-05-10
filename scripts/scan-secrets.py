@@ -76,11 +76,13 @@ def load_guardrails(vault_path):
     guardrails_path = Path(vault_path) / "_system" / "guardrails.yaml"
     if not guardrails_path.exists():
         return None, f"Guardrails file not found: {guardrails_path}"
-    if HAS_YAML:
-        with open(guardrails_path, "r") as f:
-            return yaml.safe_load(f), None
-    else:
+    try:
+        if HAS_YAML:
+            with open(guardrails_path, "r") as f:
+                return yaml.safe_load(f), None
         return simple_yaml_load(guardrails_path), None
+    except Exception as exc:
+        return None, f"Guardrails file is malformed: {guardrails_path} ({exc})"
 
 
 def compile_patterns(guardrails):

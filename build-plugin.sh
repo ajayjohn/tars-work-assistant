@@ -25,10 +25,13 @@ cp .claude-plugin/mcp-servers.json tars-cowork-plugin/.claude-plugin/
 
 # Copy the tars-vault MCP server (required for TARS workspace writes).
 # Excludes __pycache__ and tests/ — tests/ ships separately in the repo checkout.
-rsync -a --exclude '__pycache__' --exclude 'tests' mcp/tars-vault/ tars-cowork-plugin/mcp/tars-vault/
+cp -R mcp/tars-vault/. tars-cowork-plugin/mcp/tars-vault/
+rm -rf tars-cowork-plugin/mcp/tars-vault/tests
+find tars-cowork-plugin/mcp/tars-vault -type d -name '__pycache__' -prune -exec rm -rf {} +
 
 # Copy hooks (plugin auto-registers them via hooks/hooks.json).
-rsync -a --exclude '__pycache__' hooks/ tars-cowork-plugin/hooks/
+cp -R hooks/. tars-cowork-plugin/hooks/
+find tars-cowork-plugin/hooks -type d -name '__pycache__' -prune -exec rm -rf {} +
 
 # The packaged plugin ships MCP metadata in two documented places:
 # - .claude-plugin/plugin.json inline `mcpServers`.

@@ -7,7 +7,7 @@ block_patterns:
     pattern: '\b\d{3}-\d{2}-\d{4}\b'
     description: Social Security Number
   - name: api_key
-    pattern: '(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{20,}'
+    pattern: '(?i)(api[_-]?key|apikey)\s*[:=]\s*["'']?[a-zA-Z0-9_\-]{20,}'
     description: API key assignment
   - name: bearer_token
     pattern: '(?i)bearer\s+[a-zA-Z0-9_\-\.]{20,}'
@@ -19,7 +19,7 @@ block_patterns:
     pattern: '-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'
     description: Private key block
   - name: password_assignment
-    pattern: '(?i)(password|passwd|pwd)\s*[:=]\s*["\']?[^\s"'']{8,}'
+    pattern: '(?i)(password|passwd|pwd)\s*[:=]\s*["'']?[^\s"'']{8,}'
     description: Password assignment
   - name: connection_string
     pattern: '(?i)(mongodb|postgres|mysql|redis|amqp)://[^\s]+'
