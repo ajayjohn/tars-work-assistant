@@ -134,7 +134,10 @@ def create_note(**kwargs: Any) -> dict:
     # keys (`tags`, `aliases`) without prefix; reject any other non-prefix key
     # unless the caller explicitly opts in via allow_user_properties=True.
     allow_user = bool(kwargs.get("allow_user_properties", False))
-    reserved_non_prefix = {"tags", "aliases"}
+    # `title` is reserved for TaskNotes-plugin compatibility on tars/task notes
+    # — TaskNotes' title field name is configurable but defaults to `title`,
+    # and it's a native Obsidian property either way.
+    reserved_non_prefix = {"tags", "aliases", "title"}
     if not allow_user:
         for key in frontmatter.keys():
             if key in reserved_non_prefix:

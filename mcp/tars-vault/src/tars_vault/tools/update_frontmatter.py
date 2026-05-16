@@ -47,7 +47,7 @@ def update_frontmatter(**kwargs: Any) -> dict:
     if _common.is_protected_path(vault_p, note_p) and not kwargs.get("allow_protected_paths"):
         return _common.error(_common.protected_path_reason(vault_p, note_p))
 
-    reserved_non_prefix = {"tags", "aliases"}
+    reserved_non_prefix = {"tags", "aliases", "title"}
     if not allow_user:
         for k in updates.keys():
             if k in reserved_non_prefix or k.startswith("tars-"):

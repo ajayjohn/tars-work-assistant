@@ -159,6 +159,7 @@ class FreshInstallSmokeTests(unittest.TestCase):
             vault=str(self.workspace),
             path="tasks/2026-05-06-follow-up.md",
             frontmatter={
+                "title": "Follow up",
                 "tags": ["tars/task"],
                 "tars-status": "open",
                 "tars-owner": "Jordan",

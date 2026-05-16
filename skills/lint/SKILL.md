@@ -76,6 +76,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Workflows registry health (`_system/workflows.yaml` missing, schema-invalid, or contains entries whose `last_used` is null after 60d AND not pinned) | direct read of the registry | No | Surface for review |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
 | Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
+| Task title backfill (one-time, TaskNotes compatibility) — gate `tasknotes_title_backfill_done` in `_system/housekeeping-state.yaml`. Scan all `tars/task` notes; for each missing `title`, derive from body H1 (preferred) or de-slugified filename, write via `update_frontmatter`. Set the gate after a clean pass. **Remove this check (and the gate key) in a later release once all installs have run it.** | `search_by_tag("tars/task")` + body H1 / filename | Yes | Auto-update frontmatter; no user prompt — pure derivation |
 | Telemetry lint — memories saved 90d ago never re-read (durability miss) | `_system/telemetry/*.jsonl` → `memory_persisted` vs subsequent `vault_write`/`answer_delivered` hits | No | Surface for user review |
 | Telemetry lint — tasks created >60d ago still `open` (accountability miss) | `_system/telemetry/*.jsonl` + `memory/tasks/` frontmatter | No | Surface candidates (§5.4); route to `/tasks` |
 | Decision / initiative / people count drift vs `_system/maturity.yaml` hydration block | `scripts/sync.py --hydration` | Yes | Auto-update yaml via `update_frontmatter` equivalent |
@@ -181,6 +182,20 @@ mcp__tars_vault__update_frontmatter(file="maturity", property="decision_count", 
 #     else                    → 0
 mcp__tars_vault__update_frontmatter(file=<task>, property="tars-age-days", value=<n>)
 mcp__tars_vault__update_frontmatter(file=<task>, property="tars-escalation-level", value=<0-3>)
+
+# Task title backfill (one-time, TaskNotes compatibility).
+# Gated by housekeeping-state.yaml `tasknotes_title_backfill_done`. When the
+# flag is true, skip entirely. Otherwise, for every tars/task note missing a
+# `title` field:
+#   1. Read body. If first non-empty line is `# <Heading>`, title = <Heading>.
+#   2. Else derive from filename slug: strip leading `YYYY-MM-DD-`, replace
+#      hyphens with spaces, Title Case.
+#   3. mcp__tars_vault__update_frontmatter(file=<task>, property="title", value=<derived>)
+# After scanning all tasks without errors, set the gate:
+#   mcp__tars_vault__update_frontmatter(file="_system/housekeeping-state",
+#       property="tasknotes_title_backfill_done", value=true)
+# This migration is scheduled for removal in a later release — when removed, also drop
+# the gate key from `_system/housekeeping-state.yaml`.
 
 # Unfiled journal entry
 mcp__tars_vault__move_note(src="journal/YYYY-MM-DD.md", dst="journal/YYYY-MM/YYYY-MM-DD.md")
