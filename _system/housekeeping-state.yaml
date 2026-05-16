@@ -97,6 +97,6 @@ last_run:
 
 # One-time migration flag: TaskNotes-compatibility title backfill on
 # existing tars/task notes. Set by /lint after a clean pass. Scheduled for
-# removal in v3.7+ along with the migration step itself — do not depend on
+# removal in a later release along with the migration step itself — do not depend on
 # this key beyond /lint's task-title backfill check.
 tasknotes_title_backfill_done: false
