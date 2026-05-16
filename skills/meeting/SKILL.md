@@ -616,6 +616,7 @@ mcp__tars_vault__create_note(
   path="tasks/YYYY-MM-DD-task-slug.md",
   template="task",
   frontmatter={
+    "title": "Task Title",
     "tags": ["tars/task"],
     "tars-status": "open",
     "tars-owner": "[[Owner Name]]",

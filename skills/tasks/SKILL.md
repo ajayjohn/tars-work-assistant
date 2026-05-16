@@ -215,6 +215,7 @@ mcp__tars_vault__create_note(
   path="tasks/YYYY-MM-DD-task-slug.md",
   template="task",
   frontmatter={
+    "title": "Task Title",
     "tags": ["tars/task"],
     "tars-status": "open",
     "tars-owner": "[[Owner Name]]",
@@ -227,6 +228,8 @@ mcp__tars_vault__create_note(
   }
 )
 ```
+
+`title` is required (TaskNotes plugin compatibility) and must be the same human-readable phrase used as the body H1. Use the user-facing task phrase, not the filename slug.
 
 ### Optional v3.1 fields (backward-compatible, added per §5.3 / §9.1)
 

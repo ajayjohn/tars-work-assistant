@@ -1,7 +1,7 @@
 # TARS Frontmatter Schema Definitions
 # Used by scripts/validate-schema.py to enforce data quality
 # All TARS properties use the tars- prefix
-# Schema version: 3.2.1 (tracked in this comment — the validator treats any
+# Schema version: 3.6.0 (tracked in this comment — the validator treats any
 # top-level key as an entity type, so the version lives in a comment rather
 # than a top-level scalar).
 
@@ -79,6 +79,14 @@ meeting:
 task:
   required_tags: [tars/task]
   required_properties:
+    # `title` is required for TaskNotes plugin compatibility. TaskNotes' only
+    # hardcoded structural requirements are (a) the `tags` frontmatter key as
+    # task identifier and (b) a title sourced from frontmatter or filename;
+    # everything else (field names, status/priority enums, the task tag value)
+    # is remappable in TaskNotes settings. TARS uses date-prefixed slug
+    # filenames, so a frontmatter `title` is the readable source. Existing
+    # tasks without `title` are backfilled by /lint's one-time migration.
+    - title
     - tars-status
     - tars-owner
     - tars-priority

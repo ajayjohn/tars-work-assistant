@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **TaskNotes plugin compatibility.** Tasks now write a `title` frontmatter field alongside the existing `tars-*` fields. This is the only structural change required for the Obsidian TaskNotes plugin (https://github.com/callumalpass/tasknotes) to display TARS tasks correctly: every other TaskNotes-relevant property (status, priority, due, scheduled, contexts, projects, dateCreated, dateModified, completedDate, blockedBy, the task-identifier tag, and the enum values for status/priority) is remappable in TaskNotes settings to TARS's existing `tars-*` keys and values, so no other TARS conventions changed. Non-Obsidian users benefit too — a frontmatter title is easier to read than a date-prefixed slug filename.
+- **One-time title backfill in `/lint`.** Existing tasks without `title` are migrated automatically on the next `/lint` run: title is derived from the body H1 when present, otherwise from a de-slugified filename. Gated by `tasknotes_title_backfill_done` in `_system/housekeeping-state.yaml` so it runs exactly once per workspace. **Scheduled for removal in v3.7+** — once all installs have cleared the gate, both the `/lint` check and the housekeeping key should be deleted.
+
+### Changed
+
+- **Task schema bumped to 3.6.0** in `_system/schemas.yaml`: `title` added to `task.required_properties`. Task creation paths in `skills/tasks/SKILL.md` (Step 7) and `skills/meeting/SKILL.md` (post-extraction step) now emit `title` matching the body H1.
+
 ## v3.5.1 (2026-05-10)
 
 ### Fixed
