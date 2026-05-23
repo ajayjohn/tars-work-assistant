@@ -19,12 +19,12 @@ tars-modified: ""
 
 ## Objective
 
+[What are we ideating about and toward what end?]
+
 ## Context
 
-## What makes a good idea for this project
+[When/where will these ideas be used? Current situation and key facts.]
 
-## Domain family history
-<!-- Updated automatically by Phase 7 after each session. Each entry: {family_name, sub_domains_used, produced_loved, mechanisms_extracted, last_used} -->
+## What makes a good idea
 
-## Sessions
-<!-- Auto-populated by /ideate after each session -->
+[Structural quality criteria — not topics. E.g.: "Ideas that reframe the mechanism of value delivery, not just features."]
