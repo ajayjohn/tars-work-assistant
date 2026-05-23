@@ -194,8 +194,9 @@ Classify every request by signal. Slash commands are optional shortcuts. Natural
 | "Analyze", trade-off, strategy, "help me think" | `skills/think/` (analyze) | `/think` |
 | "Stress test", "what could go wrong", validate | `skills/think/` (stress-test) | `/think validate` |
 | Conflict, political, "council", high-stakes | `skills/think/` (debate) | `/think council` |
-| "Brainstorm", "deep dive" | `skills/think/` (deep) | `/think deep` |
+| "Brainstorm", "fresh ideas", "surprising angles", "non-obvious approaches", "what haven't we thought of", "break out of the box", "going in circles on", "I need fresh approaches", "deep dive" | `skills/think/` (discover) | `/think discover` |
 | Ambiguous, "I'm not sure", exploring | `skills/think/` (discover) | `/think discover` |
+| `/ideate`, "run the ideation engine", "run a collider session" | `skills/ideate/` | `/ideate` |
 | Draft, refine, "write an email to X" | `skills/communicate/` | `/communicate` |
 | Initiative scope, planning, roadmap | `skills/initiative/` (plan) | `/initiative` |
 | Initiative status, health check | `skills/initiative/` (status) | `/initiative status` |
