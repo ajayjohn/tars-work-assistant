@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.5.3 (2026-05-23)
+
+### Added
+
+- **`/ideate` skill — Open Collider bisociation engine for non-obvious idea generation.** A new skill and slash command that generates genuinely non-obvious ideas by colliding workspace context (initiative notes, product notes, decisions, meeting notes) with structurally distant knowledge domains. Based on Arthur Koestler's bisociation theory and the [Open Collider](https://github.com/CL-ML/open-collider) model; validated at 62% originality preference in blind LLM-judge evaluation and 4–13× geometric distance over vanilla brainstorming baselines.
+
+  Core pipeline: (1) auto-constructs the ideation brief from vault context so the exec confirms rather than fills forms; (2) generates domain active-principle narratives (not keyword lists) from disciplines structurally distant from the project domain; (3) spawns isolated parallel subagents — one per reference-text × domain-set combo — to prevent cross-domain convergence; (4) scores every idea on 5 axes (structural originality, resistance to objection, thesis density, concrete grounding, cognitive load) with a threshold of 4.2/5 and drift-down to 4.0; (5) applies 4 mandatory curation filters (real collision? verifiable? non-trivial? project voice?) before showing anything to the exec; (6) presents a short, prioritized list with collision mechanism in plain language, strongest objection, and a concrete next step per idea.
+
+  Three iteration strategies preserve continuity across sessions: Fresh (random distant domains), Deepen (new sub-specialties within families that produced loved ideas), and Refresh (new disciplines exhibiting the same causal mechanism as loved ideas). Domain family history and forbidden topics are tracked in `tars-domain-families` and `tars-forbidden-topics` frontmatter on the project note, so each session builds on the last.
+
+  Ideas are expressed in the executive's domain vocabulary — source-domain jargon is translated at generation time, not after. Generic structural terms ("threshold", "feedback loop", "selection pressure") are used freely; specialized terms that have no plain-language equivalent may appear once with a short parenthetical.
+
+- **Three new note types** with schema validation: `ideation-project` (project brief and domain history), `ideation-session` (per-session output), and `ideation-idea` (individual loved/liked ideas with collision metadata). Schemas added to `_system/schemas.yaml`; templates added to `templates/`.
+
+- **Storage layout**: `contexts/ideation/[slug]/project.md` (persists across sessions), `contexts/ideation/[slug]/session-NNN.md` (session output), `contexts/ideation/[slug]/ideas/` (individual curated ideas), and a thin `journal/YYYY-MM/YYYY-MM-DD-ideation-[slug].md` daily-activity pointer.
+
+### Changed
+
+- **`/think` discover mode now offers structured escalation to `/ideate`** when discovery reveals the gap is generative (options not yet conceived) rather than analytical. The escalation packages the discovery output as the ideation brief seed, skipping Phase 0 brief construction. After ideation completes, the user is offered `/think validate` to stress-test the strongest idea.
+
+- **Routing updated in `skills/core/SKILL.md`.** Ideation-specific signals ("non-obvious approaches", "what haven't we thought of", "going in circles on", "creative angles for") route to `/ideate`. Generic "brainstorm" alone still routes to `/think` (deep) for backward compatibility; the `/ideate` command is the explicit direct shortcut for returning users who know the workflow.
+
 ## v3.5.2 (2026-05-16)
 
 ### Added

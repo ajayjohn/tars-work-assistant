@@ -527,13 +527,45 @@ Ask 3-5 targeted questions to close the gap:
 
 ---
 
-### Exit criteria
+### Exit criteria and path selection
 
 You remain in discovery mode loop until:
 1. The user answers the probing questions
 2. The user explicitly says "Proceed" or "Enough context"
 
-After exit, route to the appropriate protocol based on what was discovered.
+After exit, determine which path the discovery session revealed:
+
+**Path A — Analysis needed** (the user has existing options, proposals, or a defined problem to evaluate):
+
+> "Discovery complete. I have the context I need."
+
+Route to the appropriate think mode based on what was uncovered:
+- Specific proposal or strategy to evaluate → Mode A (strategic analysis)
+- A decision to stress-test → Mode B (validation council)
+- Organizational or political conflict → Mode C (executive council)
+
+**Path B — Generation needed** (the user needs options they don't have yet):
+
+Trigger this path when Section 3 (The unknowns) reveals the core gap is *missing options* rather than missing information — or when the user said "I don't know what to do," "we've tried everything obvious," or "I need fresh approaches."
+
+Present:
+
+> "Discovery shows the gap here is generative — you need approaches you don't have yet, not deeper analysis of approaches you do. I can run a structured ideation session using everything we've mapped: it collides your context with knowledge from structurally distant fields to surface options your current frame hasn't reached.
+>
+> [Run ideation session] [Stay in analysis instead]"
+
+If the user chooses ideation:
+1. Package the discovery output (Sections 1–4) as the brief seed and pass it to `skills/ideate/`
+2. Use Section 3 (unknowns) as initial `forbidden_topics` — these are open questions, not angles to recycle
+3. Route to `skills/ideate/` in quick mode, skipping Phase 0 brief construction (discovery already did it)
+4. After ideation completes, offer: "These ideas came from the ideation engine. Want me to stress-test the strongest one? [→ /think validate]"
+
+This creates a coherent loop: discover the problem → generate options → validate the best one. The executive sees one continuous conversation, not three separate commands.
+
+Discovery mode constraints apply until the user triggers either Path A or Path B:
+- NEVER propose solutions in discovery mode
+- NEVER skip context mapping (always check memory)
+- NEVER ask open-ended questions (use bounded, targeted questions)
 
 ---
 

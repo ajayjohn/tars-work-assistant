@@ -312,3 +312,79 @@ user-model:
       enum: ["", fast, deliberate, slow]
     tars-meeting-cadence:
       enum: ["", daily, several-per-day, a-few-per-week, rare]
+
+# Ideation project configuration (one per project; lives in contexts/ideation/[slug]/project.md).
+# Created by /ideate on first session; updated each subsequent session.
+# Domain family history stored in tars-domain-families for deepen/refresh continuity.
+ideation-project:
+  required_tags: [tars/ideation-project]
+  required_properties:
+    - tars-slug
+    - tars-objective
+    - tars-status
+    - tars-session-count
+    - tars-last-session
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - aliases
+    - tars-constraints
+    - tars-forbidden-topics
+    - tars-reference-source-types
+    - tars-domain-families
+    - tars-related-initiative
+    - tars-related-product
+  property_rules:
+    tars-status:
+      enum: [active, paused, completed]
+
+# Ideation session record (one per run; lives in contexts/ideation/[slug]/session-NNN.md).
+# Created at the end of each /ideate session.
+ideation-session:
+  required_tags: [tars/ideation-session]
+  required_properties:
+    - tars-project
+    - tars-session-number
+    - tars-date
+    - tars-mode
+    - tars-strategy
+    - tars-ideas-generated
+    - tars-ideas-passing-score
+    - tars-loved-count
+    - tars-liked-count
+    - tars-created
+  optional_properties:
+    - tars-domains-used
+    - tars-combos-run
+    - tars-skip-count
+  property_rules:
+    tars-mode:
+      enum: [quick, deep, deepen]
+    tars-strategy:
+      enum: [fresh, deepen, refresh, combined]
+
+# Individual curated idea (loved or liked; lives in contexts/ideation/[slug]/ideas/).
+# Created when the exec flags an idea as loved or liked after a session.
+ideation-idea:
+  required_tags: [tars/ideation-idea]
+  required_properties:
+    - tars-project
+    - tars-session
+    - tars-score
+    - tars-flag
+    - tars-has-collision
+    - tars-created
+    - tars-modified
+  optional_properties:
+    - tars-collision-domain
+    - tars-collision-mechanism
+    - tars-challenge
+    - tars-next-step
+    - tars-combo
+    - tars-linked-initiative
+    - tars-linked-product
+  property_rules:
+    tars-flag:
+      enum: [loved, liked]
+    tars-has-collision:
+      type: checkbox
