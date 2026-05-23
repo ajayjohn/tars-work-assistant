@@ -372,10 +372,9 @@ ideation-idea:
     - tars-session
     - tars-score
     - tars-flag
-    - tars-has-collision
     - tars-created
-    - tars-modified
   optional_properties:
+    - tars-has-collision
     - tars-collision-domain
     - tars-collision-mechanism
     - tars-challenge
@@ -383,6 +382,7 @@ ideation-idea:
     - tars-combo
     - tars-linked-initiative
     - tars-linked-product
+    - tars-modified
   property_rules:
     tars-flag:
       enum: [loved, liked]

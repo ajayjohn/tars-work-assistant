@@ -60,7 +60,7 @@ Emit `TodoWrite` progress list at start:
 
 **Goal**: Auto-populate 80% of the brief from vault context so the exec confirms and tweaks, not writes from scratch.
 
-**If mode = `discovery-escalation`**: A brief seed was passed from `/think` discover (Sections 1–4 of the discovery output). Skip Steps 0b–0d. Use the discovery output as the brief draft and go directly to Step 0e for confirmation. Mark Step 1 complete in TodoWrite.
+**If mode = `discovery-escalation`**: A brief seed was passed from `/think` discover (Sections 1–4 of the discovery output). Skip Steps 0b–0d. Use the discovery output as the brief draft and go directly to Step 0e for confirmation. After confirmation, run Step 0d-lite (below) to select reference texts before Phase 1. Mark Step 1 complete in TodoWrite.
 
 **If mode = `review`**: Skip Phase 0 entirely — go to PHASE 0-SHORTCUT: Review mode.
 
@@ -69,11 +69,11 @@ Emit `TodoWrite` progress list at start:
 ### Step 0a: Check for existing project
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-project"], query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/ideation-project", query=<topic keywords>, limit=5)
 ```
 
 If a matching project exists at `contexts/ideation/<slug>/project.md`:
-- Read it: `mcp__tars_vault__read_note(path="contexts/ideation/<slug>/project.md")`
+- Read it: `mcp__tars_vault__read_note(file="contexts/ideation/<slug>/project.md")`
 - Extract: tars-objective, tars-constraints, tars-forbidden-topics, tars-domain-families, tars-session-count
 - Ask: "Found existing ideation project [[<slug>]]. Continue this project with a new session, or start fresh? [Continue / Fresh]"
 - If "Continue" and mode is quick/deep: treat as continuing project; domain families and forbidden topics carry forward
@@ -83,17 +83,17 @@ If a matching project exists at `contexts/ideation/<slug>/project.md`:
 **Subagent A — Initiative, product, and decision context**
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/initiative"], query=<topic keywords>, limit=8)
-mcp__tars_vault__search_by_tag(tags=["tars/product"], query=<topic keywords>, limit=5)
-mcp__tars_vault__search_by_tag(tags=["tars/decision"], query=<topic keywords>, limit=5)
-For each matching result: mcp__tars_vault__read_note(path=<path>) — up to 5 reads total
+mcp__tars_vault__search_by_tag(tag="tars/initiative", query=<topic keywords>, limit=8)
+mcp__tars_vault__search_by_tag(tag="tars/product", query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/decision", query=<topic keywords>, limit=5)
+For each matching result: mcp__tars_vault__read_note(file=<path>) — up to 5 reads total
 Return JSON: {"initiatives": [...], "products": [...], "decisions": [...]}
 ```
 
 **Subagent B — Competitor context and semantic search**
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/competitor"], limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/competitor", limit=5)
 mcp__tars_vault__semantic_search(query=<topic>, limit=5)
 For each result above relevance threshold: mcp__tars_vault__read_note — up to 3 reads
 Return JSON: {"competitors": [...], "context_artifacts": [...]}
@@ -103,7 +103,7 @@ Return JSON: {"competitors": [...], "context_artifacts": [...]}
 
 ```
 mcp__tars_vault__read_system_file(path="_system/config.md")
-mcp__tars_vault__search_by_tag(tags=["tars/meeting"], query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/meeting", query=<topic keywords>, limit=5)
 For the 2 most relevant meeting notes: mcp__tars_vault__read_note
 Return JSON: {"config": {...}, "recent_meetings": [...]}
 ```
@@ -133,7 +133,7 @@ From `reference_sources`, select the most relevant:
 
 Selection criteria: specificity to objective > recency > substantive length. Never select two notes about the same meeting or topic. Read each selected note fully:
 ```
-mcp__tars_vault__read_note(path=<selected_path>)
+mcp__tars_vault__read_note(file=<selected_path>)
 ```
 
 ### Step 0e: Present brief for confirmation
@@ -162,6 +162,14 @@ Confirm? [Yes / Edit objective / Change mode / Add constraints]
 
 Wait for confirmation. Apply any edits to the brief before proceeding.
 
+### Step 0d-lite (discovery-escalation only)
+
+Extract the key entities and topics mentioned in the discovery output (Sections 1–4). Run a targeted vault search to find 2-3 substantive reference notes:
+```
+mcp__tars_vault__semantic_search(query=<subject extracted from discovery output>, limit=5)
+```
+For each high-relevance result: `mcp__tars_vault__read_note(file=<path>)`. Select the 2 most specific and substantive notes as reference texts for Phase 2. If no relevant notes are found, use the discovery output itself (Sections 1–4 compressed to ~400 words) as the sole reference text.
+
 ---
 
 ## PHASE 1: Domain generation
@@ -182,7 +190,7 @@ Update TodoWrite: Step 2 in_progress.
 ### Loading domain history (if continuing project)
 
 ```
-mcp__tars_vault__read_note(path="contexts/ideation/<slug>/project.md")
+mcp__tars_vault__read_note(file="contexts/ideation/<slug>/project.md")
 ```
 
 Extract `tars-domain-families`: a list of entries, each with:
@@ -223,7 +231,7 @@ Example (illustrative only — do not reuse): "A wildfire behavior analyst whose
 
 Load loved ideas from prior sessions:
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query=<slug>, limit=20)
+mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query=<slug>, limit=20)
 Filter to tars-flag: loved
 For each: read tars-collision-domain and tars-collision-mechanism
 ```
@@ -232,6 +240,8 @@ For each domain family that produced loved ideas:
 - Look up its `sub_domains_used` in the domain history
 - Generate 2 new sub-specialties within that family that are NOT already in `sub_domains_used`
 - Write a fresh active principle for each new sub-specialty
+
+Cap: select only the top 2 domain families by number of loved ideas produced (or by most recent loved idea if tied). Generate 2 new sub-specialties per selected family. This produces exactly 4 active principles for the deepen component — a bounded, controlled expansion.
 
 The new sub-specialties must explore a different angle from the one that produced the loved idea — same family, different mechanism.
 
@@ -407,7 +417,8 @@ score = (orig × 0.25) + (resist × 0.20) + (thesis × 0.20) + (ground × 0.20) 
 
 THRESHOLD
 Retain ideas with aggregate ≥ 4.2.
-If fewer than 3 ideas pass 4.2: lower to 4.0 and recount.
+If fewer than 3 ideas pass 4.2: lower to 4.1 and recount.
+If fewer than 3 ideas pass 4.1: lower to 4.0 and recount.
 If still fewer than 3 pass 4.0: retain the top 3 by score regardless, and note "below quality threshold" next to each.
 
 IDEAS TO SCORE
@@ -419,12 +430,12 @@ For each idea, one table row:
 |---------|------|--------|--------|--------|------|-----------|
 
 Then list passing ideas:
-✓ {idea_id} — Score {X.XX} — {1 sentence: what structural quality earns this score}
+✓ {idea_id} — Score {X.XX} — {1 sentence: what structural quality earns this score} | Objection: {the single strongest counterargument to this idea, stated honestly in one sentence}
 
 No other commentary.
 ```
 
-Parse: extract all 5 axis scores and aggregate per idea. Record `strongest_objection` for each passing idea from the scoring rationale.
+Parse: extract all 5 axis scores, aggregate score, and `strongest_objection` (from the "| Objection:" field) per passing idea. These objections populate `tars-challenge` in Phase 6 and the "Objection:" line in Phase 5.
 
 Update TodoWrite: Step 4 completed.
 
@@ -492,6 +503,35 @@ Update TodoWrite: Step 5 completed.
 
 ---
 
+## PHASE 4b: Next-step generation
+
+**Goal**: Generate a concrete, owned, verifiable next step for each curated idea (COLLISION_IDEA and INSIGHT_WITHOUT_COLLISION). This populates `tars-next-step` in Phase 6 and the "Next step:" line in Phase 5.
+
+Run as a single LLM call on all curated ideas:
+
+```
+For each idea below, generate ONE concrete next step that passes the accountability test:
+- Starts with an action verb
+- Names a specific deliverable or observable outcome
+- Includes timing (before [date/milestone] or within [N] days)
+- Names an owner (use "you" if exec is owner, or a role like "PM", "eng lead")
+
+The next step must be testable: a third party could verify whether it was done.
+
+DO NOT generate: vague recommendations ("explore this further"), open-ended research ("investigate options"), or next steps that are just restatements of the idea.
+
+Ideas:
+{list of curated idea_ids and their full text}
+
+OUTPUT FORMAT
+For each idea:
+next_step[{idea_id}]: {concrete action — verb + deliverable + timing + owner}
+```
+
+After collecting next steps, associate each `next_step[idea_id]` with the corresponding idea for use in Phase 5 presentation and Phase 6 capture.
+
+---
+
 ## PHASE 5: Executive review
 
 **Goal**: Present curated ideas in a format that respects the executive's time. Lead with the BLUF. Show collision mechanism and next step per idea. Make love/like/skip easy.
@@ -499,6 +539,17 @@ Update TodoWrite: Step 5 completed.
 Update TodoWrite: Step 6 in_progress.
 
 **Presentation count**: Quick mode → top 5–7 ideas; Deep mode → top 8–12 ideas. Rank by aggregate score within each bucket.
+
+### BLUF synthesis
+
+Before presenting ideas, synthesize a one-sentence BLUF from the top-scoring collision ideas:
+1. Look at the top 2-3 COLLISION_IDEAs by aggregate score
+2. Identify the common structural pattern or the single most surprising insight
+3. Express it as a complete, assertive sentence about what the collision session revealed (not what it produced)
+
+Example pattern: "The most non-obvious angle this session surfaced: [mechanism] challenges the assumption that [implicit assumption in the brief]."
+
+Use this as the opening line of the Phase 5 output. Do not ask the user to confirm the BLUF.
 
 ### Output format
 
@@ -659,7 +710,7 @@ mcp__tars_vault__create_note(
   frontmatter={
     tags: [tars/ideation-session],
     title: "Ideation: {subject} — Session {N}",
-    tars-project: "[[{slug}]]",
+    tars-project: "[[{project-path}]]",
     tars-session-number: {N},
     tars-date: "{date}",
     tars-mode: quick | deep | deepen,
@@ -695,7 +746,7 @@ mcp__tars_vault__create_note(
 
 ```
 mcp__tars_vault__append_note(
-  path="journal/{YYYY-MM-DD}.md",
+  file="journal/{YYYY-MM-DD}.md",
   content="- Ideation [[{subject} Session {N}]] — {combos} combos, {loved} loved, {liked} liked"
 )
 ```
@@ -704,7 +755,7 @@ mcp__tars_vault__append_note(
 
 ```
 mcp__tars_vault__append_note(
-  path="_system/changelog/{YYYY-MM-DD}.md",
+  file="_system/changelog/{YYYY-MM-DD}.md",
   content="ideate: session {N} for {slug} — {combos} combos, {loved+liked} ideas saved"
 )
 ```
@@ -751,16 +802,21 @@ For each domain family used in this session:
 
 ```
 mcp__tars_vault__update_frontmatter(
-  path="contexts/ideation/{slug}/project.md",
+  file="contexts/ideation/{slug}/project.md",
   property="tars-domain-families",
   value=[...updated list...]
 )
 ```
 
 Also update `tars-forbidden-topics` on the project note with idea themes from this session — prevents recycling in future sessions:
+
+Forbidden topics grow from ideas that scored ≥ 4.0 (whether or not they were flagged by the exec). For each such idea, condense its core thesis to a 5–10 word phrase that captures the angle (not the source domain). These phrase-level themes, not full idea texts, populate `tars-forbidden-topics`.
+
+Example: "Idea: 'Set the price at the self-reinforcing adoption threshold...'" → theme: "pricing at self-reinforcing adoption threshold"
+
 ```
 mcp__tars_vault__update_frontmatter(
-  path="contexts/ideation/{slug}/project.md",
+  file="contexts/ideation/{slug}/project.md",
   property="tars-forbidden-topics",
   value=[...existing + new themes from this session's ideas (all ideas, not just loved/liked)...]
 )
@@ -789,7 +845,13 @@ Update TodoWrite: Step 8 completed.
 When `/ideate review [subject]` or "show my past ideas for X":
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query="{subject}", limit=30)
+# Step 1: Find matching ideation project
+mcp__tars_vault__search_by_tag(tag="tars/ideation-project", query="{subject}", limit=5)
+# Read the best match to get its canonical path
+
+# Step 2: Get all ideas for that project
+mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query="{subject}", limit=50)
+# Filter results where tars-project frontmatter matches the project path found in Step 1
 ```
 
 Group results by project and session. Present:
@@ -817,7 +879,7 @@ When `/ideate deepen [slug]` or "more ideas like the ones I loved":
 
 1. Load the most recent active ideation project (or match to `slug` if provided):
    ```
-   mcp__tars_vault__search_by_tag(tags=["tars/ideation-project"], limit=5)
+   mcp__tars_vault__search_by_tag(tag="tars/ideation-project", limit=5)
    Sort by tars-last-session descending
    ```
    If multiple projects, present top 3 for the exec to select.
@@ -826,7 +888,7 @@ When `/ideate deepen [slug]` or "more ideas like the ones I loved":
 
 3. Load loved ideas from prior sessions:
    ```
-   mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query="{slug}", limit=20)
+   mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query="{slug}", limit=20)
    Filter to tars-flag: loved
    ```
 
