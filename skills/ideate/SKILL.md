@@ -69,11 +69,11 @@ Emit `TodoWrite` progress list at start:
 ### Step 0a: Check for existing project
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-project"], query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/ideation-project", query=<topic keywords>, limit=5)
 ```
 
 If a matching project exists at `contexts/ideation/<slug>/project.md`:
-- Read it: `mcp__tars_vault__read_note(path="contexts/ideation/<slug>/project.md")`
+- Read it: `mcp__tars_vault__read_note(file="contexts/ideation/<slug>/project.md")`
 - Extract: tars-objective, tars-constraints, tars-forbidden-topics, tars-domain-families, tars-session-count
 - Ask: "Found existing ideation project [[<slug>]]. Continue this project with a new session, or start fresh? [Continue / Fresh]"
 - If "Continue" and mode is quick/deep: treat as continuing project; domain families and forbidden topics carry forward
@@ -83,17 +83,17 @@ If a matching project exists at `contexts/ideation/<slug>/project.md`:
 **Subagent A — Initiative, product, and decision context**
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/initiative"], query=<topic keywords>, limit=8)
-mcp__tars_vault__search_by_tag(tags=["tars/product"], query=<topic keywords>, limit=5)
-mcp__tars_vault__search_by_tag(tags=["tars/decision"], query=<topic keywords>, limit=5)
-For each matching result: mcp__tars_vault__read_note(path=<path>) — up to 5 reads total
+mcp__tars_vault__search_by_tag(tag="tars/initiative", query=<topic keywords>, limit=8)
+mcp__tars_vault__search_by_tag(tag="tars/product", query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/decision", query=<topic keywords>, limit=5)
+For each matching result: mcp__tars_vault__read_note(file=<path>) — up to 5 reads total
 Return JSON: {"initiatives": [...], "products": [...], "decisions": [...]}
 ```
 
 **Subagent B — Competitor context and semantic search**
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/competitor"], limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/competitor", limit=5)
 mcp__tars_vault__semantic_search(query=<topic>, limit=5)
 For each result above relevance threshold: mcp__tars_vault__read_note — up to 3 reads
 Return JSON: {"competitors": [...], "context_artifacts": [...]}
@@ -103,7 +103,7 @@ Return JSON: {"competitors": [...], "context_artifacts": [...]}
 
 ```
 mcp__tars_vault__read_system_file(path="_system/config.md")
-mcp__tars_vault__search_by_tag(tags=["tars/meeting"], query=<topic keywords>, limit=5)
+mcp__tars_vault__search_by_tag(tag="tars/meeting", query=<topic keywords>, limit=5)
 For the 2 most relevant meeting notes: mcp__tars_vault__read_note
 Return JSON: {"config": {...}, "recent_meetings": [...]}
 ```
@@ -133,7 +133,7 @@ From `reference_sources`, select the most relevant:
 
 Selection criteria: specificity to objective > recency > substantive length. Never select two notes about the same meeting or topic. Read each selected note fully:
 ```
-mcp__tars_vault__read_note(path=<selected_path>)
+mcp__tars_vault__read_note(file=<selected_path>)
 ```
 
 ### Step 0e: Present brief for confirmation
@@ -182,7 +182,7 @@ Update TodoWrite: Step 2 in_progress.
 ### Loading domain history (if continuing project)
 
 ```
-mcp__tars_vault__read_note(path="contexts/ideation/<slug>/project.md")
+mcp__tars_vault__read_note(file="contexts/ideation/<slug>/project.md")
 ```
 
 Extract `tars-domain-families`: a list of entries, each with:
@@ -223,7 +223,7 @@ Example (illustrative only — do not reuse): "A wildfire behavior analyst whose
 
 Load loved ideas from prior sessions:
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query=<slug>, limit=20)
+mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query=<slug>, limit=20)
 Filter to tars-flag: loved
 For each: read tars-collision-domain and tars-collision-mechanism
 ```
@@ -695,7 +695,7 @@ mcp__tars_vault__create_note(
 
 ```
 mcp__tars_vault__append_note(
-  path="journal/{YYYY-MM-DD}.md",
+  file="journal/{YYYY-MM-DD}.md",
   content="- Ideation [[{subject} Session {N}]] — {combos} combos, {loved} loved, {liked} liked"
 )
 ```
@@ -704,7 +704,7 @@ mcp__tars_vault__append_note(
 
 ```
 mcp__tars_vault__append_note(
-  path="_system/changelog/{YYYY-MM-DD}.md",
+  file="_system/changelog/{YYYY-MM-DD}.md",
   content="ideate: session {N} for {slug} — {combos} combos, {loved+liked} ideas saved"
 )
 ```
@@ -751,7 +751,7 @@ For each domain family used in this session:
 
 ```
 mcp__tars_vault__update_frontmatter(
-  path="contexts/ideation/{slug}/project.md",
+  file="contexts/ideation/{slug}/project.md",
   property="tars-domain-families",
   value=[...updated list...]
 )
@@ -760,7 +760,7 @@ mcp__tars_vault__update_frontmatter(
 Also update `tars-forbidden-topics` on the project note with idea themes from this session — prevents recycling in future sessions:
 ```
 mcp__tars_vault__update_frontmatter(
-  path="contexts/ideation/{slug}/project.md",
+  file="contexts/ideation/{slug}/project.md",
   property="tars-forbidden-topics",
   value=[...existing + new themes from this session's ideas (all ideas, not just loved/liked)...]
 )
@@ -789,7 +789,7 @@ Update TodoWrite: Step 8 completed.
 When `/ideate review [subject]` or "show my past ideas for X":
 
 ```
-mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query="{subject}", limit=30)
+mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query="{subject}", limit=30)
 ```
 
 Group results by project and session. Present:
@@ -817,7 +817,7 @@ When `/ideate deepen [slug]` or "more ideas like the ones I loved":
 
 1. Load the most recent active ideation project (or match to `slug` if provided):
    ```
-   mcp__tars_vault__search_by_tag(tags=["tars/ideation-project"], limit=5)
+   mcp__tars_vault__search_by_tag(tag="tars/ideation-project", limit=5)
    Sort by tars-last-session descending
    ```
    If multiple projects, present top 3 for the exec to select.
@@ -826,7 +826,7 @@ When `/ideate deepen [slug]` or "more ideas like the ones I loved":
 
 3. Load loved ideas from prior sessions:
    ```
-   mcp__tars_vault__search_by_tag(tags=["tars/ideation-idea"], query="{slug}", limit=20)
+   mcp__tars_vault__search_by_tag(tag="tars/ideation-idea", query="{slug}", limit=20)
    Filter to tars-flag: loved
    ```
 
