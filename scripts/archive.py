@@ -47,6 +47,31 @@ except ImportError:
     HAS_YAML = False
 
 
+def _parse_yaml_scalar(value: str) -> Any:
+    raw = value.strip()
+    if not raw:
+        return ""
+    lowered = raw.lower()
+    if lowered in {"true", "yes"}:
+        return True
+    if lowered in {"false", "no"}:
+        return False
+    if lowered in {"null", "none", "~"}:
+        return None
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        if not inner:
+            return []
+        return [
+            _parse_yaml_scalar(part.strip())
+            for part in inner.split(",")
+            if part.strip()
+        ]
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        return raw[1:-1]
+    return raw
+
+
 def parse_frontmatter(file_path: Path) -> tuple[dict | None, str]:
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -64,8 +89,7 @@ def parse_frontmatter(file_path: Path) -> tuple[dict | None, str]:
                 line = line.strip()
                 if ":" in line and not line.startswith("#"):
                     key, _, val = line.partition(":")
-                    val = val.strip().strip("'\"")
-                    fm[key.strip()] = val
+                    fm[key.strip()] = _parse_yaml_scalar(val)
         body = content[match.end():]
         return fm if isinstance(fm, dict) else None, body
     except Exception:

@@ -49,3 +49,5 @@ tests/regression/scenarios.json
 tests/regression/adversarial.json
 tests/regression/perf.json
 tests/regression/qa-reverify.json
+tests/regression/scenario-vaults/
+tests/regression/perf-vault/

@@ -67,6 +67,8 @@ run_layer() {
     else
         LAYER_RESULTS+=("fail:$((end_ts - start_ts)):$log:$rc")
         echo "    ✗ FAIL ($((end_ts - start_ts))s, rc=$rc) — see $log"
+        echo "    ── failing layer log tail ──"
+        tail -n 120 "$log" | sed 's/^/    │ /'
         OVERALL_RC=1
     fi
 }
@@ -90,13 +92,13 @@ else
 fi
 
 run_layer "L3 scenarios" \
-    "$PYTHON_BIN -m tests.regression.run_scenario_matrix --rescaffold > $OUT_DIR/scenarios.json"
+    "$PYTHON_BIN -m tests.regression.run_scenario_matrix --base $OUT_DIR/scenario-vaults --rescaffold > $OUT_DIR/scenarios.json"
 
 run_layer "L4 adversarial" \
     "$PYTHON_BIN -m tests.regression.run_adversarial_probes > $OUT_DIR/adversarial.json"
 
 run_layer "L5 perf" \
-    "$PYTHON_BIN -m tests.regression.run_perf_gates > $OUT_DIR/perf.json"
+    "$PYTHON_BIN -m tests.regression.run_perf_gates --base $OUT_DIR/perf-vault > $OUT_DIR/perf.json"
 
 run_layer "L6 notice-strings" "$PYTHON_BIN tests/test_notice_strings.py"
 
