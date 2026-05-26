@@ -1,0 +1,23 @@
+# Derived state capsule for SessionStart and adaptive briefing.
+# Rebuilt from Markdown by tars-vault workspace_map/context_gaps and /lint.
+generated_at: null
+source: derived-from-markdown
+active_file_count: 0
+archive_file_count: 0
+last:
+  session_at: null
+  briefing_at: null
+  transcript_at: null
+  inbox_process_at: null
+  successful_sync_at: null
+  archive_sweep_at: null
+stale_active_initiatives:
+  count: 0
+  oldest_days: 0
+overdue_tasks:
+  count: 0
+  oldest_days: 0
+inbox:
+  pending_count: 0
+frontmatter_pollution_count: 0
+context_gaps: []

@@ -1,4 +1,4 @@
-"""Local helper bootstrap for tars-vault (v3.5.0).
+"""Local helper bootstrap for tars-vault (v3.6.0).
 
 Wires list_tools + call_tool handlers against the tool modules under `tools/`.
 Each handler is a synchronous `(**kwargs) -> dict` function; this module
@@ -146,7 +146,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
     },
     "archive_note": {
-        "description": "Archive a note (tag + move to archive/YYYY-MM/) with guardrails.",
+        "description": "Archive a note (tag + move to a typed archive/<kind>/YYYY-MM/ path) with guardrails.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -264,6 +264,63 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "persona": {"type": "string"},
                 "overwrite": {"type": "boolean"},
                 "allow_claude_home": {"type": "boolean"},
+            },
+        },
+    },
+    "workspace_map": {
+        "description": "Return a compact active-workspace map: active file counts, initiatives, tasks, inbox, and recent journal.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "limit": {"type": "integer", "description": "Maximum rows per repeated section."},
+            },
+        },
+    },
+    "context_gaps": {
+        "description": "Detect time-aware context gaps: disuse, stale initiatives, overdue tasks, sparse transcripts, and inbox backlog.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "days_without_transcript": {"type": "integer"},
+                "stale_days": {"type": "integer"},
+            },
+        },
+    },
+    "entity_timeline": {
+        "description": "Return dated mentions and facts for one entity or topic across active notes and archived transcripts.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "query": {"type": "string"},
+                "kind": {"type": "string", "description": "Optional tag kind filter, e.g. person, initiative, decision."},
+                "limit": {"type": "integer"},
+            },
+            "required": ["query"],
+        },
+    },
+    "context_bundle": {
+        "description": "Build a bounded context pack for a question or workflow from workspace map + entity timeline.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "query": {"type": "string"},
+                "limit": {"type": "integer"},
+            },
+            "required": ["query"],
+        },
+    },
+    "archive_candidates": {
+        "description": "Run the lifecycle archive candidate dry-run and include active-set pressure. Never deletes or archives.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "check": {"type": "string", "enum": ["all", "memory", "workflows", "inbox"]},
+                "active_limit": {"type": "integer"},
             },
         },
     },
@@ -538,7 +595,7 @@ def _run_minimal_stdio(vault_path: str) -> int:
                         "result": {
                             "protocolVersion": protocol,
                             "capabilities": {"tools": {}},
-                            "serverInfo": {"name": "tars-vault", "version": "3.5.0"},
+                            "serverInfo": {"name": "tars-vault", "version": "3.6.0"},
                         },
                     }
                 )
@@ -623,7 +680,7 @@ def run_stdio(vault_path: str) -> int:
                 write_stream,
                 InitializationOptions(
                     server_name="tars-vault",
-                    server_version="3.5.0",
+                    server_version="3.6.0",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},

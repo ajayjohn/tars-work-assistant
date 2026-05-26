@@ -397,12 +397,21 @@ def _welcome_back_notice(vault: Path) -> str:
     if days < 30 or is_notice_suppressed(vault, "welcome_back", ttl_days=30):
         return ""
     mark_notice_acknowledged(vault, "welcome_back")
-    note_count = sum(1 for _ in vault.rglob("*.md"))
+    ledger = _activity_ledger(vault)
+    note_count = _ledger_int(ledger, "active_file_count", 0)
     detail = "Your workspace is still light" if note_count < 20 else "There may be useful changes to catch up on"
-    return f"Welcome back. You haven't used TARS in {days} days. {detail}. Run `/briefing --catchup` for a 60-second summary."
+    return f"Welcome back. You haven't used TARS in {days} days. {detail}. Say \"catch me up\" or run `/briefing` for a 60-second summary."
 
 
 def _pollution_notice(vault: Path) -> str:
+    ledger = _activity_ledger(vault)
+    if ledger:
+        polluted = _ledger_int(ledger, "frontmatter_pollution_count", 0)
+        if polluted == 0 or is_notice_suppressed(vault, "frontmatter_pollution"):
+            return ""
+        mark_notice_acknowledged(vault, "frontmatter_pollution")
+        return f"{polluted} note(s) use non-TARS frontmatter and won't show up in structured search. Run `/lint --fix-prefixes` to migrate."
+
     allowed = {"tags", "aliases"}
     polluted = 0
     for md in vault.rglob("*.md"):
@@ -437,6 +446,74 @@ def _parse_frontmatter_only(text: str) -> dict[str, str]:
     return out
 
 
+def _parse_scalar(value: str) -> str | int | None:
+    raw = value.strip().strip('"').strip("'")
+    if raw.lower() in ("null", "~", "none"):
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
+def _activity_ledger(vault: Path) -> dict:
+    """Read the tiny derived state capsule if it has been materialized.
+
+    This intentionally parses only the one-level YAML shape written by the
+    tars-vault activity ledger. If the capsule is absent or still a null seed,
+    callers can fall back to legacy lightweight checks.
+    """
+    target = vault / "_system" / "activity-ledger.yaml"
+    if not target.is_file():
+        return {}
+    try:
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    out: dict[str, object] = {}
+    current: str | None = None
+    for raw in text.splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        if not raw.startswith(" ") and ":" in raw:
+            key, _, value = raw.partition(":")
+            key = key.strip()
+            value = value.strip()
+            if value:
+                out[key] = _parse_scalar(value)
+                current = None
+            else:
+                out[key] = {}
+                current = key
+            continue
+        if current and raw.startswith("  ") and ":" in raw:
+            key, _, value = raw.strip().partition(":")
+            nested = out.get(current)
+            if isinstance(nested, dict):
+                nested[key.strip()] = _parse_scalar(value.strip())
+    if not out.get("generated_at"):
+        return {}
+    return out
+
+
+def _ledger_int(ledger: dict, key: str, default: int = 0) -> int:
+    value = ledger.get(key)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ledger_nested_int(ledger: dict, section: str, key: str, default: int = 0) -> int:
+    nested = ledger.get(section)
+    if not isinstance(nested, dict):
+        return default
+    try:
+        return int(nested.get(key))
+    except (TypeError, ValueError):
+        return default
+
+
 def _state_aware_lines(vault: Path) -> list[str]:
     """Power-user state insights (PRD-11). Each insight: at most one line.
 
@@ -445,6 +522,21 @@ def _state_aware_lines(vault: Path) -> list[str]:
     or git checkouts.
     """
     lines: list[str] = []
+    ledger = _activity_ledger(vault)
+    if ledger:
+        stale = _ledger_nested_int(ledger, "stale_active_initiatives", "count")
+        if stale:
+            lines.append(f"{stale} active initiative(s) haven't been touched in 30+ days. Say \"check stale initiatives\" when ready.")
+
+        overdue = _ledger_nested_int(ledger, "overdue_tasks", "count")
+        if overdue:
+            lines.append(f"{overdue} task(s) are overdue. Say \"triage my tasks\" to work through them.")
+
+        pending = _ledger_nested_int(ledger, "inbox", "pending_count")
+        if pending:
+            lines.append(f"{pending} item(s) waiting in your inbox. Say \"process inbox\" to work through them.")
+        return lines
+
     today = date.today()
     cutoff = today - timedelta(days=30)
 
@@ -467,21 +559,24 @@ def _state_aware_lines(vault: Path) -> list[str]:
         except ValueError:
             continue
     if stale:
-        lines.append(f"{stale} active initiative(s) haven't been touched in 30+ days. Run `/lint --stale`.")
+        lines.append(f"{stale} active initiative(s) haven't been touched in 30+ days. Say \"check stale initiatives\" when ready.")
 
     overdue = 0
     today_iso = today.isoformat()
-    for md in (vault / "memory" / "tasks").rglob("*.md"):
-        try:
-            fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError):
+    for task_root in (vault / "tasks", vault / "memory" / "tasks"):
+        if not task_root.is_dir():
             continue
-        if "tars/task" in fm.get("tags", "") and fm.get("tars-status", "open") in ("open", "in-progress"):
-            due = fm.get("tars-due", "").strip('"').strip("'")
-            if due and due < today_iso:
-                overdue += 1
+        for md in task_root.rglob("*.md"):
+            try:
+                fm = _parse_frontmatter_only(md.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError):
+                continue
+            if "tars/task" in fm.get("tags", "") and fm.get("tars-status", "open") in ("open", "in-progress"):
+                due = fm.get("tars-due", "").strip('"').strip("'")
+                if due and due < today_iso:
+                    overdue += 1
     if overdue:
-        lines.append(f"{overdue} task(s) are overdue. Run `/tasks` to triage them.")
+        lines.append(f"{overdue} task(s) are overdue. Say \"triage my tasks\" to work through them.")
 
     inbox_dir = vault / "inbox" / "pending"
     pending = 0

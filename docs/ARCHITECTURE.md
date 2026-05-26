@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.5 Architecture
+# TARS 3.6 Architecture
 
-This document describes the current framework architecture as of v3.5, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and requires one bundled local TARS helper for safe workspace writes.
+This document describes the current framework architecture as of v3.6, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
 
-**Version**: 3.5.0
-**Release**: 2026-05-08 — see `CHANGELOG.md`
+**Version**: 3.6.0
+**Release**: 2026-05-26 — see `CHANGELOG.md`
 
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
@@ -29,7 +29,7 @@ At a high level:
 - Obsidian Bases provide optional live query surfaces instead of hand-maintained index notes
 - Hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`) enforce write discipline, capture telemetry, and route Claude Code session transcripts into `inbox/pending/` for later `/meeting`-style review
 
-Only skill metadata loads eagerly at session start. With 14 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
+Only skill metadata loads eagerly at session start. With 15 skills, the lightweight baseline stays small before deeper instructions are loaded on demand.
 
 ## Repository layout
 
@@ -59,7 +59,7 @@ tars/
 └── CONTRIBUTING.md
 ```
 
-The framework currently ships 14 skills, 14 slash-command wrappers, and deterministic scripts.
+The framework currently ships 15 skills, 15 slash-command wrappers, and deterministic scripts.
 
 ## Deployed workspace layout
 
@@ -76,6 +76,7 @@ _system/
   guardrails.yaml
   maturity.yaml
   housekeeping-state.yaml
+  activity-ledger.yaml
   schemas.yaml
   changelog/
   backlog/issues/
@@ -101,6 +102,9 @@ contexts/
 inbox/pending/
 inbox/processed/
 archive/transcripts/YYYY-MM/
+archive/inbox/YYYY-MM/
+archive/tasks/YYYY-MM/
+tasks/
 templates/
 scripts/
 ```
@@ -111,6 +115,8 @@ Key runtime notes:
 - `contexts/` stores deep reference material and generated artifacts
 - `inbox/` is raw intake, not durable knowledge by itself
 - `archive/transcripts/` preserves transcript text for future lookup and verification
+- `_system/activity-ledger.yaml` is a tiny derived state capsule for startup and adaptive briefing
+- `tasks/` is the current task-note location; legacy `memory/tasks/` remains readable
 
 ## Runtime layers
 
@@ -157,11 +163,12 @@ The `mcp/tars-vault/` Python local helper sits between every skill and the works
 - classify files and detect near-duplicates for the Organization Engine
 - resolve capabilities against `_system/tools-registry.yaml` (populated by `SessionStart`)
 - expose FTS5 + semantic retrieval + deterministic rerank
+- expose navigation tools (`workspace_map`, `context_gaps`, `entity_timeline`, `context_bundle`, `archive_candidates`) for bounded context packs without making a database mandatory
 
 ### Hooks layer
 
 Hooks under `hooks/` are stdlib-only Python scripts wired via `hooks/hooks.json` and `.claude/settings.json`:
-- `SessionStart` — refresh the integrations index, inject concise workspace-state guidance, and suppress repeated housekeeping notices through `_system/install.yaml.acknowledged_notices`
+- `SessionStart` — refresh the integrations index, read `_system/activity-ledger.yaml` for concise workspace-state guidance, and suppress repeated housekeeping notices through `_system/install.yaml.acknowledged_notices`
 - `PreToolUse` — observability for helper writes (frontmatter prefix enforcement is owned by the local helper; this hook captures shape)
 - `PostToolUse` — emit workspace-write telemetry events
 - `PreCompact` + `SessionEnd` — drop the Claude Code session transcript into `inbox/pending/` so `/meeting` can ingest it later
@@ -204,6 +211,7 @@ TARS ships zero office-rendering Python libraries. The `templates/office/` folde
 - `tools-registry.yaml` is the auto-discovered live tool roster (24h TTL)
 - `guardrails.yaml` drives secret and negative-sentiment scans, including common Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic token patterns
 - `housekeeping-state.yaml` + `maturity.yaml` track maintenance cadence and live hydration counts
+- `activity-ledger.yaml` caches last-use, intake, stale-initiative, overdue-task, active-set, and gap signals derived from Markdown
 - `install.yaml` stores workspace identity, plugin version, scheduler preference, and notice acknowledgments
 - `telemetry/YYYY-MM-DD.jsonl` captures skill invocations, workspace writes, retrieval hits, durability / accountability signals
 - `backlog/` stores framework issues and user improvement ideas
@@ -248,7 +256,17 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace and `_system/` seeds
 
-## What's new in v3.5
+## What's new in v3.6
+
+- **Harness-first prompt architecture.** Core, briefing, meeting, maintain, learn, think, and ideate now use compact router cards plus mode-specific references instead of loading long workflow manuals by default. A harness-budget validator prevents those always-loaded cards from growing back into mega-prompts.
+- **Natural-language-first routing.** Slash commands remain compatibility shortcuts, but help and core routing now frame work as workflows: prepare my day, catch me up, process a meeting, remember this, draft a message, create an artifact, and clean up the workspace.
+- **Adaptive briefing by default.** `/briefing` infers daily, weekly, re-entry, context-gap, or drift-aware posture from workspace state. No new briefing flags are required.
+- **Dynamic activity ledger.** `_system/activity-ledger.yaml` gives SessionStart and briefing a tiny derived state capsule: last session, last briefing, last transcript, inbox pressure, stale initiatives, overdue tasks, active file count, and context gaps.
+- **Workspace navigation tools.** The local helper now exposes `workspace_map`, `context_gaps`, `entity_timeline`, `context_bundle`, and `archive_candidates` so Claude can build bounded context packs over a Markdown workspace without broad startup scans or a required database runtime.
+- **Lifecycle-aware archive guardrails.** Archival uses `tars-modified` / `tars-updated` dates, reads both `tasks/` and legacy `memory/tasks/`, protects durable and pinned notes, and moves reviewed items into typed destinations such as `archive/inbox/YYYY-MM/` and `archive/tasks/YYYY-MM/`.
+- **Self-improvement stays review-gated.** Weekly maintenance references now include a harness-review section for repeated failures, routing misses, bloated skill cards, unused aliases, and contradictions between instructions and implementation. TARS proposes changes; it does not auto-edit its own harness.
+
+## What was new in v3.5
 
 - **MCP helper safety moved into the server.** Unknown tool arguments are rejected, write tools fail when the install record points at another workspace, and auto-resolution no longer treats the current directory as a vault unless it is actually a TARS workspace.
 - **Runtime schema validation.** `create_note` and `write_note_from_content` validate managed notes against `_system/schemas.yaml` before writing. Intentional partial stubs must opt out with `validate=false`.

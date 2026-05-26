@@ -1,5 +1,28 @@
 # Changelog
 
+## v3.6.0 (2026-05-26)
+
+### Added
+
+- **Harness-first progressive disclosure.** `core`, `briefing`, `meeting`, `maintain`, `learn`, `think`, and `ideate` now load as compact router cards with mode-specific references. The original long manuals are preserved as legacy references, while always-loaded context stays lean.
+- **Harness budget validation.** New `tests/validate-harness-budget.py` guards split skill cards and `CLAUDE.md` against prompt bloat.
+- **Dynamic activity ledger.** `_system/activity-ledger.yaml` is now scaffolded as derived state and rebuilt by helper navigation tools. It tracks active file count, last-use signals, stale initiatives, overdue tasks, inbox pressure, and context gaps.
+- **Markdown-native navigation tools.** `tars-vault` now exposes `workspace_map`, `context_gaps`, `entity_timeline`, `context_bundle`, and `archive_candidates` for bounded context packs without requiring a database runtime.
+- **Harness-review maintenance references.** Weekly maintenance now has a review-gated harness health surface for routing misses, repeated workflow failures, unused aliases, prompt bloat, and instruction/implementation drift.
+
+### Changed
+
+- **Natural language is now the primary UI.** `/help` and core routing are workflow-first; slash commands remain shortcuts rather than the product surface users must memorize.
+- **`/briefing` is adaptive by default.** Daily, weekly, re-entry, sparse-intake, and drift-aware briefings are inferred from workspace state. No new briefing flags are required.
+- **SessionStart uses the activity ledger when available.** Startup guidance reads the tiny state capsule instead of doing broad scans, with legacy fallbacks for older workspaces.
+- **Archival is lifecycle-aware.** Archive scans now use `tars-modified` / `tars-updated` / `tars-inbox-processed` dates, read both `tasks/` and legacy `memory/tasks/`, protect pinned/durable/active content, and route notes into typed archive folders.
+- **Fresh workspaces include `tasks/` and typed archive roots.** `archive/inbox/`, `archive/tasks/`, `archive/people/`, `archive/initiatives/`, and `archive/notes/` are scaffolded alongside existing transcript archival.
+
+### Fixed
+
+- **Welcome-back guidance no longer points to `/briefing --catchup`.** Users can say "catch me up" or run `/briefing`; the briefing skill chooses the right posture automatically.
+- **Archive dry-runs now show typed destinations.** `archive_note` reports paths such as `archive/people/YYYY-MM/<note>.md` instead of the old flat `archive/YYYY-MM/` bucket.
+
 ## v3.5.3 (2026-05-23)
 
 ### Added

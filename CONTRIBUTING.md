@@ -7,10 +7,12 @@ Use this checklist whenever you change the framework. TARS is opinionated and th
 - Update the relevant file in `skills/`
 - Update or add the matching file in `commands/` if the skill is user-invocable
 - Update routing or protocol references in `skills/core/SKILL.md` and affected skills
+- If the change affects always-loaded harness files, keep the router card lean and move detailed workflow steps into `references/`
 - Update [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) if the public surface changed
 - Update [CHANGELOG.md](CHANGELOG.md)
 - Run `python3 tests/validate-routing.py`
 - Run `python3 tests/validate-docs.py`
+- Run `python3 tests/validate-harness-budget.py`
 
 ## If you change templates, schemas, or system files
 
@@ -28,6 +30,7 @@ Use this checklist whenever you change the framework. TARS is opinionated and th
 - Update [CHANGELOG.md](CHANGELOG.md)
 - Run `python3 tests/validate-scripts.py`
 - Run `python3 tests/validate-docs.py`
+- Run `python3 tests/validate-framework-contracts.py` if helper tools, hooks, or routing contracts changed
 
 ## If you change integrations
 
@@ -56,6 +59,8 @@ python3 tests/validate-routing.py
 python3 tests/validate-templates.py
 python3 tests/validate-scripts.py
 python3 tests/validate-docs.py
+python3 tests/validate-harness-budget.py
+python3 tests/validate-framework-contracts.py
 python3 tests/test_real_world_smoke.py
 ```
 

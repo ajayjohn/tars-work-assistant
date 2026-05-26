@@ -63,7 +63,7 @@ def _copy_seed(target_root: Path) -> None:
     sysdir.mkdir(parents=True, exist_ok=True)
     for f in (
         "schemas.yaml", "housekeeping-state.yaml", "guardrails.yaml",
-        "maturity.yaml",
+        "maturity.yaml", "activity-ledger.yaml",
     ):
         src = SYSTEM_SEED / f
         if src.is_file():
@@ -77,7 +77,7 @@ def _copy_seed(target_root: Path) -> None:
             shutil.copy2(src, sysdir / f)
     for sub in ("telemetry", "changelog"):
         (sysdir / sub).mkdir(exist_ok=True)
-    for sub in ("memory", "inbox", "journal", "archive", "contexts"):
+    for sub in ("memory", "inbox", "journal", "archive", "contexts", "tasks"):
         (target_root / sub).mkdir(exist_ok=True)
 
 

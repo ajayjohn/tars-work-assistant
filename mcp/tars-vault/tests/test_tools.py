@@ -14,16 +14,21 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "mcp" / "tars-vault" / "src"))
 
 from tars_vault.tools.append_note import append_note
+from tars_vault.tools.archive_candidates import archive_candidates
 from tars_vault.tools.archive_note import archive_note
 from tars_vault.tools.classify_file import classify_file
+from tars_vault.tools.context_bundle import context_bundle
+from tars_vault.tools.context_gaps import context_gaps
 from tars_vault.tools.create_note import create_note
 from tars_vault.tools.detect_near_duplicates import detect_near_duplicates
+from tars_vault.tools.entity_timeline import entity_timeline
 from tars_vault.tools.move_note import move_note
 from tars_vault.tools.read_note import read_note
 from tars_vault.tools.read_system_file import read_system_file
@@ -34,6 +39,7 @@ from tars_vault.tools.scan_secrets import scan_secrets
 from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.search_by_tag import search_by_tag
 from tars_vault.tools.update_frontmatter import update_frontmatter
+from tars_vault.tools.workspace_map import workspace_map
 from tars_vault.tools.write_note_from_content import write_note_from_content
 from tars_vault.server import _call_handler_sync
 
@@ -80,10 +86,12 @@ class ToolTests(unittest.TestCase):
             "inbox/processed",
             "memory/people",
             "memory/initiatives",
+            "tasks",
             "journal",
             "archive/transcripts",
         ]:
             self.assertTrue((workspace / rel).is_dir(), rel)
+        self.assertTrue((workspace / "_system" / "activity-ledger.yaml").is_file())
         self.assertTrue((workspace / "index.md").is_file())
         index = (workspace / "index.md").read_text()
         self.assertIn("Slash commands are optional shortcuts", index)
@@ -253,6 +261,56 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(r["count"], 1)
         self.assertEqual(r["results"][0]["path"], "memory/initiatives/search.md")
 
+    def test_workspace_navigation_tools(self) -> None:
+        stale_day = (date.today() - timedelta(days=60)).isoformat()
+        overdue_day = (date.today() - timedelta(days=3)).isoformat()
+        (self.vault / "memory" / "initiatives").mkdir(parents=True, exist_ok=True)
+        (self.vault / "tasks").mkdir(parents=True, exist_ok=True)
+        (self.vault / "archive" / "transcripts" / "2026-05").mkdir(parents=True, exist_ok=True)
+        (self.vault / "inbox" / "pending").mkdir(parents=True, exist_ok=True)
+        (self.vault / "inbox" / "pending" / "raw.txt").write_text("loose context")
+        (self.vault / "memory" / "people" / "alice.md").write_text(
+            "---\ntags: [tars/person]\ntars-name: Alice\ntars-modified: 2026-05-01\n---\nAlice owns search.\n"
+        )
+        (self.vault / "memory" / "initiatives" / "search.md").write_text(
+            f"---\ntags: [tars/initiative]\ntars-status: active\ntars-modified: {stale_day}\n---\nSearch quality with [[Alice]].\n"
+        )
+        (self.vault / "tasks" / "follow-up.md").write_text(
+            f"---\ntags: [tars/task]\ntars-status: open\ntars-due: {overdue_day}\n---\nFollow up with [[Alice]].\n"
+        )
+        (self.vault / "journal" / "2026-04" / "note.md").write_text(
+            "---\ntags: [tars/journal]\ntars-date: 2026-05-02\n---\nSearch launch discussion with Alice.\n"
+        )
+        (self.vault / "archive" / "transcripts" / "2026-05" / "call.md").write_text(
+            "---\ntags: [tars/transcript]\ntars-date: 2026-05-03\n---\nAlice mentioned search relevance.\n"
+        )
+
+        r = workspace_map(vault=str(self.vault), limit=5)
+        self.assertEqual(r["status"], "ok")
+        self.assertGreaterEqual(r["active_file_count"], 4)
+        self.assertEqual(r["initiatives"]["active_count"], 1)
+        self.assertEqual(r["tasks"]["overdue_count"], 1)
+        self.assertTrue((self.vault / "_system" / "activity-ledger.yaml").is_file())
+
+        gaps = context_gaps(vault=str(self.vault))
+        self.assertEqual(gaps["status"], "ok")
+        gap_types = {item["type"] for item in gaps["gaps"]}
+        self.assertIn("pending_inbox", gap_types)
+        self.assertIn("overdue_tasks", gap_types)
+        self.assertIn("stale_active_initiatives", gap_types)
+
+        timeline = entity_timeline(vault=str(self.vault), query="Alice", limit=10)
+        self.assertEqual(timeline["status"], "ok")
+        self.assertGreaterEqual(timeline["count"], 3)
+
+        bundle = context_bundle(vault=str(self.vault), query="search", limit=5)
+        self.assertEqual(bundle["status"], "ok")
+        self.assertGreaterEqual(len(bundle["timeline"]), 2)
+
+        candidates = archive_candidates(vault=str(self.vault), check="inbox")
+        self.assertEqual(candidates["status"], "ok")
+        self.assertIn("summary", candidates)
+
     def test_classify_file_resume(self) -> None:
         (self.vault / "contexts").mkdir()
         p = self.vault / "contexts" / "Alice Resume.md"
@@ -316,6 +374,49 @@ class ToolTests(unittest.TestCase):
         types = {item["type"] for item in r["guardrails"]}
         self.assertIn("recent_backlink", types)
         self.assertIn("active_task_reference", types)
+
+    def test_archive_note_dry_run_uses_typed_destination(self) -> None:
+        (self.vault / "memory" / "people" / "old.md").write_text(
+            "---\ntags: [tars/person]\ntars-modified: 2020-01-01\n---\nbody\n"
+        )
+        r = archive_note(vault=str(self.vault), file="memory/people/old.md", dry_run=True)
+        self.assertEqual(r["status"], "ok")
+        self.assertIn("archive/people/", r["to_path"])
+
+    def test_archive_candidates_protect_legacy_tasks_and_pinned_notes(self) -> None:
+        (self.vault / "memory" / "tasks").mkdir(parents=True, exist_ok=True)
+        (self.vault / "tasks").mkdir(parents=True, exist_ok=True)
+        (self.vault / "memory" / "people" / "old-ivy.md").write_text(
+            "---\n"
+            "tags: [tars/person]\n"
+            "aliases: [Ivy]\n"
+            "tars-staleness: ephemeral\n"
+            "tars-modified: 2020-01-01\n"
+            "---\n"
+            "Old profile.\n"
+        )
+        (self.vault / "memory" / "people" / "pinned.md").write_text(
+            "---\n"
+            "tags: [tars/person]\n"
+            "tars-pinned: true\n"
+            "tars-staleness: ephemeral\n"
+            "tars-modified: 2020-01-01\n"
+            "---\n"
+            "Pinned profile.\n"
+        )
+        (self.vault / "memory" / "tasks" / "legacy.md").write_text(
+            "---\ntags: [tars/task]\ntars-status: open\n---\nFollow up with [[Ivy]].\n"
+        )
+        (self.vault / "tasks" / "current.md").write_text(
+            "---\ntags: [tars/task]\ntars-status: open\n---\nAlso check [[memory/people/old-ivy]].\n"
+        )
+        r = archive_candidates(vault=str(self.vault), check="memory")
+        self.assertEqual(r["status"], "ok")
+        protected = {item["file"]: item for item in r["memory"]["protected"]}
+        self.assertIn("memory/people/old-ivy.md", protected)
+        reasons = protected["memory/people/old-ivy.md"]["protection_reasons"]
+        self.assertIn("referenced by active task", reasons)
+        self.assertGreaterEqual(r["memory"]["pinned_skipped"], 1)
 
     # --- integrations ---
 

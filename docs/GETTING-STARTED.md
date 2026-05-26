@@ -15,7 +15,7 @@ You need:
 Markdown files are plain text files you can open in any text editor. If you do
 not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
-If you are starting fresh, create an empty folder. This branch supports fresh v3.5 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
+If you are starting fresh, create an empty folder. This branch supports fresh v3.6 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
 
 ## Installation
 
@@ -78,12 +78,16 @@ After setup, the workspace should contain:
 
 ```text
 _system/
+  activity-ledger.yaml
 memory/
 journal/
 contexts/
 inbox/pending/
 inbox/processed/
 archive/transcripts/
+archive/inbox/
+archive/tasks/
+tasks/
 templates/
 scripts/
 index.md
@@ -131,6 +135,8 @@ The first time `/answer` or any skill triggers a semantic search, FastEmbed down
 ```
 
 TARS combines calendar context, tasks, memory, initiatives, and system health into a short daily briefing.
+
+That same workflow adapts automatically for weekly planning, re-entry after time away, sparse-input periods, and drift-aware catch-up. No extra briefing flags are required.
 
 ### Meeting processing
 
@@ -220,6 +226,16 @@ or run:
 TARS inventories the pending folder, classifies each item, asks what to process, routes selected items through meeting, learn, tasks, or companion-note workflows, and moves finished items to `inbox/processed/`. This works in bulk. If a file type cannot be read directly by the active Claude environment, TARS creates a companion note and asks for extracted text or a converted copy rather than silently dropping the file.
 
 When transcripts are processed, the raw text should remain available through archived transcript notes in `archive/transcripts/YYYY-MM/`. Those notes are part of the retrieval model, not disposable temporary files.
+
+## Upgrading an existing workspace
+
+`3.6.0` does not require a manual migration script.
+
+After installing the updated build:
+- run `/briefing` or `/lint` once so TARS rebuilds `_system/activity-ledger.yaml`
+- keep using your existing workspace path; `install.yaml` and schedule state remain valid
+- no task migration is required; legacy `memory/tasks/` notes are still readable, while active task workflows continue to use `tasks/`
+- if you rely on scheduled jobs, it is worth running `/maintain` or `/welcome --setup-schedules` once so the new version is the one refreshing notices and weekly review behavior
 
 ## Self-learning
 

@@ -56,7 +56,7 @@ Use this sequence for release preparation:
 1. Update framework source files.
 2. Update public docs and changelog.
 3. Update `.claude-plugin/plugin.json` if version or release metadata changed.
-4. Run validators from `tests/`.
+4. Run validators from `tests/`, including harness-budget and framework-contract checks when the harness changes.
 5. Run `./build-plugin.sh`.
 6. Run `python3 tests/validate-release-artifact.py` to verify the packaged plugin contents, helper startup, and scaffold behavior.
 7. Tag and publish the GitHub release artifact.
@@ -78,6 +78,8 @@ Helpful utilities:
 
 ```bash
 python3 scripts/bump-version.py X.Y.Z
+python3 tests/validate-harness-budget.py
+python3 tests/validate-framework-contracts.py
 ./build-plugin.sh
 python3 tests/validate-plugin.py
 ```

@@ -32,6 +32,7 @@ DIRECTORIES = [
     "memory/initiatives",
     "memory/decisions",
     "memory/org-context",
+    "tasks",
     "journal",
     "contexts",
     "contexts/products",
@@ -42,7 +43,11 @@ DIRECTORIES = [
     "inbox/processed",
     "archive",
     "archive/transcripts",
+    "archive/inbox",
     "archive/tasks",
+    "archive/people",
+    "archive/initiatives",
+    "archive/notes",
     "templates",
     "scripts",
     "skills",
@@ -252,6 +257,33 @@ coaching:
 """
 
 
+def _activity_ledger_yaml() -> str:
+    return """# Derived state capsule for SessionStart and adaptive briefing.
+# Rebuilt from Markdown by tars-vault workspace_map/context_gaps and /lint.
+generated_at: null
+source: derived-from-markdown
+active_file_count: 0
+archive_file_count: 0
+last:
+  session_at: null
+  briefing_at: null
+  transcript_at: null
+  inbox_process_at: null
+  successful_sync_at: null
+  archive_sweep_at: null
+stale_active_initiatives:
+  count: 0
+  oldest_days: 0
+overdue_tasks:
+  count: 0
+  oldest_days: 0
+inbox:
+  pending_count: 0
+frontmatter_pollution_count: 0
+context_gaps: []
+"""
+
+
 def scaffold_workspace(**kwargs: Any) -> dict:
     vault = kwargs.get("vault")
     if not vault:
@@ -306,6 +338,7 @@ def scaffold_workspace(**kwargs: Any) -> dict:
         "_system/schedule.md": "# Schedule\n\nRecurring and one-time TARS schedules.\n",
         "_system/guardrails.yaml": _repo_seed("_system/guardrails.yaml", "block_patterns: []\nwarn_patterns: []\n"),
         "_system/housekeeping-state.yaml": _repo_seed("_system/housekeeping-state.yaml", f'plugin_version: "{_plugin_version()}"\n').replace('plugin_version: ""', f'plugin_version: "{_plugin_version()}"'),
+        "_system/activity-ledger.yaml": _repo_seed("_system/activity-ledger.yaml", _activity_ledger_yaml()),
         "index.md": _index_md(),
     }
 
