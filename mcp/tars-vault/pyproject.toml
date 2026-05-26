@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tars-vault"
-version = "3.5.0"
+version = "3.6.0"
 description = "TARS local helper: validated Markdown writes, wikilink checks, FTS search, optional semantic search, integration resolver"
 requires-python = ">=3.10"
 license = {text = "PolyForm-Noncommercial-1.0.0"}

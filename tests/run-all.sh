@@ -14,7 +14,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-ALL_TESTS="structure frontmatter references routing templates scripts notice-strings"
+ALL_TESTS="structure frontmatter references routing templates scripts harness-budget notice-strings"
 
 test_script_for() {
     case "$1" in
@@ -24,6 +24,7 @@ test_script_for() {
         routing) echo "validate-routing.py" ;;
         templates) echo "validate-templates.py" ;;
         scripts) echo "validate-scripts.py" ;;
+        harness-budget) echo "validate-harness-budget.py" ;;
         notice-strings) echo "test_notice_strings.py" ;;
         *) return 1 ;;
     esac
@@ -102,6 +103,7 @@ $(git ls-files --others --exclude-standard 2>/dev/null || true)"
                     add_test frontmatter
                     add_test references
                     add_test routing
+                    add_test harness-budget
                     ;;
                 commands/*)
                     add_test structure

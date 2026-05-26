@@ -20,25 +20,28 @@ For Obsidian users, the same workspace can be opened as a vault. The product ter
 TARS is intentionally opinionated about how a long-lived assistant should work:
 - Markdown files and YAML frontmatter are the native runtime
 - the local TARS helper (`tars-vault`) is the write path for managed workspace changes
+- the harness is kept lean and layered, so the assistant loads routing first and detailed workflow logic only when needed
 - `.base` files are optional Obsidian views over the same workspace
 - transcript archives are first-class retrieval assets
 - `inbox/pending/` is the bulk intake surface for transcripts, PDFs, decks, docs, screenshots, exports, and rough notes
 - tasks and memory go through explicit review before persistence
 - schemas, guardrails, aliasing, and maintenance state live in `_system/`
 
-The result is a framework that is stable for months-long use, especially when the workspace accumulates hundreds of journal entries, transcripts, and memory notes.
+The result is a framework that is stable for months-long use, especially when the workspace accumulates hundreds or low-thousands of journal entries, transcripts, and memory notes and the harder problem becomes time drift rather than raw file count.
 
 ## Core capabilities
 
 ### Daily operating loop
 
-TARS can assemble a daily or weekly briefing from:
+TARS can assemble an adaptive briefing from:
 - calendar context
 - tasks and deadlines
 - people context
 - initiatives and decisions
 - inbox backlog
 - system health signals
+
+The same `/briefing` workflow also handles re-entry after time away, sparse-intake periods, and drift-aware orientation when the workspace has gone stale.
 
 ### Meeting-to-execution pipeline
 
@@ -67,6 +70,10 @@ TARS maintains structured notes for:
 
 The answer workflow searches memory first, then journal, then transcript archives, then integrations. This lets TARS answer both summary questions and detailed “what exactly was said?” questions without collapsing everything into prose summaries.
 
+### Time-aware navigation
+
+TARS maintains a tiny derived state capsule, `_system/activity-ledger.yaml`, and helper navigation tools that summarize workspace shape without turning Markdown into a database product. This is what lets SessionStart and `/briefing` notice long gaps, stale initiatives, overdue work, or missing intake quickly.
+
 ### Strategic and communication workflows
 
 TARS supports structured strategic analysis, stakeholder-aware drafting, initiative planning, and artifact creation while grounding those outputs in what the workspace already knows.
@@ -84,6 +91,8 @@ Every wikilink TARS writes is formed via the local helper’s `format_wikilink` 
 ### Self-improvement loop (v3.2)
 
 A single weekly scheduled job (`tars-weekly-maintenance`, Sunday evening, enabled through `/welcome --setup-schedules` when a scheduler is available) opens a Claude session, rolls up telemetry, groups backlog issues, runs `/lint --actions`, surfaces user-model and workflow-alias proposals from `/learn --review-patterns`, runs the workspace-side curator (memory staleness 90d, workflow staleness 60d, persona-drift 30d with cooling-off windows), and writes everything to a numbered review queue at `inbox/pending/weekly-review-YYYY-MM-DD.md`. Nothing is auto-applied. The user reviews on next session.
+
+Archival is active-set management, not blind cleanup. TARS protects pinned notes, durable decisions, org context, active initiatives, and active-task references, while routing reviewed material into typed archive folders such as `archive/transcripts/`, `archive/inbox/`, and `archive/tasks/`.
 
 ## Who it is for
 

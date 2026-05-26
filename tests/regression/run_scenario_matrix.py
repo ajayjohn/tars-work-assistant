@@ -45,10 +45,10 @@ EXPECTATIONS: list[tuple[str, list[str], list[str]]] = [
      ["scheduled jobs aren't running"],   # baseline: schedules notice
      ["mcp__", "python3 scripts/", "cron"]),
     ("s8-sparse-returning",
-     ["Welcome back", "/briefing --catchup"],
+     ["Welcome back", "catch me up", "/briefing"],
      ["mcp__", "python3 scripts/", "cron"]),
     ("s9-advanced",
-     ["active initiative(s) haven't been touched", "/lint --stale",
+     ["active initiative(s) haven't been touched", "check stale initiatives",
       "item(s) waiting in your inbox"],
      ["mcp__", "python3 scripts/", "cron"]),
 ]

@@ -17,7 +17,7 @@ at the skill's `SKILL.md`; all pipeline logic lives in the skill.
 |---------|-------|---------|--------------------------|
 | `/help` | [skills/core/](../skills/core/SKILL.md) | Command and workflow help | "What can TARS do?" |
 | `/answer` | [skills/answer/](../skills/answer/SKILL.md) | Fast lookup with full-text + semantic fallback | "What do we know about the platform rewrite?" |
-| `/briefing` | [skills/briefing/](../skills/briefing/SKILL.md) | Daily / weekly briefing | "What should I focus on today?" |
+| `/briefing` | [skills/briefing/](../skills/briefing/SKILL.md) | Adaptive daily / weekly / re-entry briefing | "What should I focus on today?" |
 | `/communicate` | [skills/communicate/](../skills/communicate/SKILL.md) | Stakeholder drafting with RASCI | "Draft a follow-up to Sam from this call" |
 | `/create` | [skills/create/](../skills/create/SKILL.md) | Office output via Anthropic rendering skills | "Turn this into an exec-ready narrative" |
 | `/doctor` | [skills/doctor/](../skills/doctor/SKILL.md) | Install and workspace health check | "Check my TARS install" |

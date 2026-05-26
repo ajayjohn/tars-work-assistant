@@ -4,10 +4,14 @@ Each tool module exposes a single callable named identically to the module.
 """
 from . import (
     append_note,
+    archive_candidates,
     archive_note,
     classify_file,
+    context_bundle,
+    context_gaps,
     create_note,
     detect_near_duplicates,
+    entity_timeline,
     format_wikilink,
     fts_search,
     move_note,
@@ -23,15 +27,20 @@ from . import (
     search_by_tag,
     semantic_search,
     update_frontmatter,
+    workspace_map,
     write_note_from_content,
 )
 
 __all__ = [
     "append_note",
+    "archive_candidates",
     "archive_note",
     "classify_file",
+    "context_bundle",
+    "context_gaps",
     "create_note",
     "detect_near_duplicates",
+    "entity_timeline",
     "format_wikilink",
     "fts_search",
     "move_note",
@@ -47,5 +56,6 @@ __all__ = [
     "search_by_tag",
     "semantic_search",
     "update_frontmatter",
+    "workspace_map",
     "write_note_from_content",
 ]

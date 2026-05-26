@@ -9,8 +9,9 @@ after explicit approval.
 
 Three check classes (default: all):
   memory     — memory/* notes with tars-staleness tier elapsed since
-               tars-modified, gated by guardrails (active-task references,
-               recent backlinks) and never auto-proposing tars-pinned: true
+               tars-modified / tars-updated, gated by guardrails (active-task
+               references across tasks/ and legacy memory/tasks/, recent backlinks)
+               and never auto-proposing tars-pinned: true
                or already-archived notes.
   workflows  — _system/workflows.yaml entries whose last_used is null AND
                created is older than 60 days, OR last_used is older than
@@ -46,6 +47,31 @@ except ImportError:
     HAS_YAML = False
 
 
+def _parse_yaml_scalar(value: str) -> Any:
+    raw = value.strip()
+    if not raw:
+        return ""
+    lowered = raw.lower()
+    if lowered in {"true", "yes"}:
+        return True
+    if lowered in {"false", "no"}:
+        return False
+    if lowered in {"null", "none", "~"}:
+        return None
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        if not inner:
+            return []
+        return [
+            _parse_yaml_scalar(part.strip())
+            for part in inner.split(",")
+            if part.strip()
+        ]
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        return raw[1:-1]
+    return raw
+
+
 def parse_frontmatter(file_path: Path) -> tuple[dict | None, str]:
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -63,8 +89,7 @@ def parse_frontmatter(file_path: Path) -> tuple[dict | None, str]:
                 line = line.strip()
                 if ":" in line and not line.startswith("#"):
                     key, _, val = line.partition(":")
-                    val = val.strip().strip("'\"")
-                    fm[key.strip()] = val
+                    fm[key.strip()] = _parse_yaml_scalar(val)
         body = content[match.end():]
         return fm if isinstance(fm, dict) else None, body
     except Exception:
@@ -77,6 +102,74 @@ def extract_wikilinks(text: str) -> list[str]:
     return [m.group(1) for m in re.finditer(r'\[\[([^\]|]+?)(?:\|[^\]]+?)?\]\]', text)]
 
 
+def _tags(fm: dict | None) -> list[str]:
+    if not fm:
+        return []
+    tags = fm.get("tags", []) or []
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        return []
+    return [str(t).lstrip("#") for t in tags]
+
+
+def _parse_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if value in (None, "", "null", "~", "None"):
+        return None
+    raw = str(value).strip().strip('"').strip("'")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+
+
+def note_activity_date(path: Path, fm: dict | None) -> date | None:
+    fm = fm or {}
+    for key in (
+        "tars-modified",
+        "tars-updated",
+        "tars-inbox-processed",
+        "tars-date",
+        "tars-created",
+        "updated",
+        "created",
+    ):
+        parsed = _parse_date(fm.get(key))
+        if parsed:
+            return parsed
+    match = re.search(r"(20\d{2})[-/](\d{2})[-/](\d{2})", str(path))
+    if match:
+        try:
+            return date.fromisoformat("-".join(match.groups()))
+        except ValueError:
+            pass
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime).date()
+    except OSError:
+        return None
+
+
+def note_reference_keys(vault: Path, md: Path, fm: dict | None) -> set[str]:
+    fm = fm or {}
+    keys = {md.stem.lower(), str(md.relative_to(vault).with_suffix("")).replace("\\", "/").lower()}
+    for alias in fm.get("aliases") or []:
+        keys.add(str(alias).lower())
+    for key in ("title", "tars-name"):
+        value = fm.get(key)
+        if value:
+            keys.add(str(value).lower())
+    return {key for key in keys if key}
+
+
 # ---------------------------------------------------------------------------
 # Memory check
 # ---------------------------------------------------------------------------
@@ -84,46 +177,42 @@ def extract_wikilinks(text: str) -> list[str]:
 
 def find_active_task_references(vault: Path) -> set[str]:
     referenced: set[str] = set()
-    mem = vault / "memory"
-    if not mem.is_dir():
-        return referenced
-    for md in mem.rglob("*.md"):
-        fm, body = parse_frontmatter(md)
-        if not fm:
+    for root in (vault / "tasks", vault / "memory" / "tasks"):
+        if not root.is_dir():
             continue
-        tags = fm.get("tags", []) or []
-        if not isinstance(tags, list):
-            tags = [tags]
-        if "tars/task" not in tags:
-            continue
-        if fm.get("tars-status") in ("done", "cancelled"):
-            continue
-        if body:
-            for link in extract_wikilinks(body):
-                referenced.add(link.lower())
-        for key in ("tars-owner", "tars-project", "tars-source"):
-            val = fm.get(key, "")
-            if isinstance(val, str):
-                for link in extract_wikilinks(val):
+        for md in root.rglob("*.md"):
+            fm, body = parse_frontmatter(md)
+            if not fm:
+                continue
+            if "tars/task" not in _tags(fm):
+                continue
+            if str(fm.get("tars-status", "")).lower() in ("done", "completed", "cancelled", "canceled", "archived"):
+                continue
+            if body:
+                for link in extract_wikilinks(body):
                     referenced.add(link.lower())
+            for key in ("tars-owner", "tars-project", "tars-source"):
+                val = fm.get(key, "")
+                if isinstance(val, str):
+                    for link in extract_wikilinks(val):
+                        referenced.add(link.lower())
     return referenced
 
 
 def find_recent_backlinks(vault: Path, days: int = 90) -> set[str]:
     cutoff = date.today() - timedelta(days=days)
     linked: set[str] = set()
-    for scan_dir in ("journal", "memory"):
+    for scan_dir in ("journal", "memory", "contexts", "tasks"):
         d = vault / scan_dir
         if not d.is_dir():
             continue
         for md in d.rglob("*.md"):
-            try:
-                mtime = datetime.fromtimestamp(md.stat().st_mtime).date()
-            except OSError:
+            fm, body = parse_frontmatter(md)
+            activity = note_activity_date(md, fm)
+            if not activity:
                 continue
-            if mtime < cutoff:
+            if activity < cutoff:
                 continue
-            _, body = parse_frontmatter(md)
             if body:
                 for link in extract_wikilinks(body):
                     linked.add(link.lower())
@@ -149,9 +238,7 @@ def find_memory_candidates(vault: Path, override_days: int | None = None) -> dic
         fm, _ = parse_frontmatter(md)
         if not fm:
             continue
-        tags = fm.get("tags", []) or []
-        if not isinstance(tags, list):
-            tags = [tags]
+        tags = _tags(fm)
         if "tars/archived" in tags:
             continue
         # Phase 7: respect pinned notes regardless of staleness
@@ -162,26 +249,21 @@ def find_memory_candidates(vault: Path, override_days: int | None = None) -> dic
         threshold = override_days if override_days else thresholds.get(staleness)
         if threshold is None:
             continue
-        modified = fm.get("tars-modified")
-        if not modified:
+        modified_date = note_activity_date(md, fm)
+        if not modified_date:
             continue
-        try:
-            if isinstance(modified, str):
-                mod_date = datetime.strptime(modified, "%Y-%m-%d").date()
-            elif isinstance(modified, date):
-                mod_date = modified
-            else:
-                continue
-        except (ValueError, TypeError):
-            continue
-        age_days = (today - mod_date).days
+        age_days = (today - modified_date).days
         if age_days <= threshold:
             continue
-        note_name = md.stem.lower()
+        note_keys = note_reference_keys(vault, md, fm)
         protection: list[str] = []
-        if note_name in active_refs:
+        if tags and any(t in {"tars/decision", "tars/org-context"} for t in tags):
+            protection.append("durable decision/org context")
+        if "tars/initiative" in tags and str(fm.get("tars-status", "")).lower() in ("active", "planned", "in-progress"):
+            protection.append("active initiative")
+        if note_keys & active_refs:
             protection.append("referenced by active task")
-        if note_name in recent_links:
+        if note_keys & recent_links:
             protection.append("has recent backlinks (< 90 days)")
         record = {
             "file": str(md.relative_to(vault)),
@@ -189,7 +271,7 @@ def find_memory_candidates(vault: Path, override_days: int | None = None) -> dic
             "staleness": staleness,
             "threshold_days": threshold,
             "age_days": age_days,
-            "last_modified": str(modified),
+            "last_modified": modified_date.isoformat(),
             "protection_reasons": protection,
         }
         if protection:
@@ -294,7 +376,7 @@ def find_workflow_candidates(vault: Path, stale_days: int = 60) -> dict[str, Any
 
 
 # ---------------------------------------------------------------------------
-# Inbox sweep (unchanged semantics, keeps the legacy cleanup path)
+# Inbox sweep (uses tars-inbox-processed/tars dates before filesystem mtime)
 # ---------------------------------------------------------------------------
 
 
@@ -307,11 +389,11 @@ def find_processed_inbox_items(vault: Path, days_old: int = 7) -> list[dict]:
     for f in target.iterdir():
         if f.name.startswith("."):
             continue
-        try:
-            mtime = datetime.fromtimestamp(f.stat().st_mtime).date()
-            age = (today - mtime).days
-        except OSError:
+        fm, _body = parse_frontmatter(f) if f.suffix == ".md" else ({}, "")
+        activity = note_activity_date(f, fm)
+        if not activity:
             continue
+        age = (today - activity).days
         if age >= days_old:
             out.append({"file": str(f.relative_to(vault)), "age_days": age})
     return out

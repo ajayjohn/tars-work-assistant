@@ -1,4 +1,4 @@
-"""archive_note — Add tars/archived tag + move into archive/YYYY-MM/ with guardrails.
+"""archive_note — Add tars/archived tag + move into typed archive paths.
 
 Guardrails (PRD §19.2):
   * Refuse if the note has backlinks in the last 90 days (`--force` overrides).
@@ -41,6 +41,44 @@ def _tags(fm: dict[str, Any]) -> list[str]:
     return [str(t) for t in tags]
 
 
+def _parse_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if value in (None, "", "null", "~", "None"):
+        return None
+    raw = str(value).strip().strip('"').strip("'")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+
+
+def _note_activity_date(path: Path, fm: dict[str, Any]) -> date:
+    for key in (
+        "tars-modified",
+        "tars-updated",
+        "tars-inbox-processed",
+        "tars-date",
+        "tars-created",
+        "updated",
+        "created",
+    ):
+        parsed = _parse_date(fm.get(key))
+        if parsed:
+            return parsed
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime).date()
+    except OSError:
+        return date.today()
+
+
 def _note_targets(note_p: Path, fm: dict[str, Any], vault_p: Path) -> set[str]:
     rel_no_ext = str(note_p.relative_to(vault_p).with_suffix("")).replace("\\", "/")
     targets = {note_p.stem, rel_no_ext}
@@ -75,10 +113,8 @@ def _scan_guardrails(vault_p: Path, note_p: Path, fm: dict[str, Any]) -> list[di
             continue
         if not _contains_wikilink(text, targets):
             continue
-        try:
-            modified_at = datetime.fromtimestamp(md.stat().st_mtime).astimezone()
-        except OSError:
-            modified_at = datetime.now().astimezone()
+        modified_date = _note_activity_date(md, other_fm or {})
+        modified_at = datetime.combine(modified_date, datetime.min.time()).astimezone()
         if modified_at >= cutoff:
             findings.append({
                 "type": "recent_backlink",
@@ -87,13 +123,43 @@ def _scan_guardrails(vault_p: Path, note_p: Path, fm: dict[str, Any]) -> list[di
             })
         other_tags = _tags(other_fm or {})
         other_status = str((other_fm or {}).get("tars-status", "")).lower()
-        if "tars/task" in other_tags and other_status in ("", "open", "active"):
+        if "tars/task" in other_tags and other_status in ("", "open", "active", "in-progress"):
             findings.append({
                 "type": "active_task_reference",
                 "file": str(rel),
                 "status": other_status or "open",
             })
     return findings
+
+
+def _archive_kind(note_p: Path, fm: dict[str, Any], vault_p: Path) -> str:
+    rel = str(note_p.relative_to(vault_p)).replace("\\", "/")
+    tags = set(_tags(fm))
+    if rel.startswith("inbox/"):
+        return "inbox"
+    if rel.startswith("tasks/") or rel.startswith("memory/tasks/") or "tars/task" in tags:
+        return "tasks"
+    if "tars/transcript" in tags or rel.startswith("archive/transcripts/"):
+        return "transcripts"
+    if "tars/person" in tags or rel.startswith("memory/people/"):
+        return "people"
+    if "tars/vendor" in tags or rel.startswith("memory/vendors/"):
+        return "vendors"
+    if "tars/competitor" in tags or rel.startswith("memory/competitors/"):
+        return "competitors"
+    if "tars/product" in tags or rel.startswith("memory/products/"):
+        return "products"
+    if "tars/initiative" in tags or rel.startswith("memory/initiatives/"):
+        return "initiatives"
+    if "tars/decision" in tags or rel.startswith("memory/decisions/"):
+        return "decisions"
+    if "tars/org-context" in tags or rel.startswith("memory/org-context/"):
+        return "org-context"
+    if rel.startswith("contexts/"):
+        return "contexts"
+    if rel.startswith("journal/"):
+        return "journal"
+    return "notes"
 
 
 def archive_note(**kwargs: Any) -> dict:
@@ -135,9 +201,10 @@ def archive_note(**kwargs: Any) -> dict:
             guardrails=guardrail_findings,
         )
 
-    # Determine target path: archive/YYYY-MM/<filename>
+    # Determine typed target path: archive/<kind>/YYYY-MM/<filename>
     today = date.today()
-    bucket = f"archive/{today.year:04d}-{today.month:02d}"
+    kind = _archive_kind(note_p, fm, vault_p)
+    bucket = f"archive/{kind}/{today.year:04d}-{today.month:02d}"
     target_rel = f"{bucket}/{note_p.name}"
     target_abs = vault_p / target_rel
     if target_abs.exists() and not force:

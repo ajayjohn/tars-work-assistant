@@ -18,6 +18,7 @@ REQUIRED_SYSTEM_FILES = [
     "guardrails.yaml",
     "maturity.yaml",
     "housekeeping-state.yaml",
+    "activity-ledger.yaml",
     "schemas.yaml",
     "config.md",
 ]
@@ -310,6 +311,7 @@ def main():
         "guardrails.yaml",
         "maturity.yaml",
         "housekeeping-state.yaml",
+        "activity-ledger.yaml",
     ]
     for fname in yaml_files:
         fpath = os.path.join(SYSTEM_DIR, fname)

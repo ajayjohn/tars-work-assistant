@@ -63,6 +63,7 @@ class FreshInstallSmokeTests(unittest.TestCase):
             "memory/initiatives",
             "memory/decisions",
             "memory/org-context",
+            "tasks",
             "journal",
             "contexts/artifacts",
             "archive/transcripts",

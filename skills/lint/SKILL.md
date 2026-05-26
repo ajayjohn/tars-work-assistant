@@ -74,6 +74,7 @@ Vault reads and writes use `mcp__tars_vault__*` tools. Deterministic checks call
 | Observed-vs-declared drift (`_system/user-model.md` differs from `_system/config.md`: e.g. observed `tars-bluf-tolerance: low` vs declared `tars-bluf-level: high`) | direct read of both notes | No | Surface; recommend `/learn --review-patterns` or a manual config edit |
 | User-model staleness (`tars-last-pattern-scan` empty or older than 14d AND there is recent telemetry) | `_system/user-model.md` frontmatter + telemetry mtimes | No | Propose `/learn --review-patterns` |
 | Workflows registry health (`_system/workflows.yaml` missing, schema-invalid, or contains entries whose `last_used` is null after 60d AND not pinned) | direct read of the registry | No | Surface for review |
+| Activity ledger freshness (`_system/activity-ledger.yaml` missing, null, or older than the last visible workspace activity) | `mcp__tars_vault__workspace_map` / `mcp__tars_vault__context_gaps` | Yes | Rebuild the derived capsule; no durable memory mutation |
 | Duplicate aliases (one alias → multiple canonical notes) | alias registry reverse-map | No | Surface for manual disambiguation |
 | Task age + escalation (sets `tars-age-days`, `tars-escalation-level`) | file mtime + `tars-due` vs today | Yes | Auto-update frontmatter; surface level-2 + level-3 for user review |
 | Task title backfill (one-time, TaskNotes compatibility) — gate `tasknotes_title_backfill_done` in `_system/housekeeping-state.yaml`. Scan all `tars/task` notes; for each missing `title`, derive from body H1 (preferred) or de-slugified filename, write via `update_frontmatter`. Set the gate after a clean pass. **Remove this check (and the gate key) in a later release once all installs have run it.** | `search_by_tag("tars/task")` + body H1 / filename | Yes | Auto-update frontmatter; no user prompt — pure derivation |
@@ -120,6 +121,8 @@ scripts/heal-wikilinks.py   --vault <TARS_VAULT_PATH> --json --dry-run
 mcp__tars_vault__search_by_tag(...)            # for tag-scoped link + orphan scans
 mcp__tars_vault__read_note(...)                # for targeted body inspection
 mcp__tars_vault__resolve_alias(...)            # for canonical-name resolution
+mcp__tars_vault__workspace_map(...)            # rebuilds _system/activity-ledger.yaml
+mcp__tars_vault__context_gaps(...)             # time/drift gaps for briefing + maintenance
 ```
 
 ### Step 4: Classify results

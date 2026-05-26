@@ -13,10 +13,14 @@ sys.path.insert(0, str(REPO / "mcp" / "tars-vault" / "src"))
 
 EXPECTED_TOOLS = {
     "append_note",
+    "archive_candidates",
     "archive_note",
     "classify_file",
+    "context_bundle",
+    "context_gaps",
     "create_note",
     "detect_near_duplicates",
+    "entity_timeline",
     "format_wikilink",
     "fts_search",
     "move_note",
@@ -32,6 +36,7 @@ EXPECTED_TOOLS = {
     "search_by_tag",
     "semantic_search",
     "update_frontmatter",
+    "workspace_map",
     "write_note_from_content",
 }
 
