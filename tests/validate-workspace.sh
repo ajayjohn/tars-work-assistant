@@ -7,10 +7,18 @@ FAIL=0
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1"; FAIL=1; }
 
+has_text() {
+  local needle="$1"
+  shift
+  rg -q --fixed-strings -- "$needle" "$@"
+}
+
 [ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
 [ -f commands/doctor.md ] && pass "/doctor command exists" || fail "/doctor command missing"
 [ -f skills/doctor/SKILL.md ] && pass "/doctor skill exists" || fail "/doctor skill missing"
-grep -q "Command groups" skills/core/SKILL.md && pass "core help grouped" || fail "core help groups missing"
+has_text "## Help routing" skills/core \
+  || has_text "### Command groups" skills/core \
+  && pass "core help grouped" || fail "core help groups missing"
 grep -q "skills/doctor/" skills/core/SKILL.md && pass "/doctor routed" || fail "/doctor route missing"
 grep -q -- "--continue-setup" skills/welcome/SKILL.md && pass "welcome continue setup documented" || fail "welcome continue setup missing"
 grep -q "Natural-language example" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && pass "generated index natural-language examples" || fail "index natural-language examples missing"
@@ -65,14 +73,17 @@ grep -q "Existing identity, memory, schedule, and integrations were left untouch
 
 grep -q "coaching:" _system/maturity.yaml && pass "maturity has coaching state" || fail "coaching state missing"
 grep -q "deferred_setup:" _system/maturity.yaml && pass "maturity has deferred setup state" || fail "deferred setup state missing"
-grep -q "Next useful thing" skills/briefing/SKILL.md && pass "briefing coaching slot" || fail "briefing coaching missing"
-grep -q -- "--continue-setup" skills/briefing/SKILL.md && pass "briefing deferred setup reminder" || fail "briefing deferred setup reminder missing"
+has_text "Next useful thing" skills/briefing \
+  && pass "briefing coaching slot" || fail "briefing coaching missing"
+has_text "--continue-setup" skills/briefing \
+  && pass "briefing deferred setup reminder" || fail "briefing deferred setup reminder missing"
 grep -q "Empty-workspace response" skills/answer/SKILL.md && pass "answer empty-workspace coaching" || fail "answer empty-workspace missing"
 grep -q "embedding model" skills/answer/SKILL.md && pass "FastEmbed warning" || fail "FastEmbed warning missing"
 
-grep -q "Degradation messaging convention" skills/core/SKILL.md && pass "degradation convention" || fail "degradation convention missing"
+has_text "Degradation messaging convention" skills/core \
+  && pass "degradation convention" || fail "degradation convention missing"
 for s in answer briefing meeting tasks create maintain; do
-  grep -qi "degradation messaging convention" "skills/$s/SKILL.md" \
+  has_text "degradation messaging convention" "skills/$s" \
     && pass "$s references degradation convention" \
     || fail "$s missing degradation convention"
 done
