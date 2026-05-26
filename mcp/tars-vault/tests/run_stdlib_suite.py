@@ -1,33 +1,48 @@
 """Deterministic stdlib-only MCP test runner.
 
-Used by the regression suite when `pytest` is unavailable. This avoids relying
-on `unittest discover` behavior that can vary across environments while still
-covering the intended MCP helper tests.
+Used by the regression suite when `pytest` is unavailable. It executes the
+existing standalone test entrypoints in subprocesses instead of importing them
+in-process, which keeps path and environment behavior aligned with the way the
+tests are documented to run.
 """
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
-import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+TESTS = ROOT / "tests"
+FIXTURE_VAULT = TESTS / "fixtures" / "fixture-vault"
 
-import test_search_index  # noqa: E402
-import test_skeleton  # noqa: E402
-import test_tools  # noqa: E402
+
+def _run_script(path: Path) -> int:
+    env = os.environ.copy()
+    env.setdefault("TARS_VAULT_PATH", str(FIXTURE_VAULT))
+    print(f"==> {path.name}")
+    proc = subprocess.run(
+        [sys.executable, str(path)],
+        cwd=str(ROOT),
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    if proc.stdout:
+        print(proc.stdout, end="")
+    if proc.stderr:
+        print(proc.stderr, end="", file=sys.stderr)
+    if proc.returncode != 0:
+        print(f"FAILED {path.name} (rc={proc.returncode})", file=sys.stderr)
+    return proc.returncode
 
 
 def main() -> int:
-    suite = unittest.TestLoader().loadTestsFromTestCase(test_tools.ToolTests)
-    result = unittest.TextTestRunner(verbosity=2).run(suite)
-    if not result.wasSuccessful():
-        return 1
-    if test_skeleton.run() != 0:
-        return 1
-    if test_search_index.run() != 0:
-        return 1
+    for name in ("test_tools.py", "test_skeleton.py", "test_search_index.py"):
+        rc = _run_script(TESTS / name)
+        if rc != 0:
+            return rc
     return 0
 
 
