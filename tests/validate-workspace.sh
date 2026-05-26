@@ -10,7 +10,11 @@ fail() { echo "FAIL  $1"; FAIL=1; }
 has_text() {
   local needle="$1"
   shift
-  rg -q --fixed-strings -- "$needle" "$@"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q --fixed-strings -- "$needle" "$@"
+  else
+    grep -R -F -q -- "$needle" "$@"
+  fi
 }
 
 [ -f commands/help.md ] && pass "/help command exists" || fail "/help command missing"
