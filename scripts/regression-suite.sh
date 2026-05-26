@@ -86,7 +86,7 @@ if [[ -x "$VENV_PYTHON" ]]; then
 elif "$PYTHON_BIN" -c "import pytest" >/dev/null 2>&1; then
     run_layer "L2 mcp pytest" "( cd mcp/tars-vault && $PYTHON_BIN -m pytest tests/ -q )"
 else
-    run_layer "L2 mcp tests (stdlib)" "( cd mcp/tars-vault && $PYTHON_BIN -m unittest discover -s tests -v )"
+    run_layer "L2 mcp tests (stdlib)" "( cd mcp/tars-vault && $PYTHON_BIN tests/run_stdlib_suite.py )"
 fi
 
 run_layer "L3 scenarios" \
