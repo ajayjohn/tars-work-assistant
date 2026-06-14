@@ -73,6 +73,7 @@ _system/
   taxonomy.md
   kpis.md
   schedule.md
+  extensions.yaml
   guardrails.yaml
   maturity.yaml
   housekeeping-state.yaml
@@ -99,6 +100,7 @@ contexts/
   products/
   artifacts/
   YYYY-MM/
+extensions/
 inbox/pending/
 inbox/processed/
 archive/transcripts/YYYY-MM/
@@ -113,6 +115,8 @@ Key runtime notes:
 - `memory/` stores durable entity knowledge
 - `journal/` stores dated outputs such as meeting notes and briefings
 - `contexts/` stores deep reference material and generated artifacts
+- `extensions/` stores workspace-installed provider adapters, workflow playbooks,
+  template packs, retrieval packs, and validation packs
 - `inbox/` is raw intake, not durable knowledge by itself
 - `archive/transcripts/` preserves transcript text for future lookup and verification
 - `_system/activity-ledger.yaml` is a tiny derived state capsule for startup and adaptive briefing
@@ -162,6 +166,8 @@ The `mcp/tars-vault/` Python local helper sits between every skill and the works
 - read system files through `read_system_file`, with YAML parsed into structured data and traversal blocked
 - classify files and detect near-duplicates for the Organization Engine
 - resolve capabilities against `_system/tools-registry.yaml` (populated by `SessionStart`)
+- resolve and read workspace-installed extensions from `extensions/` through
+  `_system/extensions.yaml`
 - expose FTS5 + semantic retrieval + deterministic rerank
 - expose navigation tools (`workspace_map`, `context_gaps`, `entity_timeline`, `context_bundle`, `archive_candidates`) for bounded context packs without making a database mandatory
 
@@ -190,6 +196,19 @@ Hybrid retrieval, built by `scripts/build-search-index.py` and served from `mcp/
 
 Every skill resolves integrations through `mcp__tars_vault__resolve_capability(capability=…)` and uses whatever MCP tool the registry returns. No hardcoded server names anywhere.
 
+### Extension layer (proposed)
+
+TARS should support provider adapters, workflow extensions, template packs,
+retrieval packs, and validation packs as subordinate modules loaded by canonical
+core skills at explicit extension points. The design keeps plugin skills and
+framework code in the dynamic plugin root, while all installed extensions live
+under the recorded workspace root. Curated extensions hosted in the TARS GitHub
+repository are installed into the workspace before use, so default commands can
+use third-party tools without turning TARS itself into a vendor-specific
+framework or mixing plugin and workspace paths. See [EXTENSIONS.md](EXTENSIONS.md)
+for the proposed path model, manifest contract, registry, resolver tools, and
+migration plan.
+
 ### Office output layer
 
 `/create` orchestrates office output but does NOT render. Rendering delegates to Anthropic's first-party skills — `pptx`, `docx`, `xlsx`, `pdf`, `web-artifacts-builder`. `/create`'s responsibilities:
@@ -208,6 +227,8 @@ TARS ships zero office-rendering Python libraries. The `templates/office/` folde
 - `schemas.yaml` defines allowed TARS note shapes (v3.1 adds `tars-blocked-by`, `tars-age-days`, `tars-escalation-level` on tasks; `tars-brand` / `tars-draft-status` on context-artifacts; full companion-note super-set)
 - `alias-registry.md` resolves names and alternate forms
 - `integrations.md` records capability preferences (v3.1 format, `tars-config-version: "2.0"`)
+- `extensions.yaml` records enabled workspace-installed extensions and their
+  workspace-relative paths
 - `tools-registry.yaml` is the auto-discovered live tool roster (24h TTL)
 - `guardrails.yaml` drives secret and negative-sentiment scans, including common Slack, GitHub, Stripe, Twilio, SendGrid, Google, OpenAI, and Anthropic token patterns
 - `housekeeping-state.yaml` + `maturity.yaml` track maintenance cadence and live hydration counts

@@ -169,6 +169,12 @@ def validate_required_tool_surface() -> None:
         "semantic_search",
         "runtime_info",
         "resolve_alias",
+        "list_extensions",
+        "validate_extension",
+        "resolve_extension",
+        "read_extension",
+        "scaffold_extension",
+        "install_extension",
     }
     missing = sorted(required - set(TOOL_SCHEMAS))
     if missing:

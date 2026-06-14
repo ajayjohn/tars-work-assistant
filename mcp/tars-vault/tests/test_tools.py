@@ -29,16 +29,22 @@ from tars_vault.tools.context_gaps import context_gaps
 from tars_vault.tools.create_note import create_note
 from tars_vault.tools.detect_near_duplicates import detect_near_duplicates
 from tars_vault.tools.entity_timeline import entity_timeline
+from tars_vault.tools.install_extension import install_extension
+from tars_vault.tools.list_extensions import list_extensions
 from tars_vault.tools.move_note import move_note
+from tars_vault.tools.read_extension import read_extension
 from tars_vault.tools.read_note import read_note
 from tars_vault.tools.read_system_file import read_system_file
 from tars_vault.tools.resolve_alias import resolve_alias
 from tars_vault.tools.resolve_capability import resolve_capability
+from tars_vault.tools.resolve_extension import resolve_extension
 from tars_vault.tools.runtime_info import runtime_info
 from tars_vault.tools.scan_secrets import scan_secrets
+from tars_vault.tools.scaffold_extension import scaffold_extension
 from tars_vault.tools.scaffold_workspace import scaffold_workspace
 from tars_vault.tools.search_by_tag import search_by_tag
 from tars_vault.tools.update_frontmatter import update_frontmatter
+from tars_vault.tools.validate_extension import validate_extension
 from tars_vault.tools.workspace_map import workspace_map
 from tars_vault.tools.write_note_from_content import write_note_from_content
 from tars_vault.server import _call_handler_sync
@@ -89,9 +95,11 @@ class ToolTests(unittest.TestCase):
             "tasks",
             "journal",
             "archive/transcripts",
+            "extensions",
         ]:
             self.assertTrue((workspace / rel).is_dir(), rel)
         self.assertTrue((workspace / "_system" / "activity-ledger.yaml").is_file())
+        self.assertTrue((workspace / "_system" / "extensions.yaml").is_file())
         self.assertTrue((workspace / "index.md").is_file())
         index = (workspace / "index.md").read_text()
         self.assertIn("Slash commands are optional shortcuts", index)
@@ -443,6 +451,109 @@ class ToolTests(unittest.TestCase):
         r = resolve_capability(vault=str(self.vault), capability="calendar")
         self.assertEqual(r["status"], "ok")
         self.assertEqual(r["server"], "workiq")
+
+    # --- extensions ---
+
+    def test_scaffold_extension_registers_workspace_extension(self) -> None:
+        r = scaffold_extension(
+            vault=str(self.vault),
+            extension_id="meeting-recording.example",
+            name="Example Recording Adapter",
+            type="provider-adapter",
+            capability="meeting-recording",
+            skills=["maintain", "meeting"],
+            modes=["inbox", "sync"],
+            enable=True,
+        )
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["path"], "extensions/meeting-recording.example")
+        registry = (self.vault / "_system" / "extensions.yaml").read_text()
+        self.assertIn("root: workspace", registry)
+        self.assertIn("path: extensions/meeting-recording.example", registry)
+
+        listed = list_extensions(vault=str(self.vault))
+        self.assertEqual(listed["status"], "ok")
+        self.assertEqual(len(listed["extensions"]), 1)
+        self.assertTrue(listed["extensions"][0]["valid"])
+
+        resolved = resolve_extension(
+            vault=str(self.vault),
+            skill="maintain",
+            mode="inbox",
+            capability="meeting-recording",
+        )
+        self.assertEqual(resolved["status"], "ok")
+        self.assertEqual(resolved["selected"]["id"], "meeting-recording.example")
+        self.assertEqual(resolved["selected"]["root"], "workspace")
+
+        read = read_extension(vault=str(self.vault), extension_id="meeting-recording.example")
+        self.assertEqual(read["status"], "ok")
+        self.assertIn("Example Recording Adapter", read["content"])
+
+        valid = validate_extension(vault=str(self.vault), extension_id="meeting-recording.example")
+        self.assertEqual(valid["status"], "ok")
+        self.assertTrue(valid["valid"])
+
+    def test_validate_extension_rejects_plugin_root_path(self) -> None:
+        (self.vault / "_system" / "extensions.yaml").write_text(
+            "version: \"1\"\n"
+            "extensions:\n"
+            "  bad.plugin:\n"
+            "    enabled: true\n"
+            "    source: catalog\n"
+            "    root: workspace\n"
+            "    path: /tmp/plugin/extensions/bad.plugin\n"
+        )
+        r = list_extensions(vault=str(self.vault))
+        self.assertEqual(r["status"], "ok")
+        self.assertFalse(r["extensions"][0]["valid"])
+        self.assertIn("workspace-relative", r["extensions"][0]["errors"][0])
+        read = read_extension(vault=str(self.vault), extension_id="bad.plugin")
+        self.assertEqual(read["status"], "error")
+
+    def test_install_extension_copies_source_into_workspace(self) -> None:
+        source = self.vault / "source-extension"
+        source.mkdir()
+        (source / "extension.yaml").write_text(
+            "id: meeting-recording.catalog-demo\n"
+            "name: Catalog Demo\n"
+            "version: \"1.0.0\"\n"
+            "tars_extension_version: \"1\"\n"
+            "type: provider-adapter\n"
+            "capabilities:\n"
+            "  - meeting-recording\n"
+            "applies_to:\n"
+            "  skills:\n"
+            "    - maintain\n"
+            "  modes:\n"
+            "    - inbox\n"
+            "entrypoints:\n"
+            "  instructions: instructions.md\n"
+            "safety:\n"
+            "  requires_review: true\n"
+            "  may_write_workspace: false\n"
+            "  may_mutate_external_provider: false\n"
+        )
+        (source / "instructions.md").write_text("# Catalog Demo\n")
+        r = install_extension(
+            vault=str(self.vault),
+            source_path=str(source),
+            source="catalog",
+            enable=True,
+        )
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["path"], "extensions/meeting-recording.catalog-demo")
+        self.assertTrue((self.vault / "extensions" / "meeting-recording.catalog-demo" / "extension.yaml").is_file())
+        registry = (self.vault / "_system" / "extensions.yaml").read_text()
+        self.assertIn("source: catalog", registry)
+        self.assertNotIn(str(source), registry)
+
+    def test_server_exposes_extension_tools_and_rejects_unknown_args(self) -> None:
+        r = _call_handler_sync("list_extensions", {"vault": str(self.vault)}, "")
+        self.assertEqual(r["status"], "ok")
+        bad = _call_handler_sync("list_extensions", {"vault": str(self.vault), "plugin_root": "/tmp/plugin"}, "")
+        self.assertEqual(bad["status"], "error")
+        self.assertIn("unknown argument", bad["reason"])
 
     # --- secrets ---
 
