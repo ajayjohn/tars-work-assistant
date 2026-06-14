@@ -11,6 +11,7 @@ The build model is:
 - `.claude-plugin/plugin.json` is the metadata source of truth
 - `build-plugin.sh` assembles the distributable plugin tree
 - the packaged plugin is meant for installation, not for authoring
+- extensions are runtime workspace artifacts, not plugin-root runtime assets
 
 ## What the root build script packages
 
@@ -29,6 +30,11 @@ The root build script currently creates `tars-cowork-plugin/` and copies:
 - `requirements-search.txt`
 - `.claude-plugin/mcp-servers.json`
 - `.mcp.json` when present
+
+The build script does not package workspace-installed extensions into the plugin
+root. Curated extension sources may live in the repository for catalog and
+release purposes, but installation copies or syncs them into the user's
+workspace under `extensions/` and records them in `_system/extensions.yaml`.
 
 It also:
 - generates a minimal distribution `plugin.json`
@@ -67,8 +73,10 @@ Repository source includes:
 - documentation
 - tests
 - helper and compatibility files not required in the install artifact
+- optional extension catalog sources, when present
 
 Distribution output includes only what the installed framework needs to run.
+It must not rely on extensions being present under the plugin root.
 
 ## Versioning
 
