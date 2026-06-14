@@ -91,7 +91,7 @@ Put raw files in `inbox/pending/` and say "process inbox" or run `/maintain inbo
 
 The plugin/workspace boundary is strict: plugin-shipped skills are read-only from a user's perspective, and any auto-created or user-tunable behavior lives in the workspace (`_system/install.yaml`, `_system/extensions.yaml`, `_system/user-model.md`, `_system/workflows.yaml`, `extensions/`).
 
-Existing workspaces do not need a manual migration for `3.6.0`. The first `/briefing` or `/lint` rebuilds the derived activity ledger; legacy `memory/tasks/` notes remain readable while new task workflows continue to use `tasks/`.
+Existing workspaces do not need a manual migration for `3.7.0`. The first `/briefing` or `/lint` rebuilds the derived activity ledger; legacy `memory/tasks/` notes remain readable while new task workflows continue to use `tasks/`. Workspace extensions are installed under `extensions/` when first used.
 
 ## Quick start
 

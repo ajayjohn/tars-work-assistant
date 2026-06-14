@@ -15,7 +15,7 @@ You need:
 Markdown files are plain text files you can open in any text editor. If you do
 not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
-If you are starting fresh, create an empty folder. This branch supports fresh v3.6 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
+If you are starting fresh, create an empty folder. This branch supports fresh v3.7 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
 
 ## Installation
 
@@ -231,10 +231,11 @@ When transcripts are processed, the raw text should remain available through arc
 
 ## Upgrading an existing workspace
 
-`3.6.0` does not require a manual migration script.
+`3.7.0` does not require a manual migration script.
 
 After installing the updated build:
 - run `/briefing` or `/lint` once so TARS rebuilds `_system/activity-ledger.yaml`
+- extension-enabled workflows will use `extensions/` and `_system/extensions.yaml`; older workspaces can add those lazily when the first extension is installed
 - keep using your existing workspace path; `install.yaml` and schedule state remain valid
 - no task migration is required; legacy `memory/tasks/` notes are still readable, while active task workflows continue to use `tasks/`
 - if you rely on scheduled jobs, it is worth running `/maintain` or `/welcome --setup-schedules` once so the new version is the one refreshing notices and weekly review behavior

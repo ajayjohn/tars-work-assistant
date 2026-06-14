@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.6 Architecture
+# TARS 3.7 Architecture
 
-This document describes the current framework architecture as of v3.6, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
+This document describes the current framework architecture as of v3.7, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
 
-**Version**: 3.6.0
-**Release**: 2026-05-26 — see `CHANGELOG.md`
+**Version**: 3.7.0
+**Release**: 2026-06-14 — see `CHANGELOG.md`
 
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
@@ -277,7 +277,23 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace and `_system/` seeds
 
-## What's new in v3.6
+## What's new in v3.7
+
+- **Workspace extension layer.** Provider adapters, workflow playbooks, template
+  packs, retrieval packs, and validation packs now have a workspace-only runtime
+  model. Installed extensions live under `extensions/` and are registered in
+  `_system/extensions.yaml`; plugin-root extension loading is intentionally not
+  supported.
+- **Extension resolver tools.** The local helper exposes `list_extensions`,
+  `validate_extension`, `resolve_extension`, `read_extension`,
+  `scaffold_extension`, and `install_extension` so core skills can load
+  extension instructions through a path-safe boundary.
+- **Extension path invariants.** Catalog extensions from the TARS repository are
+  copied into the workspace before use. Registry entries store
+  workspace-relative paths only, and tests reject absolute or plugin-root
+  extension paths.
+
+## What was new in v3.6
 
 - **Harness-first prompt architecture.** Core, briefing, meeting, maintain, learn, think, and ideate now use compact router cards plus mode-specific references instead of loading long workflow manuals by default. A harness-budget validator prevents those always-loaded cards from growing back into mega-prompts.
 - **Natural-language-first routing.** Slash commands remain compatibility shortcuts, but help and core routing now frame work as workflows: prepare my day, catch me up, process a meeting, remember this, draft a message, create an artifact, and clean up the workspace.
