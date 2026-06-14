@@ -15,6 +15,7 @@ TARS is built around a few core ideas:
 - Meetings run a nuance-capture pass after summarization — contrarian views, quotes, numbers, unusual terms are preserved verbatim.
 - The inbox is a first-class intake path: drop transcripts, PDFs, decks, docs, screenshots, exports, or rough notes into `inbox/pending/` and ask TARS to process the inbox in bulk.
 - Integrations are provider-agnostic: skills resolve a capability (calendar, tasks, meeting-recording, data-warehouse, analytics, design, documentation, project-tracker, etc.) and the registry picks the active server.
+- Extensions are workspace-installed modules for provider adapters, workflow playbooks, template packs, retrieval packs, and validators; even curated catalog extensions are copied into the user's workspace before use.
 - Office output (`.pptx`, `.docx`, `.xlsx`, `.pdf`, HTML) delegates to Anthropic's first-party rendering skills; TARS owns content structuring, brand application, companion notes, and workspace filing.
 - Tasks and durable memory always go through review before persistence.
 - Cold-start friction is addressed by progressive `/welcome`, seven onboarding personas, and graceful degradation when integrations are missing.
@@ -76,6 +77,7 @@ _system/               Runtime config, install state, maturity, schemas, guardra
 memory/                Durable knowledge graph
 journal/               Skill outputs and dated notes
 contexts/              Deep reference material and generated artifacts
+extensions/            Workspace-installed TARS extensions
 inbox/pending/         Raw intake waiting for processing (incl. weekly review queues)
 inbox/processed/       Processed intake awaiting later maintenance
 tasks/                 Current task-note location
@@ -87,9 +89,9 @@ index.md               Cheat sheet and natural-language workflow guide
 
 Put raw files in `inbox/pending/` and say "process inbox" or run `/maintain inbox`. TARS inventories the folder, classifies each item, routes it to the right workflow, proposes memory/tasks for review, writes durable context, and moves processed items to `inbox/processed/`.
 
-The plugin/workspace boundary is strict: plugin-shipped skills are read-only from a user's perspective, and any auto-created or user-tunable behavior lives in the workspace (`_system/install.yaml`, `_system/user-model.md`, `_system/workflows.yaml`).
+The plugin/workspace boundary is strict: plugin-shipped skills are read-only from a user's perspective, and any auto-created or user-tunable behavior lives in the workspace (`_system/install.yaml`, `_system/extensions.yaml`, `_system/user-model.md`, `_system/workflows.yaml`, `extensions/`).
 
-Existing workspaces do not need a manual migration for `3.6.0`. The first `/briefing` or `/lint` rebuilds the derived activity ledger; legacy `memory/tasks/` notes remain readable while new task workflows continue to use `tasks/`.
+Existing workspaces do not need a manual migration for `3.7.0`. The first `/briefing` or `/lint` rebuilds the derived activity ledger; legacy `memory/tasks/` notes remain readable while new task workflows continue to use `tasks/`. Workspace extensions are installed under `extensions/` when first used.
 
 ## Quick start
 

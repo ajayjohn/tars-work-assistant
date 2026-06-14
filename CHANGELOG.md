@@ -1,5 +1,24 @@
 # Changelog
 
+
+## v3.7.0 (2026-06-14)
+
+### Added
+
+- **Workspace extension foundation.** TARS now has a workspace-only extension model for provider adapters, workflow playbooks, template packs, retrieval packs, and validation packs. Extensions live under `extensions/` in the user's workspace and are tracked by `_system/extensions.yaml`; the plugin root remains reserved for canonical framework code.
+- **Extension helper tools.** `tars-vault` now exposes `list_extensions`, `validate_extension`, `resolve_extension`, `read_extension`, `scaffold_extension`, and `install_extension` so core skills can discover and load extensions through a deterministic path-safe boundary.
+- **Extension architecture guide.** New `docs/EXTENSIONS.md` defines the path model, manifest contract, registry shape, resolver contract, conflict rules, authoring flow, and catalog-installation model.
+
+### Changed
+
+- **Fresh workspaces include extension state.** `/welcome` scaffolding now creates `extensions/` and `_system/extensions.yaml` so extension discovery never searches the local machine or infers paths from the dynamic plugin root.
+- **Documentation and release guidance describe extensions.** README, Getting Started, Architecture, Catalog, Build, and command reference docs now explain when to use workspace extensions instead of adding new plugin skills or commands.
+
+### Fixed
+
+- **Plugin/workspace path separation is test-covered for extensions.** New tests reject plugin-root or absolute extension paths, require workspace-relative registry entries, and validate that catalog-installed extensions are copied into the workspace before use.
+
+
 ## v3.6.0 (2026-05-26)
 
 ### Added

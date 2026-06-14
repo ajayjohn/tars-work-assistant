@@ -207,6 +207,85 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["capability"],
         },
     },
+    "list_extensions": {
+        "description": "List workspace-installed TARS extensions and validation status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+            },
+        },
+    },
+    "validate_extension": {
+        "description": "Validate a workspace extension manifest and path boundaries.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "extension_id": {"type": "string"},
+                "id": {"type": "string", "description": "Compatibility alias for extension_id."},
+                "path": {"type": "string", "description": "Workspace-relative path under extensions/."},
+            },
+        },
+    },
+    "resolve_extension": {
+        "description": "Resolve enabled workspace extensions for a core skill/mode/capability/provider.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "skill": {"type": "string"},
+                "mode": {"type": "string"},
+                "capability": {"type": "string"},
+                "provider": {"type": "string"},
+                "tool_names": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    "read_extension": {
+        "description": "Read an approved entrypoint file from a registered workspace extension.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "extension_id": {"type": "string"},
+                "id": {"type": "string", "description": "Compatibility alias for extension_id."},
+                "file": {"type": "string", "description": "Extension-relative file. Defaults to instructions entrypoint."},
+                "max_chars": {"type": "integer"},
+            },
+        },
+    },
+    "scaffold_extension": {
+        "description": "Create a disabled workspace extension skeleton and registry entry.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "extension_id": {"type": "string"},
+                "id": {"type": "string", "description": "Compatibility alias for extension_id."},
+                "name": {"type": "string"},
+                "type": {"type": "string"},
+                "capability": {"type": "string"},
+                "skills": {"type": "array", "items": {"type": "string"}},
+                "modes": {"type": "array", "items": {"type": "string"}},
+                "enable": {"type": "boolean"},
+                "overwrite": {"type": "boolean"},
+            },
+        },
+    },
+    "install_extension": {
+        "description": "Copy an extension source directory into workspace extensions/ and register it.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_COMMON_VAULT,
+                "source_path": {"type": "string"},
+                "source": {"type": "string", "description": "Install provenance label such as local or catalog."},
+                "enable": {"type": "boolean"},
+            },
+            "required": ["source_path"],
+        },
+    },
     "resolve_alias": {
         "description": "Resolve an alias, abbreviation, or short name to a canonical TARS record.",
         "inputSchema": {
@@ -404,8 +483,10 @@ WRITE_TOOLS = {
     "append_note",
     "archive_note",
     "create_note",
+    "install_extension",
     "move_note",
     "refresh_integrations",
+    "scaffold_extension",
     "scaffold_workspace",
     "update_frontmatter",
     "write_note_from_content",

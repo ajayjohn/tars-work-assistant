@@ -38,6 +38,7 @@ DIRECTORIES = [
     "contexts/products",
     "contexts/artifacts",
     "contexts/brand",
+    "extensions",
     "inbox",
     "inbox/pending",
     "inbox/processed",
@@ -284,6 +285,15 @@ context_gaps: []
 """
 
 
+def _extensions_yaml() -> str:
+    return """# TARS workspace extension registry.
+# Extensions are installed into this workspace under extensions/.
+# Plugin-root paths must never be recorded here.
+version: "1"
+extensions: {}
+"""
+
+
 def scaffold_workspace(**kwargs: Any) -> dict:
     vault = kwargs.get("vault")
     if not vault:
@@ -332,6 +342,7 @@ def scaffold_workspace(**kwargs: Any) -> dict:
             {"tags": ["tars/system"], "tars-created": now_date},
             "# Integration registry\n\nCalendar and task integrations are not configured yet.\n",
         ),
+        "_system/extensions.yaml": _extensions_yaml(),
         "_system/alias-registry.md": "# Alias registry\n\n| Alias | Canonical note | Type | Confidence |\n|---|---|---|---|\n",
         "_system/taxonomy.md": "# TARS taxonomy\n\nStarter taxonomy for people, initiatives, decisions, tasks, inbox, and journal entries.\n",
         "_system/kpis.md": "# KPIs\n\nAdd team, product, and initiative metrics here when useful.\n",

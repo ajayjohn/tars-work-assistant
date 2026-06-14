@@ -33,6 +33,7 @@ grep -q "workspace_path" templates/install.yaml && pass "install has workspace_p
 grep -q "obsidian_enabled" templates/install.yaml && pass "install has obsidian flag" || fail "install missing obsidian flag"
 grep -q "workspace_path" hooks/_common.py && pass "hooks read workspace_path" || fail "hooks not workspace-aware"
 grep -q "workspace_path" mcp/tars-vault/src/tars_vault/server.py && pass "server checks workspace_path" || fail "server not workspace-aware"
+grep -q "\"extensions\"" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && grep -q "_system/extensions.yaml" mcp/tars-vault/src/tars_vault/tools/scaffold_workspace.py && pass "scaffold seeds workspace extensions" || fail "workspace extension scaffold missing"
 grep -q "scaffold_workspace" mcp/tars-vault/src/tars_vault/server.py && pass "server exposes scaffold_workspace" || fail "scaffold_workspace schema missing"
 grep -q "mcp__tars_vault__scaffold_workspace" skills/welcome/SKILL.md && pass "welcome uses deterministic scaffold" || fail "welcome does not use scaffold tool"
 grep -q "What should TARS know to personalize" skills/welcome/SKILL.md && pass "welcome asks identity essentials" || fail "welcome identity prompt missing"

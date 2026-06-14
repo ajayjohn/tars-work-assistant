@@ -25,6 +25,8 @@ TARS is intentionally opinionated about how a long-lived assistant should work:
 - transcript archives are first-class retrieval assets
 - `inbox/pending/` is the bulk intake surface for transcripts, PDFs, decks, docs, screenshots, exports, and rough notes
 - tasks and memory go through explicit review before persistence
+- extensions are installed into the user's workspace, so provider-specific
+  adapters and reusable playbooks stay outside the core plugin runtime
 - schemas, guardrails, aliasing, and maintenance state live in `_system/`
 
 The result is a framework that is stable for months-long use, especially when the workspace accumulates hundreds or low-thousands of journal entries, transcripts, and memory notes and the harder problem becomes time drift rather than raw file count.
@@ -78,6 +80,21 @@ TARS maintains a tiny derived state capsule, `_system/activity-ledger.yaml`, and
 
 TARS supports structured strategic analysis, stakeholder-aware drafting, initiative planning, and artifact creation while grounding those outputs in what the workspace already knows.
 
+### Workspace extensions
+
+TARS can load workspace-installed extensions through explicit extension points
+owned by core workflows. Extensions cover provider adapters, workflow playbooks,
+template packs, retrieval packs, and validation packs. They live under
+`extensions/` in the user's workspace and are tracked by
+`_system/extensions.yaml`; the plugin root remains reserved for canonical TARS
+skills, commands, hooks, and helper code.
+
+Curated extensions hosted in the TARS repository are catalog sources. Installing
+one copies it into the workspace before use, which keeps the same runtime model
+for catalog-provided and user-authored extensions. Core workflows still own
+review gates and persistence, so extensions can propose behavior without
+bypassing TARS safety rules.
+
 ### Persona-driven cold start (v3.2)
 
 Onboarding is built around seven role personas — Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Engineer, Support / Ops Lead, Engineering Manager. Each persona seeds role-aware briefing layout, BLUF level, default analysis mode, review-gate strictness, and starter taxonomy tags so the day-1 briefing is useful instead of empty.
@@ -121,6 +138,7 @@ The public framework includes:
 - slash-command wrappers
 - canonical templates
 - system defaults
+- workspace extension architecture and helper tools
 - live views
 - deterministic maintenance scripts
 - documentation for setup, architecture, release, and contribution

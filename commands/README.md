@@ -45,3 +45,15 @@ guarantee slash-command availability today.
 2. Add a matching wrapper file in `commands/` (3 lines of body, following
    the pattern of the existing wrappers in this folder).
 3. Update the mapping table above.
+
+## Adding an extension instead
+
+Most third-party tool behavior should not become a new command. Provider
+adapters, workflow playbooks, template packs, retrieval packs, and validation
+packs belong in workspace extensions under `extensions/`, registered through
+`_system/extensions.yaml`. Core commands such as `/maintain`, `/meeting`,
+`/create`, `/answer`, `/briefing`, and `/lint` stay responsible for routing,
+review gates, and persistence.
+
+Use a command only when TARS needs a new top-level workflow. Use an extension
+when an existing workflow needs provider-specific or domain-specific guidance.

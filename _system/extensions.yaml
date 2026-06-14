@@ -1,0 +1,5 @@
+# TARS workspace extension registry.
+# Extensions are installed into this workspace under extensions/.
+# Plugin-root paths must never be recorded here.
+version: "1"
+extensions: {}

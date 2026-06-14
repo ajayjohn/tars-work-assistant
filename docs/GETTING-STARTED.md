@@ -15,7 +15,7 @@ You need:
 Markdown files are plain text files you can open in any text editor. If you do
 not know what Obsidian is, leave it disabled during setup. You can turn it on later.
 
-If you are starting fresh, create an empty folder. This branch supports fresh v3.6 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
+If you are starting fresh, create an empty folder. This branch supports fresh v3.7 workspaces; legacy v3.0-v3.3 migration tooling is no longer part of the active framework.
 
 ## Installation
 
@@ -42,7 +42,7 @@ TARS does NOT bundle any office-rendering libraries. Office output in `/create` 
 
 The plugin ships the local TARS helper configuration. In code checkout flows, set `TARS_VAULT_PATH` in your shell or IDE environment to point at your workspace before starting Claude Code, so the helper knows where to operate. The helper fails closed when it cannot resolve a real TARS workspace; it will not silently use a random current directory.
 
-The repository contains the framework source. The folder you point TARS at is the live runtime workspace.
+The repository contains the framework source. The folder you point TARS at is the live runtime workspace. Claude exposes the current plugin package location through `${CLAUDE_PLUGIN_ROOT}` for framework hooks and helper scripts, but that path is dynamic and is not used for workspace extensions. Extensions always live under the recorded workspace path in `extensions/` and are tracked by `_system/extensions.yaml`.
 
 If setup behaves strangely, run the lightweight doctor from the framework checkout:
 
@@ -62,6 +62,7 @@ The welcome flow:
 - asks you to **pick a persona** (Product Leader, Sales / Customer-Facing, Delivery / PM, Data Science Lead, Architect / Staff Eng, Support / Ops Lead, Engineering Manager) so day-1 briefings are role-aware instead of empty
 - creates the TARS workspace structure
 - writes `_system/` files (including `install.yaml`), templates, scripts, `index.md`, and optional Obsidian views only when Obsidian mode is enabled
+- creates `extensions/` plus `_system/extensions.yaml` so provider adapters and other extension packs have one safe workspace-owned location
 - records the live plugin version in install and housekeeping state so fresh workspaces do not see false migration prompts
 - captures your initial profile
 - asks you to paste or upload a meeting transcript, PDF/report excerpt, email thread, or rough notes so TARS can preview extraction into memory candidates, journal notes, and tasks
@@ -82,6 +83,7 @@ _system/
 memory/
 journal/
 contexts/
+extensions/
 inbox/pending/
 inbox/processed/
 archive/transcripts/
@@ -229,10 +231,11 @@ When transcripts are processed, the raw text should remain available through arc
 
 ## Upgrading an existing workspace
 
-`3.6.0` does not require a manual migration script.
+`3.7.0` does not require a manual migration script.
 
 After installing the updated build:
 - run `/briefing` or `/lint` once so TARS rebuilds `_system/activity-ledger.yaml`
+- extension-enabled workflows will use `extensions/` and `_system/extensions.yaml`; older workspaces can add those lazily when the first extension is installed
 - keep using your existing workspace path; `install.yaml` and schedule state remain valid
 - no task migration is required; legacy `memory/tasks/` notes are still readable, while active task workflows continue to use `tasks/`
 - if you rely on scheduled jobs, it is worth running `/maintain` or `/welcome --setup-schedules` once so the new version is the one refreshing notices and weekly review behavior
