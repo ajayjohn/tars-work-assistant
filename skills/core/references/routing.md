@@ -11,8 +11,14 @@ shortcuts for power users and tests.
 3. Match the user's work intent before matching command syntax.
 4. If workflow aliases exist in `_system/workflows.yaml`, use them only when
    they clearly match the request.
-5. If genuinely ambiguous, ask one bounded question.
-6. If no route matches, use `answer`.
+5. Determine the target skill and mode.
+6. Run mandatory extension pre-flight:
+   `list_extensions` → `resolve_extension(skill=<target>, mode=<mode>)` →
+   `read_extension` for matches. Treat extension "When To Load" triggers as a
+   contract against the current user-facing intent, then resolve capabilities
+   declared by matched extensions before the target workflow begins.
+7. If genuinely ambiguous, ask one bounded question.
+8. If no route matches, use `answer`.
 
 ## Workflow-first help labels
 
@@ -33,4 +39,3 @@ Use these labels in `/help` and onboarding:
 | Plan or check an initiative | initiative |
 | Clean up stale or broken workspace state | lint / maintain |
 | Set up or diagnose TARS | welcome / doctor |
-

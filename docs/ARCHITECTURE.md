@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.7 Architecture
+# TARS 3.7.1 Architecture
 
-This document describes the current framework architecture as of v3.7, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
+This document describes the current framework architecture as of v3.7.1, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
 
-**Version**: 3.7.0
-**Release**: 2026-06-14 — see `CHANGELOG.md`
+**Version**: 3.7.1
+**Release**: 2026-06-15 — see `CHANGELOG.md`
 
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
@@ -277,7 +277,14 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace and `_system/` seeds
 
-## What's new in v3.7
+## What's new in v3.7.1
+
+- **Mandatory extension pre-flight.** Core routing resolves enabled extensions
+  for the selected skill/mode before the target workflow runs. Matched
+  extensions declare the capabilities that must be resolved before a workflow
+  decides no provider work is needed.
+
+## What was new in v3.7
 
 - **Workspace extension layer.** Provider adapters, workflow playbooks, template
   packs, retrieval packs, and validation packs now have a workspace-only runtime
