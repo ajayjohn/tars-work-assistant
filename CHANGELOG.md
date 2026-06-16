@@ -1,6 +1,17 @@
 # Changelog
 
 
+## v3.7.1 (2026-06-15)
+
+### Changed
+
+- **Extension discovery is a mandatory workflow pre-flight.** Core routing now requires `list_extensions`/`resolve_extension`/`read_extension` before a target skill's main workflow runs, and matched extensions force capability resolution before provider work is skipped.
+
+### Fixed
+
+- **Maintain no longer relies on implicit extension discovery.** Inbox and sync maintenance references now explicitly run extension pre-flight before scanning `inbox/pending/` or checking external drift.
+
+
 ## v3.7.0 (2026-06-14)
 
 ### Added

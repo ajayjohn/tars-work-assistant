@@ -62,6 +62,29 @@ Route by user intent, not by command text. If a slash command is present, treat
 it as an explicit shortcut into the same workflow. If multiple intents appear,
 handle the primary request first and surface any follow-up as a recommendation.
 
+## Extension pre-flight
+
+After selecting a target skill and mode, but before the target skill's main
+workflow runs, perform workspace extension discovery:
+
+1. Call `mcp__tars_vault__list_extensions`.
+2. If enabled extensions exist, call `mcp__tars_vault__resolve_extension` with
+   the selected `skill`, selected `mode` when known, and any capability/provider
+   hints already known from the request.
+3. For every resolved extension, call `mcp__tars_vault__read_extension` and read
+   its instructions before the workflow scans files, queries integrations, or
+   emits review items.
+4. Treat the extension's "When To Load" or equivalent trigger list as a
+   contract. If the current user-facing intent matches, apply the extension
+   under the parent skill's non-negotiables.
+5. Resolve any capabilities declared by a matched extension with
+   `mcp__tars_vault__resolve_capability` before deciding that no provider work
+   is needed.
+
+This pre-flight is mandatory for direct slash commands and natural-language
+routes. Missing or invalid extensions degrade with a plain warning; they do not
+block the base workflow unless the user explicitly requested that extension.
+
 ### Signal Table
 
 Common natural-language routes:

@@ -271,23 +271,30 @@ extensions:
 The registry stores workspace-relative paths only. It must never store
 plugin-root paths as extension paths.
 
-## Loading Order
+## Mandatory Loading Pre-Flight
 
-Core skills load extensions only after selecting the parent workflow.
+Core routing and direct slash-command execution must surface applicable
+extensions before a target skill's main workflow begins. Extension loading is a
+framework pre-flight, not optional per-skill behavior.
 
-Recommended order:
+Required order:
 
-1. Load the core skill and mode reference.
-2. Resolve broad capability with `mcp__tars_vault__resolve_capability`.
+1. Select the target skill and mode.
+2. Call `mcp__tars_vault__list_extensions`.
 3. Ask the extension resolver for enabled extensions matching:
    - skill
    - mode
-   - capability
-   - detected provider/tool shape
+   - capability, if already known
+   - detected provider/tool shape, if already known
 4. If multiple enabled workspace extensions match, apply the conflict rules.
-5. Load the extension's `instructions.md`.
-6. Apply extension guidance under the parent skill's non-negotiables.
-7. Surface review output through the parent skill's normal review queue.
+5. Load each matched extension's `instructions.md`.
+6. Treat the extension's "When To Load" or equivalent trigger list as a
+   contract against the current user-facing intent.
+7. For every matched extension capability, call
+   `mcp__tars_vault__resolve_capability` before deciding no external-provider
+   work is needed.
+8. Apply extension guidance under the parent skill's non-negotiables.
+9. Surface review output through the parent skill's normal review queue.
 
 Extensions should be invisible in normal user interaction unless:
 
@@ -403,8 +410,11 @@ Phase 2: Resolver
 
 Phase 3: Core skill integration
 
-- Update `maintain`, `meeting`, `create`, `answer`, `briefing`, and `lint` to
-  load extensions through explicit extension points.
+- Done: make extension pre-flight mandatory in core routing.
+- Done: make maintain inbox/sync references explicitly run extension pre-flight
+  before file scans or external drift checks.
+- Update additional skill references as extension use cases emerge, but do not
+  rely on individual skills for discovery.
 - Keep extension loading behind mode-specific references to protect baseline
   context size.
 

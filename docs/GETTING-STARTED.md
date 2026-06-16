@@ -231,7 +231,7 @@ When transcripts are processed, the raw text should remain available through arc
 
 ## Upgrading an existing workspace
 
-`3.7.0` does not require a manual migration script.
+`3.7.1` does not require a manual migration script.
 
 After installing the updated build:
 - run `/briefing` or `/lint` once so TARS rebuilds `_system/activity-ledger.yaml`

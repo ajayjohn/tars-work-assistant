@@ -183,12 +183,39 @@ def validate_required_tool_surface() -> None:
         pass_("required helper tools are declared in server schemas")
 
 
+def validate_extension_preflight_contract() -> None:
+    core = read(ROOT / "skills" / "core" / "SKILL.md")
+    routing = read(ROOT / "skills" / "core" / "references" / "routing.md")
+    inbox = read(ROOT / "skills" / "maintain" / "references" / "inbox.md")
+    sync = read(ROOT / "skills" / "maintain" / "references" / "sync.md")
+    required_core = [
+        "Extension pre-flight",
+        "mcp__tars_vault__list_extensions",
+        "mcp__tars_vault__resolve_extension",
+        "mcp__tars_vault__read_extension",
+        "mcp__tars_vault__resolve_capability",
+        "direct slash commands",
+    ]
+    missing = [needle for needle in required_core if needle not in core]
+    if missing:
+        fail(f"core extension pre-flight contract missing markers: {missing}")
+    elif "resolve_extension(skill=<target>, mode=<mode>)" not in routing:
+        fail("routing reference missing explicit resolve_extension pre-flight step")
+    elif "Before scanning `inbox/pending/`" not in inbox:
+        fail("maintain inbox reference missing extension pre-flight before scanning")
+    elif "Before checking calendar gaps" not in sync:
+        fail("maintain sync reference missing extension pre-flight before drift checks")
+    else:
+        pass_("extension pre-flight is mandatory in core routing and maintain")
+
+
 def main() -> int:
     validate_tool_references()
     validate_command_registry()
     validate_user_facing_docs()
     validate_welcome_contract()
     validate_required_tool_surface()
+    validate_extension_preflight_contract()
     if FAIL:
         print("ONE OR MORE CONTRACT CHECKS FAILED")
         return 1
