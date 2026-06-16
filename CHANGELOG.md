@@ -1,6 +1,17 @@
 # Changelog
 
 
+## v3.7.1 (2026-06-15)
+
+### Changed
+
+- **Extension discovery is a mandatory workflow pre-flight.** Core routing now requires `list_extensions`/`resolve_extension`/`read_extension` before a target skill's main workflow runs, and matched extensions force capability resolution before provider work is skipped.
+
+### Fixed
+
+- **Maintain no longer relies on implicit extension discovery.** Inbox and sync maintenance references now explicitly run extension pre-flight before scanning `inbox/pending/` or checking external drift.
+
+
 ## v3.7.0 (2026-06-14)
 
 ### Added
@@ -13,12 +24,10 @@
 
 - **Fresh workspaces include extension state.** `/welcome` scaffolding now creates `extensions/` and `_system/extensions.yaml` so extension discovery never searches the local machine or infers paths from the dynamic plugin root.
 - **Documentation and release guidance describe extensions.** README, Getting Started, Architecture, Catalog, Build, and command reference docs now explain when to use workspace extensions instead of adding new plugin skills or commands.
-- **Extension discovery is a mandatory workflow pre-flight.** Core routing now requires `list_extensions`/`resolve_extension`/`read_extension` before a target skill's main workflow runs, and matched extensions force capability resolution before provider work is skipped.
 
 ### Fixed
 
 - **Plugin/workspace path separation is test-covered for extensions.** New tests reject plugin-root or absolute extension paths, require workspace-relative registry entries, and validate that catalog-installed extensions are copied into the workspace before use.
-- **Maintain no longer relies on implicit extension discovery.** Inbox and sync maintenance references now explicitly run extension pre-flight before scanning `inbox/pending/` or checking external drift.
 
 
 ## v3.6.0 (2026-05-26)
