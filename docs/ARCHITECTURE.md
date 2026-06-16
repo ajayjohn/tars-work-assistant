@@ -288,6 +288,10 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
   `validate_extension`, `resolve_extension`, `read_extension`,
   `scaffold_extension`, and `install_extension` so core skills can load
   extension instructions through a path-safe boundary.
+- **Mandatory extension pre-flight.** Core routing resolves enabled extensions
+  for the selected skill/mode before the target workflow runs. Matched
+  extensions declare the capabilities that must be resolved before a workflow
+  decides no provider work is needed.
 - **Extension path invariants.** Catalog extensions from the TARS repository are
   copied into the workspace before use. Registry entries store
   workspace-relative paths only, and tests reject absolute or plugin-root

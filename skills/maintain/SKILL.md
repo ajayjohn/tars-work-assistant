@@ -45,6 +45,9 @@ workflow names in user output. Slash commands remain shortcuts.
 
 - Never delete files.
 - Never auto-apply archive, memory, task, or harness changes.
+- Run core extension pre-flight before every mode. Enabled extensions whose
+  triggers match "process inbox", "run maintenance", "sync", or the active mode
+  must be loaded before scanning files or checking external drift.
 - Archive is active-set management, not punishment for old files.
 - Weekly maintenance includes a Harness review section.
 - Heavy scans belong in maintenance, not SessionStart.
