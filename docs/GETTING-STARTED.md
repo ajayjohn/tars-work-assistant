@@ -231,11 +231,11 @@ When transcripts are processed, the raw text should remain available through arc
 
 ## Upgrading an existing workspace
 
-`3.7.1` does not require a manual migration script.
+`3.7.2` does not require a manual migration script.
 
 After installing the updated build:
 - run `/briefing` or `/lint` once so TARS rebuilds `_system/activity-ledger.yaml`
-- extension-enabled workflows will use `extensions/` and `_system/extensions.yaml`; older workspaces can add those lazily when the first extension is installed
+- extension-enabled workflows will use `extensions/`, `_system/extensions.yaml`, and derived `_system/extension-runtime.json`; older workspaces can add those lazily when the first extension is installed
 - keep using your existing workspace path; `install.yaml` and schedule state remain valid
 - no task migration is required; legacy `memory/tasks/` notes are still readable, while active task workflows continue to use `tasks/`
 - if you rely on scheduled jobs, it is worth running `/maintain` or `/welcome --setup-schedules` once so the new version is the one refreshing notices and weekly review behavior

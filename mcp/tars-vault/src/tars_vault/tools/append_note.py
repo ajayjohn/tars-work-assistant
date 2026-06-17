@@ -21,6 +21,7 @@ from typing import Any
 from .. import _common
 from ..telemetry import append_event
 from ..validators import validate_no_bad_wikilinks
+from . import extension_common as ext
 
 
 DEFAULT_CHUNK = 40_000
@@ -54,6 +55,24 @@ def append_note(**kwargs: Any) -> dict:
 
     if not note_p.is_file():
         return _common.error(f"note not found: {note_p.relative_to(vault_p)}")
+
+    try:
+        fm, _body = _common.split_frontmatter(_common.read_note_text(note_p))
+    except OSError as exc:
+        return _common.error(f"read failed: {exc}")
+    tags = (fm or {}).get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        tags = []
+    owner = ext.blocking_workspace_owner(
+        vault_p,
+        path=str(note_p.relative_to(vault_p)),
+        tags=[str(tag) for tag in tags],
+        operation="append_note",
+    )
+    if owner:
+        return ext.owned_write_error(owner)
 
     payload = content.encode("utf-8")
     chunks = 0

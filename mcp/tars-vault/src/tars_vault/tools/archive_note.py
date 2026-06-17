@@ -24,6 +24,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
+from . import extension_common as ext
 from .move_note import move_note
 from .update_frontmatter import update_frontmatter
 
@@ -187,6 +188,14 @@ def archive_note(**kwargs: Any) -> dict:
     if fm.get("tars-archive-exempt") is True and not force:
         return _common.error("note has tars-archive-exempt=true (pass force=true to override)")
     tags = _tags(fm)
+    owner = ext.blocking_workspace_owner(
+        vault_p,
+        path=str(note_p.relative_to(vault_p)),
+        tags=tags,
+        operation="archive_note",
+    )
+    if owner:
+        return ext.owned_write_error(owner)
     if any(t in DURABLE_TAGS for t in tags) and not force:
         return _common.error(
             f"note has durable tag {[t for t in tags if t in DURABLE_TAGS]}; "

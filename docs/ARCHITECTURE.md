@@ -1,11 +1,11 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.7.1 Architecture
+# TARS 3.7.2 Architecture
 
-This document describes the current framework architecture as of v3.7.1, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
+This document describes the current framework architecture as of v3.7.2, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
 
-**Version**: 3.7.1
-**Release**: 2026-06-15 — see `CHANGELOG.md`
+**Version**: 3.7.2
+**Release**: 2026-06-16 — see `CHANGELOG.md`
 
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
 
@@ -168,6 +168,9 @@ The `mcp/tars-vault/` Python local helper sits between every skill and the works
 - resolve capabilities against `_system/tools-registry.yaml` (populated by `SessionStart`)
 - resolve and read workspace-installed extensions from `extensions/` through
   `_system/extensions.yaml`
+- enforce fail-closed extension ownership for workspace paths and tags before
+  mutating notes, preventing externalized capabilities from silently falling
+  back to local Markdown
 - expose FTS5 + semantic retrieval + deterministic rerank
 - expose navigation tools (`workspace_map`, `context_gaps`, `entity_timeline`, `context_bundle`, `archive_candidates`) for bounded context packs without making a database mandatory
 
@@ -175,12 +178,17 @@ The `mcp/tars-vault/` Python local helper sits between every skill and the works
 
 Hooks under `hooks/` are stdlib-only Python scripts wired via `hooks/hooks.json` and `.claude/settings.json`:
 - `SessionStart` — refresh the integrations index, read `_system/activity-ledger.yaml` for concise workspace-state guidance, and suppress repeated housekeeping notices through `_system/install.yaml.acknowledged_notices`
-- `PreToolUse` — observability for helper writes (frontmatter prefix enforcement is owned by the local helper; this hook captures shape)
-- `PostToolUse` — emit workspace-write telemetry events
+- `PreToolUse` — block unsafe helper writes and direct provider MCP calls
+  governed by required/fail-closed extensions until the extension contract has
+  been loaded
+- `PostToolUse` — emit workspace-write telemetry events and record successful
+  extension loads for provider-bypass enforcement
 - `PreCompact` + `SessionEnd` — drop the Claude Code session transcript into `inbox/pending/` so `/meeting` can ingest it later
-- `InstructionsLoaded` — telemetry on skill load
+- `InstructionsLoaded` — telemetry on skill load plus active-skill state for
+  extension enforcement
 
-All hook errors exit 0 — they never block a tool call.
+Hook implementation errors exit 0, but successful `PreToolUse` policy checks can
+deny unsafe tool calls with a plain reason.
 
 ### Retrieval layer
 
@@ -196,18 +204,23 @@ Hybrid retrieval, built by `scripts/build-search-index.py` and served from `mcp/
 
 Every skill resolves integrations through `mcp__tars_vault__resolve_capability(capability=…)` and uses whatever MCP tool the registry returns. No hardcoded server names anywhere.
 
-### Extension layer (proposed)
+### Extension layer
 
-TARS should support provider adapters, workflow extensions, template packs,
-retrieval packs, and validation packs as subordinate modules loaded by canonical
-core skills at explicit extension points. The design keeps plugin skills and
+TARS supports provider adapters, workflow extensions, template packs, retrieval
+packs, and validation packs as subordinate modules loaded by canonical core
+skills at explicit extension points. The design keeps plugin skills and
 framework code in the dynamic plugin root, while all installed extensions live
 under the recorded workspace root. Curated extensions hosted in the TARS GitHub
-repository are installed into the workspace before use, so default commands can
-use third-party tools without turning TARS itself into a vendor-specific
-framework or mixing plugin and workspace paths. See [EXTENSIONS.md](EXTENSIONS.md)
-for the proposed path model, manifest contract, registry, resolver tools, and
-migration plan.
+repository are installed into the workspace before use.
+
+Extensions can also declare ownership of capabilities, workspace paths, tags,
+and provider tools. Advisory ownership only informs routing; required ownership
+blocks provider bypasses until the extension is loaded; fail-closed ownership
+also blocks local workspace writes to owned paths/tags. This lets default
+commands use third-party tools without turning TARS itself into a
+vendor-specific framework or mixing plugin and workspace paths. See
+[EXTENSIONS.md](EXTENSIONS.md) for the path model, manifest contract, registry,
+resolver tools, and enforcement rules.
 
 ### Office output layer
 
@@ -277,7 +290,17 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace and `_system/` seeds
 
-## What's new in v3.7.1
+## What's new in v3.7.2
+
+- **Extension enforcement layer.** Extensions can declare ownership of
+  capabilities, workspace paths, tags, and provider tools. `tars-vault` blocks
+  fail-closed local writes to owned state, while hooks block direct provider
+  MCP calls until the governing extension has been loaded.
+- **Direct command pre-flight.** Slash-command wrappers now name the extension
+  pre-flight before skill handoff so direct commands do not rely solely on core
+  routing to discover extensions.
+
+## What was new in v3.7.1
 
 - **Mandatory extension pre-flight.** Core routing resolves enabled extensions
   for the selected skill/mode before the target workflow runs. Matched

@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import read_event, write_output, vault_path, in_recursion, append_telemetry
+from _common import read_event, write_output, vault_path, in_recursion, append_telemetry, record_skill_loaded
 
 
 def _skill_from_event(event: dict) -> str | None:
@@ -37,11 +37,13 @@ def main() -> int:
     vault = vault_path()
     skill = _skill_from_event(event)
     if vault is not None and skill:
+        session_id = str(event.get("session_id", ""))
+        record_skill_loaded(vault, session_id, skill)
         append_telemetry(
             vault,
             {
                 "event": "skill_loaded",
-                "session_id": event.get("session_id", ""),
+                "session_id": session_id,
                 "skill": skill,
             },
         )

@@ -6,6 +6,8 @@ argument-hint: "[quick | deep | deepen <slug> | review <slug>] [topic or questio
 # /ideate
 
 ## Protocol
+Before following the skill, run the TARS extension pre-flight for `skill="ideate"` using the selected mode and topic as intent: `list_extensions` → `resolve_extension` → `read_extension` for matches → resolve declared capabilities.
+
 Read and follow `skills/ideate/`
 
 Modes: quick (5 min, top 5–7 ideas), deep (15 min, top 10–15 ideas), deepen (iterate from loved ideas in a prior session), review (show past ideas for a project).

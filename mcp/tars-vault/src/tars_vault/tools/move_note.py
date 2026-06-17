@@ -22,6 +22,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
+from . import extension_common as ext
 
 
 SKIP_DIRS = {".git", ".obsidian", ".claude"}
@@ -52,6 +53,28 @@ def move_note(**kwargs: Any) -> dict:
         return _common.error(_common.protected_path_reason(vault_p, src_p))
     if _common.is_protected_path(vault_p, dst_p) and not allow_protected:
         return _common.error(_common.protected_path_reason(vault_p, dst_p))
+
+    try:
+        fm, _body = _common.split_frontmatter(_common.read_note_text(src_p))
+    except OSError as exc:
+        return _common.error(f"read failed: {exc}")
+    tags = (fm or {}).get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        tags = []
+    for rel, op in (
+        (str(src_p.relative_to(vault_p)), "move_note:source"),
+        (str(dst_p.relative_to(vault_p)), "move_note:destination"),
+    ):
+        owner = ext.blocking_workspace_owner(
+            vault_p,
+            path=rel,
+            tags=[str(tag) for tag in tags],
+            operation=op,
+        )
+        if owner:
+            return ext.owned_write_error(owner)
 
     dst_p.parent.mkdir(parents=True, exist_ok=True)
     src_p.rename(dst_p)

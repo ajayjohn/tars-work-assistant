@@ -218,6 +218,13 @@ provider:
       - "get_transcript"
       - "get_meeting_assets"
 
+owns:
+  capabilities:
+    - meeting-recording
+  provider_tools:
+    - "mcp__demo_recording__.*"
+  enforcement: required
+
 entrypoints:
   instructions: instructions.md
   tool_contract: tool-contract.yaml
@@ -240,6 +247,16 @@ Required fields:
 - `applies_to`
 - `entrypoints.instructions`
 - `safety.requires_review`
+
+Optional `owns` fields let an extension declare the state and provider surface
+it governs:
+
+- `capabilities` — capability names owned by the extension, such as `tasks` or
+  `meeting-recording`
+- `workspace_paths` — workspace-relative glob patterns such as `tasks/**`
+- `tags` — tag glob patterns such as `tars/task`
+- `provider_tools` — provider MCP tool patterns such as `mcp__airtable__.*`
+- `enforcement` — `advisory`, `required`, or `fail_closed`
 
 The manifest is intentionally small. Extension-specific details belong in
 referenced files so TARS can load only the relevant pieces.
@@ -275,7 +292,9 @@ plugin-root paths as extension paths.
 
 Core routing and direct slash-command execution must surface applicable
 extensions before a target skill's main workflow begins. Extension loading is a
-framework pre-flight, not optional per-skill behavior.
+framework pre-flight, not optional per-skill behavior. Command wrappers include
+this requirement explicitly so direct slash commands do not depend solely on
+core routing context.
 
 Required order:
 
@@ -295,6 +314,57 @@ Required order:
    work is needed.
 8. Apply extension guidance under the parent skill's non-negotiables.
 9. Surface review output through the parent skill's normal review queue.
+
+This pre-flight keeps token cost bounded: resolver calls use compact registry
+and manifest metadata, and full extension instructions are loaded only for
+matched extensions.
+
+## Enforcement
+
+Extension loading is backed by generic enforcement, not only prompt guidance.
+
+### Provider Bypass Guard
+
+`PreToolUse` watches MCP provider tools declared in `owns.provider_tools` or
+`provider.detection.tool_name_patterns`. If an enabled extension declares
+`enforcement: required` or `enforcement: fail_closed`, direct provider calls are
+denied until `mcp__tars_vault__read_extension` has loaded that extension in the
+current session.
+
+This prevents a command from calling a Zoom, Airtable, or future provider MCP
+directly while skipping the extension's contract.
+
+### Capability Ownership Write Guard
+
+`tars-vault` checks enabled extension ownership before mutating workspace
+state. When an extension declares `enforcement: fail_closed`, writes to owned
+`workspace_paths` or owned `tags` are rejected by:
+
+- `create_note`
+- `write_note_from_content`
+- `append_note`
+- `update_frontmatter`
+- `archive_note`
+- `move_note`
+
+This prevents split-brain state when a capability has been externalized. For
+example, a `tasks.airtable` extension can own `tasks/**`, `archive/tasks/**`,
+and `tars/task`; local task writes then fail loudly instead of silently landing
+in Markdown.
+
+### Runtime Acknowledgement
+
+`InstructionsLoaded` records the active skill and `read_extension` records
+loaded extension ids in `_system/extension-runtime.json`. The file is derived
+runtime state and can be rebuilt by simply loading the relevant extension again.
+
+### Enforcement Levels
+
+| Level | Meaning |
+|---|---|
+| `advisory` | Resolver surfaces the extension, but hooks and write tools do not block fallback behavior. |
+| `required` | Provider MCP calls governed by the extension are blocked until the extension is loaded. |
+| `fail_closed` | Provider MCP calls are blocked until load, and local writes to owned workspace paths/tags are rejected. |
 
 Extensions should be invisible in normal user interaction unless:
 
@@ -413,6 +483,10 @@ Phase 3: Core skill integration
 - Done: make extension pre-flight mandatory in core routing.
 - Done: make maintain inbox/sync references explicitly run extension pre-flight
   before file scans or external drift checks.
+- Done: add direct slash-command pre-flight reminders so command execution does
+  not rely only on core routing.
+- Done: add generic ownership enforcement for fail-closed workspace paths/tags
+  and required/fail-closed provider tool bypass prevention.
 - Update additional skill references as extension use cases emerge, but do not
   rely on individual skills for discovery.
 - Keep extension loading behind mode-specific references to protect baseline

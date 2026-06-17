@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
@@ -317,6 +318,17 @@ def validate_manifest(vault: Path, ext_dir: Path) -> tuple[dict[str, Any], list[
     for key in ("may_write_workspace", "may_mutate_external_provider"):
         if isinstance(safety, dict) and safety.get(key) is True:
             warnings.append(f"{key}=true requires parent skill approval at runtime")
+    owns = manifest.get("owns")
+    if owns is not None:
+        if not isinstance(owns, dict):
+            errors.append("owns must be a mapping")
+        else:
+            enforcement = str(owns.get("enforcement") or "advisory")
+            if enforcement not in {"advisory", "required", "fail_closed"}:
+                errors.append("owns.enforcement must be advisory, required, or fail_closed")
+            for key in ("capabilities", "workspace_paths", "tags", "provider_tools"):
+                if key in owns and not isinstance(owns.get(key), list):
+                    errors.append(f"owns.{key} must be a list")
     return manifest, errors, warnings
 
 
@@ -461,3 +473,135 @@ def match_extension(manifest: dict[str, Any], *, skill: str | None, mode: str | 
             score += min(10, len(matched) * 3)
             reasons.append("tool-pattern")
     return True, score, reasons
+
+
+def _list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item not in (None, "")]
+    if value in (None, ""):
+        return []
+    return [str(value)]
+
+
+def _owned_capabilities(manifest: dict[str, Any], owns: dict[str, Any]) -> list[str]:
+    declared = _list(owns.get("capabilities"))
+    if not declared and owns.get("capability"):
+        declared = _list(owns.get("capability"))
+    if not declared:
+        declared = _list(manifest.get("capabilities"))
+    return declared
+
+
+def enabled_extension_manifests(vault: Path) -> list[dict[str, Any]]:
+    """Return validated enabled extension manifests with path metadata."""
+    out: list[dict[str, Any]] = []
+    for extension_id, entry in sorted(registry_entries(vault).items()):
+        if not isinstance(entry, dict) or not entry.get("enabled", False):
+            continue
+        rel = entry.get("path")
+        if not rel:
+            continue
+        target, path_error = safe_workspace_relative_path(vault, str(rel))
+        if path_error or target is None:
+            continue
+        manifest, errors, _warnings = validate_manifest(vault, target)
+        if errors:
+            continue
+        manifest = dict(manifest)
+        manifest["_extension_id"] = str(extension_id)
+        manifest["_extension_path"] = target.relative_to(vault).as_posix()
+        out.append(manifest)
+    return out
+
+
+def ownership_policies(vault: Path) -> list[dict[str, Any]]:
+    """Return normalized ownership declarations for enabled extensions."""
+    policies: list[dict[str, Any]] = []
+    for manifest in enabled_extension_manifests(vault):
+        owns = manifest.get("owns")
+        if not isinstance(owns, dict):
+            continue
+        enforcement = str(owns.get("enforcement") or "advisory")
+        policies.append(
+            {
+                "extension_id": manifest.get("_extension_id") or manifest.get("id"),
+                "name": manifest.get("name") or manifest.get("_extension_id") or manifest.get("id"),
+                "path": manifest.get("_extension_path") or "",
+                "capabilities": _owned_capabilities(manifest, owns),
+                "workspace_paths": _list(owns.get("workspace_paths")),
+                "tags": _list(owns.get("tags")),
+                "provider_tools": _list(owns.get("provider_tools")),
+                "enforcement": enforcement,
+                "entrypoints": manifest.get("entrypoints") if isinstance(manifest.get("entrypoints"), dict) else {},
+                "applies_to": manifest.get("applies_to") if isinstance(manifest.get("applies_to"), dict) else {},
+            }
+        )
+    return policies
+
+
+def _normalize_relpath(path: str) -> str:
+    return str(path).replace("\\", "/").lstrip("/")
+
+
+def _path_matches(pattern: str, relpath: str) -> bool:
+    pattern = _normalize_relpath(pattern)
+    relpath = _normalize_relpath(relpath)
+    return fnmatch(relpath, pattern) or fnmatch(relpath.removesuffix(".md"), pattern.removesuffix(".md"))
+
+
+def _tag_matches(pattern: str, tag: str) -> bool:
+    return fnmatch(str(tag), str(pattern))
+
+
+def blocking_workspace_owner(
+    vault: Path,
+    *,
+    path: str | None = None,
+    tags: list[str] | None = None,
+    operation: str = "write",
+) -> dict[str, Any] | None:
+    """Return the fail-closed owner that blocks a workspace mutation, if any."""
+    relpath = _normalize_relpath(path or "")
+    tag_list = [str(tag) for tag in (tags or [])]
+    for policy in ownership_policies(vault):
+        if policy.get("enforcement") != "fail_closed":
+            continue
+        matched_by = ""
+        for pattern in policy.get("workspace_paths", []):
+            if relpath and _path_matches(str(pattern), relpath):
+                matched_by = f"path:{pattern}"
+                break
+        if not matched_by:
+            for pattern in policy.get("tags", []):
+                if any(_tag_matches(str(pattern), tag) for tag in tag_list):
+                    matched_by = f"tag:{pattern}"
+                    break
+        if matched_by:
+            return {
+                "extension_id": policy.get("extension_id"),
+                "name": policy.get("name"),
+                "capabilities": policy.get("capabilities", []),
+                "enforcement": policy.get("enforcement"),
+                "matched_by": matched_by,
+                "operation": operation,
+                "tool_contract": (policy.get("entrypoints") or {}).get("tool_contract", ""),
+            }
+    return None
+
+
+def owned_write_error(owner: dict[str, Any]) -> dict[str, Any]:
+    capability = ", ".join(str(c) for c in owner.get("capabilities", []) if c) or "declared capability"
+    contract = owner.get("tool_contract") or "the extension instructions"
+    return _common.error(
+        "workspace write blocked by enabled extension ownership: "
+        f"{owner.get('extension_id')} owns {capability} ({owner.get('matched_by')}) "
+        "with fail_closed enforcement. Load and follow the extension contract "
+        f"before mutating this state; see {contract}.",
+        blocked=True,
+        extension_id=owner.get("extension_id"),
+        capability=capability,
+        enforcement=owner.get("enforcement"),
+        matched_by=owner.get("matched_by"),
+        operation=owner.get("operation"),
+        tool_contract=owner.get("tool_contract") or "",
+    )

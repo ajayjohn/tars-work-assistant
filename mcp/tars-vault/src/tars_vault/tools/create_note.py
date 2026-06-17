@@ -34,6 +34,7 @@ from typing import Any
 from .. import _common
 from ..telemetry import append_event
 from ..validators import load_schemas, validate_against_schema, validate_no_bad_wikilinks
+from . import extension_common as ext
 
 
 # Paths under these vault-relative prefixes receive auto-alias treatment.
@@ -114,6 +115,20 @@ def create_note(**kwargs: Any) -> dict:
         note_p = _common.resolve_note_path(vault_p, path)
     except ValueError as exc:
         return _common.error(str(exc))
+
+    tags = frontmatter.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    if not isinstance(tags, list):
+        tags = []
+    owner = ext.blocking_workspace_owner(
+        vault_p,
+        path=str(note_p.relative_to(vault_p)),
+        tags=[str(tag) for tag in tags],
+        operation="create_note",
+    )
+    if owner:
+        return ext.owned_write_error(owner)
 
     if validate_schema:
         schemas = load_schemas(vault_p)

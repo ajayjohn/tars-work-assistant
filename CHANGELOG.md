@@ -1,6 +1,19 @@
 # Changelog
 
 
+## v3.7.2 (2026-06-16)
+
+### Added
+
+- **Extension ownership enforcement.** Extensions can now declare an `owns:` policy for capabilities, workspace paths, tags, provider tools, and enforcement level. `tars-vault` blocks local writes to fail-closed owned state so externalized capabilities such as task stores cannot silently split across Markdown and a provider.
+- **Provider bypass guard.** The `PreToolUse` hook watches provider MCP calls claimed by enabled extensions and denies required/fail-closed provider calls until the governing extension has been loaded in the session.
+- **Direct command extension pre-flight.** Slash-command wrappers now name the generic extension pre-flight before handing off to workflow skills, so direct `/maintain`, `/tasks`, `/create`, and future command execution paths do not rely only on core routing.
+
+### Changed
+
+- **Extension runtime state is explicit.** `InstructionsLoaded` records the active skill and `read_extension` records loaded extensions in `_system/extension-runtime.json` so enforcement can distinguish loaded from bypassed extensions.
+
+
 ## v3.7.1 (2026-06-15)
 
 ### Changed

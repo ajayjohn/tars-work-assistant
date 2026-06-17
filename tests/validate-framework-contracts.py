@@ -197,7 +197,21 @@ def validate_extension_preflight_contract() -> None:
         "direct slash commands",
     ]
     missing = [needle for needle in required_core if needle not in core]
-    if missing:
+    command_missing: list[str] = []
+    for path in sorted((ROOT / "commands").glob("*.md")):
+        if path.name in {"README.md", "doctor.md", "help.md", "welcome.md"}:
+            continue
+        text = read(path)
+        for needle in ("extension pre-flight", "list_extensions", "resolve_extension", "read_extension"):
+            if needle not in text:
+                command_missing.append(f"{path.relative_to(ROOT)} missing {needle}")
+                break
+    hooks = read(ROOT / "hooks" / "hooks.json")
+    pre_tool = read(ROOT / "hooks" / "pre-tool-use.py")
+    ext_docs = read(ROOT / "docs" / "EXTENSIONS.md")
+    if command_missing:
+        fail("command wrappers missing extension pre-flight:\n  " + "\n  ".join(command_missing))
+    elif missing:
         fail(f"core extension pre-flight contract missing markers: {missing}")
     elif "resolve_extension(skill=<target>, mode=<mode>)" not in routing:
         fail("routing reference missing explicit resolve_extension pre-flight step")
@@ -205,8 +219,14 @@ def validate_extension_preflight_contract() -> None:
         fail("maintain inbox reference missing extension pre-flight before scanning")
     elif "Before checking calendar gaps" not in sync:
         fail("maintain sync reference missing extension pre-flight before drift checks")
+    elif '"matcher": "mcp__.*|Bash"' not in hooks:
+        fail("PreToolUse hook must watch provider MCP calls for extension bypass guard")
+    elif "enabled_extension_policies" not in pre_tool or "extension_loaded" not in pre_tool:
+        fail("PreToolUse hook missing provider bypass guard markers")
+    elif "owns:" not in ext_docs or "fail_closed" not in ext_docs:
+        fail("extension docs missing ownership enforcement contract")
     else:
-        pass_("extension pre-flight is mandatory in core routing and maintain")
+        pass_("extension pre-flight and enforcement contracts are mandatory")
 
 
 def main() -> int:
