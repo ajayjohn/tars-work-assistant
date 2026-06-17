@@ -1,6 +1,13 @@
 # Changelog
 
 
+## v3.7.3 (2026-06-16)
+
+### Fixed
+
+- **Extension load acknowledgement works across Claude plugin mounts.** `PostToolUse` now recognizes TARS vault `read_extension` calls by normalized tool action and TARS/vault server identity instead of one canonical MCP tool name, so plugin-namespaced or hyphenated tool names can still unlock legitimate extension provider calls.
+
+
 ## v3.7.2 (2026-06-16)
 
 ### Added

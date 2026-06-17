@@ -103,6 +103,26 @@ class ExtensionHookTests(unittest.TestCase):
         )
         self.assertEqual(allowed, {})
 
+    def test_plugin_namespaced_read_extension_acknowledges_load(self) -> None:
+        session_id = "session-2"
+        self._run_hook("instructions-loaded.py", {"session_id": session_id, "skill": "maintain"})
+
+        self._run_hook(
+            "post-tool-use.py",
+            {
+                "session_id": session_id,
+                "tool_name": "mcp__tars_work_assistant__tars-vault__read-extension",
+                "tool_input": {"extension_id": "meeting-recording.zoom"},
+                "tool_response": {},
+            },
+        )
+
+        allowed = self._run_hook(
+            "pre-tool-use.py",
+            {"session_id": session_id, "tool_name": "mcp__zoom__search_meetings", "tool_input": {}},
+        )
+        self.assertEqual(allowed, {})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

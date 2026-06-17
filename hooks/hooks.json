@@ -26,7 +26,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__tars_vault__.*|Bash",
+        "matcher": "mcp__.*|Bash",
         "hooks": [
           {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use.py\""}
         ]

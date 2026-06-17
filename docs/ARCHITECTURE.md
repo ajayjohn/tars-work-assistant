@@ -1,10 +1,10 @@
 <!-- Copyright 2026 Ajay John. Licensed under PolyForm Noncommercial 1.0.0. See LICENSE. -->
 
-# TARS 3.7.2 Architecture
+# TARS 3.7.3 Architecture
 
-This document describes the current framework architecture as of v3.7.2, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
+This document describes the current framework architecture as of v3.7.3, which makes the local Markdown workspace authoritative, keeps Obsidian optional, and treats the AI harness as first-class product code.
 
-**Version**: 3.7.2
+**Version**: 3.7.3
 **Release**: 2026-06-16 — see `CHANGELOG.md`
 
 **Model**: Framework repository plus deployed Markdown workspace runtime, with optional Obsidian views
@@ -290,7 +290,14 @@ The TARS v3 rebuild introduced the most important architectural changes in the f
 - maintenance state, schemas, and guardrails live in `_system/`
 - the active runtime structure is centered on the workspace and `_system/` seeds
 
-## What's new in v3.7.2
+## What's new in v3.7.3
+
+- **Plugin mount compatibility.** Extension load acknowledgements recognize
+  plugin-namespaced and hyphenated TARS vault `read_extension` tool names, so
+  legitimate extension provider calls are not blocked on installs where Claude
+  mounts the helper under a different MCP name.
+
+## What was new in v3.7.2
 
 - **Extension enforcement layer.** Extensions can declare ownership of
   capabilities, workspace paths, tags, and provider tools. `tars-vault` blocks
