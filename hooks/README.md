@@ -10,11 +10,12 @@ exit 0 for observability-only lifecycle events.
 | Hook | Lifecycle | Purpose |
 |------|-----------|---------|
 | `session-start.py` | SessionStart | staleness banner, reach-ability checks, alias-registry head-load, cron health |
-| `pre-tool-use.py` | PreToolUse | block obsidian `create` with no args; warn on >40KB payload; enforce `tars-` prefix |
-| `post-tool-use.py` | PostToolUse | emit `vault_write` telemetry event on successful vault-mutating MCP calls |
+| `pre-tool-use.py` | PreToolUse | block unsafe helper writes; enforce payload, wikilink, prefix, workspace-path, and extension provider-bypass guards |
+| `post-tool-use.py` | PostToolUse | emit `vault_write` telemetry event on successful vault-mutating MCP calls; record successful `read_extension` acknowledgements |
 | `pre-compact.py` | PreCompact | flush decisions/commitments to `inbox/pending/claude-session-*.md` |
 | `session-end.py` | SessionEnd | same as PreCompact for sessions that close without compacting |
-| `instructions-loaded.py` | InstructionsLoaded | append `skill_loaded` to telemetry jsonl |
+| `instructions-loaded.py` | InstructionsLoaded | append `skill_loaded` to telemetry jsonl and record active skill for extension enforcement |
 
 All hooks follow the template in PRD §26.5. SessionStart and InstructionsLoaded
-must never exit non-zero. PreToolUse may exit 2 (deny) with a message on stderr.
+must never exit non-zero. PreToolUse may deny unsafe tool calls with a structured
+permission decision.

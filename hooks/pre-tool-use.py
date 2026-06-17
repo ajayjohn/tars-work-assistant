@@ -29,7 +29,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import read_event, resolve_vault, write_output
+from _common import (
+    enabled_extension_policies,
+    extension_loaded,
+    last_loaded_skill,
+    provider_tool_matches,
+    read_event,
+    resolve_vault,
+    write_output,
+)
 
 
 _MUTATION_TOOLS = frozenset(
@@ -213,12 +221,34 @@ def main() -> int:
     event = read_event()
     tool_name = str(event.get("tool_name") or "")
     tool_input = event.get("tool_input") or {}
+    _vault, status = resolve_vault()
+    session_id = str(event.get("session_id", ""))
+    if tool_name.startswith("mcp__") and not tool_name.startswith("mcp__tars_vault__") and _vault is not None:
+        active_skill = last_loaded_skill(_vault, session_id)
+        for policy in enabled_extension_policies(_vault):
+            if policy.get("enforcement") not in {"required", "fail_closed"}:
+                continue
+            applies_to = policy.get("applies_to_skills") or []
+            if applies_to and active_skill and active_skill not in applies_to:
+                continue
+            if not any(provider_tool_matches(str(pattern), tool_name) for pattern in policy.get("provider_tools", [])):
+                continue
+            extension_id = str(policy.get("extension_id") or "")
+            if extension_id and not extension_loaded(_vault, session_id, extension_id):
+                contract = policy.get("tool_contract") or "the extension instructions"
+                _deny(
+                    "Refusing direct provider MCP call because enabled TARS extension "
+                    f"{extension_id} governs {tool_name} with {policy.get('enforcement')} "
+                    "enforcement. Call mcp__tars_vault__resolve_extension and "
+                    f"mcp__tars_vault__read_extension first, then follow {contract}."
+                )
+                return 0
+
     if tool_name not in _MUTATION_TOOLS:
         write_output({})
         return 0
 
     # Rule 1: install.yaml mismatch.
-    _vault, status = resolve_vault()
     ti = tool_input if isinstance(tool_input, dict) else {}
     claude_home_reason = _claude_home_write_reason(_vault, ti)
     if claude_home_reason:

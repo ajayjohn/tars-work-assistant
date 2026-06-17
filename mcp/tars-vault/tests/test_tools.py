@@ -61,6 +61,52 @@ class ToolTests(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def _install_owned_tasks_extension(self, *, paths: str = "tasks/**", tags: str = "tars/task") -> None:
+        ext_dir = self.vault / "extensions" / "tasks.airtable"
+        ext_dir.mkdir(parents=True, exist_ok=True)
+        (ext_dir / "extension.yaml").write_text(
+            "id: tasks.airtable\n"
+            "name: Airtable Tasks\n"
+            "version: \"1.0.0\"\n"
+            "tars_extension_version: \"1\"\n"
+            "type: provider-adapter\n"
+            "capabilities:\n"
+            "  - tasks\n"
+            "applies_to:\n"
+            "  skills:\n"
+            "    - tasks\n"
+            "    - maintain\n"
+            "entrypoints:\n"
+            "  instructions: instructions.md\n"
+            "  tool_contract: tool-contract.yaml\n"
+            "safety:\n"
+            "  requires_review: true\n"
+            "  may_write_workspace: false\n"
+            "  may_mutate_external_provider: false\n"
+            "owns:\n"
+            "  capabilities:\n"
+            "    - tasks\n"
+            "  workspace_paths:\n"
+            f"    - {paths}\n"
+            "  tags:\n"
+            f"    - {tags}\n"
+            "  provider_tools:\n"
+            "    - mcp__airtable__.*\n"
+            "  enforcement: fail_closed\n"
+        )
+        (ext_dir / "instructions.md").write_text("# Airtable Tasks\n")
+        (ext_dir / "tool-contract.yaml").write_text("provider: airtable\n")
+        (self.vault / "_system" / "extensions.yaml").write_text(
+            "version: \"1\"\n"
+            "extensions:\n"
+            "  tasks.airtable:\n"
+            "    enabled: true\n"
+            "    source: local\n"
+            "    root: workspace\n"
+            "    path: extensions/tasks.airtable\n"
+            "    installed_version: \"1.0.0\"\n"
+        )
+
     # --- create / read / append / update ---
 
     def test_create_then_read_roundtrip(self) -> None:
@@ -632,6 +678,58 @@ class ToolTests(unittest.TestCase):
         )
         self.assertEqual(r["status"], "error")
         self.assertIn("either content or frontmatter/body", r["reason"])
+
+    def test_extension_owned_path_blocks_local_create(self) -> None:
+        self._install_owned_tasks_extension()
+        r = create_note(
+            vault=str(self.vault),
+            path="tasks/local-task.md",
+            frontmatter={"tags": ["tars/task"], "tars-status": "open"},
+            body="Local task should not be created.",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+        self.assertEqual(r["extension_id"], "tasks.airtable")
+        self.assertIn("fail_closed", r["reason"])
+        self.assertFalse((self.vault / "tasks" / "local-task.md").exists())
+
+    def test_extension_owned_tag_blocks_local_create_outside_path(self) -> None:
+        self._install_owned_tasks_extension(paths="archive/tasks/**")
+        r = create_note(
+            vault=str(self.vault),
+            path="contexts/task-candidate.md",
+            frontmatter={"tags": ["tars/task"], "tars-status": "open"},
+            body="A task by tag still belongs to the extension.",
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+        self.assertIn("tag:tars/task", r["matched_by"])
+
+    def test_extension_owned_existing_note_blocks_append_update_move_archive(self) -> None:
+        self._install_owned_tasks_extension()
+        task = self.vault / "tasks" / "owned.md"
+        task.parent.mkdir(parents=True, exist_ok=True)
+        task.write_text("---\ntags: [tars/task]\ntars-status: open\n---\nbody\n")
+
+        r = append_note(vault=str(self.vault), file="tasks/owned.md", content="more")
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+
+        r = update_frontmatter(
+            vault=str(self.vault),
+            file="tasks/owned.md",
+            updates={"tars-status": "done"},
+        )
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+
+        r = move_note(vault=str(self.vault), src="tasks/owned.md", dst="tasks/moved-owned.md")
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
+
+        r = archive_note(vault=str(self.vault), file="tasks/owned.md", force=True)
+        self.assertEqual(r["status"], "error")
+        self.assertTrue(r["blocked"])
 
     def test_dispatcher_rejects_unknown_args(self) -> None:
         r = _call_handler_sync(

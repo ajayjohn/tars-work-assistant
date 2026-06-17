@@ -18,7 +18,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__tars_vault__.*|Bash",
+        "matcher": "mcp__.*|Bash",
         "hooks": [
           {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use.py\""}
         ]

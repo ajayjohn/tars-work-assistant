@@ -21,6 +21,7 @@ from typing import Any
 
 from .. import _common
 from ..telemetry import append_event
+from . import extension_common as ext
 
 
 def update_frontmatter(**kwargs: Any) -> dict:
@@ -47,6 +48,26 @@ def update_frontmatter(**kwargs: Any) -> dict:
     if _common.is_protected_path(vault_p, note_p) and not kwargs.get("allow_protected_paths"):
         return _common.error(_common.protected_path_reason(vault_p, note_p))
 
+    try:
+        existing_text = _common.read_note_text(note_p)
+    except OSError as exc:
+        return _common.error(f"read failed: {exc}")
+    existing_fm, body = _common.split_frontmatter(existing_text)
+    existing_fm = existing_fm or {}
+    effective_tags = updates.get("tags", existing_fm.get("tags") or [])
+    if isinstance(effective_tags, str):
+        effective_tags = [effective_tags]
+    if not isinstance(effective_tags, list):
+        effective_tags = []
+    owner = ext.blocking_workspace_owner(
+        vault_p,
+        path=str(note_p.relative_to(vault_p)),
+        tags=[str(tag) for tag in effective_tags],
+        operation="update_frontmatter",
+    )
+    if owner:
+        return ext.owned_write_error(owner)
+
     reserved_non_prefix = {"tags", "aliases", "title"}
     if not allow_user:
         for k in updates.keys():
@@ -56,11 +77,7 @@ def update_frontmatter(**kwargs: Any) -> dict:
                 f"key {k!r} is not tars-prefixed; pass allow_user_properties=true"
             )
 
-    try:
-        text = _common.read_note_text(note_p)
-    except OSError as exc:
-        return _common.error(f"read failed: {exc}")
-    fm, body = _common.split_frontmatter(text)
+    fm, body = existing_fm, body
     if fm is None:
         fm = {}
     updated: list[str] = []

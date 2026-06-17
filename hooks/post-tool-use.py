@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import read_event, write_output, vault_path, in_recursion, append_telemetry
+from _common import read_event, write_output, vault_path, in_recursion, append_telemetry, record_extension_loaded
 
 
 # MCP tools that mutate the vault — their success events warrant telemetry.
@@ -33,6 +33,14 @@ def _extract_file(tool_input: dict) -> str | None:
     return None
 
 
+def _is_error_response(tool_response: object) -> bool:
+    if isinstance(tool_response, dict):
+        return bool(tool_response.get("isError") or tool_response.get("error"))
+    if isinstance(tool_response, str):
+        return "error" in tool_response.lower() and "status" in tool_response.lower()
+    return False
+
+
 def main() -> int:
     event = read_event()
     if in_recursion():
@@ -44,15 +52,25 @@ def main() -> int:
         return 0
 
     tool_name = event.get("tool_name") or ""
+    tool_input = event.get("tool_input") or {}
+    tool_response = event.get("tool_response") or {}
+    # Mark extension instructions as loaded once read_extension succeeds. The
+    # provider bypass guard uses this as its session-scoped acknowledgement.
+    if tool_name == "mcp__tars_vault__read_extension":
+        extension_id = ""
+        if isinstance(tool_input, dict):
+            extension_id = str(tool_input.get("extension_id") or tool_input.get("id") or "")
+        if extension_id and not _is_error_response(tool_response):
+            record_extension_loaded(vault, str(event.get("session_id", "")), extension_id)
+        write_output({})
+        return 0
+
     if tool_name not in MUTATING_TOOLS:
         write_output({})
         return 0
 
-    tool_input = event.get("tool_input") or {}
-    tool_response = event.get("tool_response") or {}
     # Respect both string + object response shapes. Treat missing error as success.
-    is_error = bool(tool_response.get("isError") or tool_response.get("error"))
-    if is_error:
+    if _is_error_response(tool_response):
         write_output({})
         return 0
 

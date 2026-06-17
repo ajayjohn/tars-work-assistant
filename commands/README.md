@@ -9,7 +9,9 @@ requests to the same skills.
 
 Each slash command in this folder is a thin wrapper around a skill under
 the repo's `skills/` tree. The wrapper's sole job is to point Claude Code
-at the skill's `SKILL.md`; all pipeline logic lives in the skill.
+at the skill's `SKILL.md`; all pipeline logic lives in the skill. Commands
+that run workflow skills must also name the generic extension pre-flight so
+direct slash-command execution cannot bypass workspace-installed extensions.
 
 ## Mapping
 
@@ -44,7 +46,10 @@ guarantee slash-command availability today.
 1. Add a new skill folder under `skills/` containing a `SKILL.md`.
 2. Add a matching wrapper file in `commands/` (3 lines of body, following
    the pattern of the existing wrappers in this folder).
-3. Update the mapping table above.
+3. Include the standard extension pre-flight line before the skill handoff:
+   `list_extensions` → `resolve_extension` → `read_extension` for matches →
+   resolve declared capabilities.
+4. Update the mapping table above.
 
 ## Adding an extension instead
 
