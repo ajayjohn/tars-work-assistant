@@ -504,3 +504,26 @@ def provider_tool_matches(pattern: str, tool_name: str) -> bool:
         return bool(re.search(pattern, tool_name, re.IGNORECASE))
     except re.error:
         return pattern.lower() in tool_name.lower()
+
+
+def normalized_tool_name(tool_name: str) -> str:
+    return str(tool_name or "").strip().lower().replace("-", "_")
+
+
+def tool_action(tool_name: str) -> str:
+    normalized = normalized_tool_name(tool_name)
+    if "__" in normalized:
+        return normalized.rsplit("__", 1)[-1]
+    return normalized.rsplit(".", 1)[-1]
+
+
+def is_tars_vault_tool(tool_name: str) -> bool:
+    normalized = normalized_tool_name(tool_name)
+    if not normalized.startswith("mcp__"):
+        return False
+    parts = [part for part in normalized.split("__")[1:] if part]
+    return any("tars" in part for part in parts) and any("vault" in part for part in parts)
+
+
+def is_tars_vault_action(tool_name: str, action: str) -> bool:
+    return is_tars_vault_tool(tool_name) and tool_action(tool_name) == normalized_tool_name(action)

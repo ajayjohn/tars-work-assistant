@@ -11,17 +11,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from _common import read_event, write_output, vault_path, in_recursion, append_telemetry, record_extension_loaded
+from _common import (
+    is_tars_vault_action,
+    read_event,
+    write_output,
+    vault_path,
+    in_recursion,
+    append_telemetry,
+    record_extension_loaded,
+    tool_action,
+)
 
 
 # MCP tools that mutate the vault — their success events warrant telemetry.
-MUTATING_TOOLS = {
-    "mcp__tars_vault__create_note",
-    "mcp__tars_vault__append_note",
-    "mcp__tars_vault__write_note_from_content",
-    "mcp__tars_vault__update_frontmatter",
-    "mcp__tars_vault__move_note",
-    "mcp__tars_vault__archive_note",
+MUTATING_ACTIONS = {
+    "create_note",
+    "append_note",
+    "write_note_from_content",
+    "update_frontmatter",
+    "move_note",
+    "archive_note",
 }
 
 
@@ -56,7 +65,7 @@ def main() -> int:
     tool_response = event.get("tool_response") or {}
     # Mark extension instructions as loaded once read_extension succeeds. The
     # provider bypass guard uses this as its session-scoped acknowledgement.
-    if tool_name == "mcp__tars_vault__read_extension":
+    if is_tars_vault_action(tool_name, "read_extension"):
         extension_id = ""
         if isinstance(tool_input, dict):
             extension_id = str(tool_input.get("extension_id") or tool_input.get("id") or "")
@@ -65,7 +74,7 @@ def main() -> int:
         write_output({})
         return 0
 
-    if tool_name not in MUTATING_TOOLS:
+    if not is_tars_vault_action(tool_name, tool_action(tool_name)) or tool_action(tool_name) not in MUTATING_ACTIONS:
         write_output({})
         return 0
 

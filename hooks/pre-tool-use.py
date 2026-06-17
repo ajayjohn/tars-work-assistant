@@ -32,22 +32,25 @@ sys.path.insert(0, str(ROOT))
 from _common import (
     enabled_extension_policies,
     extension_loaded,
+    is_tars_vault_action,
+    is_tars_vault_tool,
     last_loaded_skill,
     provider_tool_matches,
     read_event,
     resolve_vault,
+    tool_action,
     write_output,
 )
 
 
-_MUTATION_TOOLS = frozenset(
+_MUTATION_ACTIONS = frozenset(
     {
-        "mcp__tars_vault__create_note",
-        "mcp__tars_vault__append_note",
-        "mcp__tars_vault__write_note_from_content",
-        "mcp__tars_vault__update_frontmatter",
-        "mcp__tars_vault__archive_note",
-        "mcp__tars_vault__move_note",
+        "create_note",
+        "append_note",
+        "write_note_from_content",
+        "update_frontmatter",
+        "archive_note",
+        "move_note",
     }
 )
 
@@ -86,18 +89,16 @@ def _scan_bad_wikilinks(text: str) -> list[str]:
 def _content_fields(tool_name: str, tool_input: dict) -> list[str]:
     """Return the strings from a tool input that should be wikilink-scanned."""
     fields: list[str] = []
-    if tool_name == "mcp__tars_vault__append_note":
+    action = tool_action(tool_name)
+    if action == "append_note":
         v = tool_input.get("content")
         if isinstance(v, str):
             fields.append(v)
-    elif tool_name in (
-        "mcp__tars_vault__create_note",
-        "mcp__tars_vault__write_note_from_content",
-    ):
+    elif action in {"create_note", "write_note_from_content"}:
         v = tool_input.get("body")
         if isinstance(v, str):
             fields.append(v)
-    elif tool_name == "mcp__tars_vault__update_frontmatter":
+    elif action == "update_frontmatter":
         # Frontmatter values rarely contain wikilinks but treat string values defensively.
         updates = tool_input.get("updates")
         if isinstance(updates, dict):
@@ -117,10 +118,7 @@ def _check_payload_size(tool_name: str, tool_input: dict) -> str:
     `append_note` is the chunking variant — it is *meant* to take large
     payloads — so we only guard `create_note` / `write_note_from_content`.
     """
-    if tool_name not in (
-        "mcp__tars_vault__create_note",
-        "mcp__tars_vault__write_note_from_content",
-    ):
+    if tool_action(tool_name) not in {"create_note", "write_note_from_content"}:
         return ""
     body = tool_input.get("body")
     if not isinstance(body, str):
@@ -141,7 +139,8 @@ def _check_prefix(tool_name: str, tool_input: dict) -> str:
 
     Allows: tars-* keys; tags / aliases; anything when allow_user_properties=true.
     """
-    if tool_name == "mcp__tars_vault__create_note":
+    action = tool_action(tool_name)
+    if action == "create_note":
         fm = tool_input.get("frontmatter") or {}
         if not isinstance(fm, dict):
             return ""
@@ -159,7 +158,7 @@ def _check_prefix(tool_name: str, tool_input: dict) -> str:
                 "to permit user-owned keys."
             )
         return ""
-    if tool_name == "mcp__tars_vault__update_frontmatter":
+    if action == "update_frontmatter":
         updates = tool_input.get("updates") or {}
         if not isinstance(updates, dict):
             return ""
@@ -223,7 +222,7 @@ def main() -> int:
     tool_input = event.get("tool_input") or {}
     _vault, status = resolve_vault()
     session_id = str(event.get("session_id", ""))
-    if tool_name.startswith("mcp__") and not tool_name.startswith("mcp__tars_vault__") and _vault is not None:
+    if tool_name.startswith("mcp__") and not is_tars_vault_tool(tool_name) and _vault is not None:
         active_skill = last_loaded_skill(_vault, session_id)
         for policy in enabled_extension_policies(_vault):
             if policy.get("enforcement") not in {"required", "fail_closed"}:
@@ -244,7 +243,7 @@ def main() -> int:
                 )
                 return 0
 
-    if tool_name not in _MUTATION_TOOLS:
+    if tool_action(tool_name) not in _MUTATION_ACTIONS or not is_tars_vault_tool(tool_name):
         write_output({})
         return 0
 
